@@ -6,7 +6,7 @@ export function generateTOTPSecret() {
   return secret;
 }
 
-export function generateTOTPUri(email, secret, issuer = "TestForge") {
+export function generateTOTPUri(email, secret, issuer = "NexTest") {
   return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 

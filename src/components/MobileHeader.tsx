@@ -1,5 +1,5 @@
 import { useAppStore } from "../store/useAppStore";
-import { TestForgeIcon } from "./ui/TestForgeLogo";
+import { Logo } from "./ui/Logo";
 
 export function MobileHeader() {
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
@@ -17,8 +17,7 @@ export function MobileHeader() {
         </svg>
       </button>
       <div className="flex items-center gap-2">
-        <TestForgeIcon size="sm" />
-        <span className="text-sm font-bold gradient-text" style={{ background: "var(--gradient-rainbow)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>TestForge</span>
+        <Logo variant="mark" />
       </div>
     </header>
   );

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { api, type EmailLog } from "../lib/api";
+import { api, type EmailLog, type ProductKey } from "../lib/api";
+import { ProductKeyModal } from "../components/ProductKeyModal";
 
 export function EmailLogPage() {
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedKey, setSelectedKey] = useState<ProductKey | null>(null);
+  const [loadingKey, setLoadingKey] = useState(false);
 
   useEffect(() => {
     api.get<{ logs: EmailLog[] }>("/api/admin/email/logs")
@@ -11,6 +14,34 @@ export function EmailLogPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleKeyClick(keyStr: string) {
+    setLoadingKey(true);
+    try {
+      const res = await api.get<{ keys: ProductKey[] }>(`/api/admin/keys?email=${encodeURIComponent(keyStr)}`);
+      const found = res.data.keys.find((k) => k.key === keyStr);
+      if (found) {
+        setSelectedKey(found);
+      } else {
+        // If key not found in DB, show a minimal readonly version
+        const fallback: ProductKey = {
+          id: "", key: keyStr, status: "available",
+          customerEmail: null, registeredEmail: null, usedBy: null, usedAt: null,
+          createdAt: new Date().toISOString(), expiresAt: null, notes: null,
+        };
+        setSelectedKey(fallback);
+      }
+    } catch {
+      // Fallback if API fails
+      const fallback: ProductKey = {
+        id: "", key: keyStr, status: "available",
+        customerEmail: null, registeredEmail: null, usedBy: null, usedAt: null,
+        createdAt: new Date().toISOString(), expiresAt: null, notes: null,
+      };
+      setSelectedKey(fallback);
+    }
+    setLoadingKey(false);
+  }
 
   return (
     <div>
@@ -50,7 +81,14 @@ export function EmailLogPage() {
                   <tr key={log.id}>
                     <td>{log.to}</td>
                     <td className="truncate" style={{ maxWidth: 200 }}>{log.subject}</td>
-                    <td><span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{log.productKey}</span></td>
+                    <td>
+                      <span className="text-mono" style={{ fontSize: 12, letterSpacing: 1, cursor: "pointer" }}
+                        onClick={() => handleKeyClick(log.productKey)}
+                        title="Click to manage this key"
+                      >
+                        {log.productKey}
+                      </span>
+                    </td>
                     <td>
                       <span className={`badge ${log.status === "sent" ? "badge-available" : "badge-expired"}`}>
                         {log.status === "sent" ? (
@@ -68,6 +106,21 @@ export function EmailLogPage() {
           </div>
         )}
       </div>
+
+      {loadingKey && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <div className="modal-body" style={{ textAlign: "center", padding: 40 }}>
+              <span className="h-5 w-5 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+              <p style={{ marginTop: 12, color: "var(--text-muted)" }}>Loading key details...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedKey && (
+        <ProductKeyModal keyData={selectedKey} onClose={() => setSelectedKey(null)} onUpdated={() => setSelectedKey(null)} />
+      )}
     </div>
   );
 }

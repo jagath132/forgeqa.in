@@ -64,7 +64,7 @@ export function LoginPage() {
             </svg>
             <input className="login-input" type="email" required value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@testforge.io"
+              placeholder="admin@nextest.app"
               autoComplete="email"
               spellCheck={false}
             />
@@ -129,7 +129,7 @@ export function LoginPage() {
         </form>
 
         <div className="login-footer">
-          <p>TestForge License Manager <span>v0.1.0</span></p>
+          <p>NexTest License Manager <span>v0.1.0</span></p>
         </div>
       </div>
     </div>

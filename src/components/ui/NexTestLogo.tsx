@@ -18,7 +18,7 @@ const ShieldSvg = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export function TestForgeLogo({ size = "md", showWordmark = true }: LogoProps) {
+export function NexTestLogo({ size = "md", showWordmark = true }: LogoProps) {
   const s = sizeMap[size];
 
   return (
@@ -28,7 +28,7 @@ export function TestForgeLogo({ size = "md", showWordmark = true }: LogoProps) {
       </div>
       {showWordmark && (
         <div>
-          <p className={`${s.text} font-bold gradient-text`} style={{ background: "var(--gradient-rainbow)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>TestForge</p>
+          <p className={`${s.text} font-bold gradient-text`} style={{ background: "var(--gradient-rainbow)", backgroundClip: "text", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>NexTest</p>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>QA Automation Suite</p>
         </div>
       )}
@@ -36,7 +36,7 @@ export function TestForgeLogo({ size = "md", showWordmark = true }: LogoProps) {
   );
 }
 
-export function TestForgeIcon({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
+export function NexTestIcon({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const s = sizeMap[size];
   return (
     <div className={`flex ${s.box} items-center justify-center rounded-lg shrink-0`} style={{ background: "var(--gradient-rainbow)" }}>

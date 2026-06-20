@@ -1,16 +1,21 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAdminStore } from "./store/useAdminStore";
+import { api } from "./lib/api";
 import { LoginPage } from "./pages/Login";
 import { DashboardPage } from "./pages/Dashboard";
 import { KeysPage } from "./pages/Keys";
 import { CustomersPage } from "./pages/Customers";
 import { EmailLogPage } from "./pages/EmailLog";
 import { PaymentsPage } from "./pages/Payments";
+import { VerificationsPage } from "./pages/Verifications";
+import { PlansPage } from "./pages/Plans";
 
-export type Page = "dashboard" | "keys" | "customers" | "email" | "payments";
+export type Page = "dashboard" | "plans" | "keys" | "customers" | "email" | "payments" | "verifications";
 
 const NAV_ITEMS: { key: Page; label: string; icon: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: "M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm12 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" },
+  { key: "plans", label: "Plans", icon: "M9 12h6m-3-3v6m-7 4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
+  { key: "verifications", label: "Verifications", icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" },
   { key: "keys", label: "Product Keys", icon: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" },
   { key: "customers", label: "Customers", icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" },
   { key: "email", label: "Email Log", icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" },
@@ -29,8 +34,22 @@ export function App() {
   const { isAuthenticated, loading, checkAuth, logout, admin, keyStats } = useAdminStore();
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("lm_sidebar_collapsed") === "true");
+  const [pendingVerificationsCount, setPendingVerificationsCount] = useState(0);
 
   useEffect(() => { checkAuth(); }, []);
+
+  // Poll for pending verifications count every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    function fetchPendingCount() {
+      api.get<{ registrations: any[] }>("/api/admin/verifications?status=pending_verification")
+        .then((r) => setPendingVerificationsCount(r.data.registrations.length))
+        .catch(() => {});
+    }
+    fetchPendingCount();
+    const interval = setInterval(fetchPendingCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const getInitials = useCallback((email: string) => {
     return email.split("@")[0].slice(0, 2).toUpperCase();
@@ -41,6 +60,8 @@ export function App() {
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard": return <DashboardPage onNavigate={navigate} />;
+      case "plans": return <PlansPage />;
+      case "verifications": return <VerificationsPage />;
       case "keys": return <KeysPage />;
       case "customers": return <CustomersPage />;
       case "email": return <EmailLogPage />;
@@ -80,7 +101,7 @@ export function App() {
         <div className="sidebar-brand">
           <div className="sidebar-brand-icon">TF</div>
           <div className="sidebar-brand-text">
-            <h1>TestForge</h1>
+            <h1>NexTest</h1>
             <p>License Manager</p>
           </div>
           <button className="sidebar-collapse-btn" onClick={toggleSidebar} type="button" aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
@@ -102,6 +123,9 @@ export function App() {
               <span>{item.label}</span>
               {item.key === "keys" && keyStats && keyStats.available > 0 && (
                 <span className="nav-badge">{keyStats.available}</span>
+              )}
+              {item.key === "verifications" && pendingVerificationsCount > 0 && (
+                <span className="nav-badge" style={{ background: "linear-gradient(135deg, #f59e0b, #ef4444)" }}>{pendingVerificationsCount}</span>
               )}
             </button>
           ))}

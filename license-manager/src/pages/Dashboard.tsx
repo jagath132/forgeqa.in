@@ -9,6 +9,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
   const [totalUsers, setTotalUsers] = useState(0);
   const [recentKeys, setRecentKeys] = useState(0);
   const [recentRegistrations, setRecentRegistrations] = useState(0);
+  const [pendingVerifications, setPendingVerifications] = useState(0);
 
   useEffect(() => {
     api.get<KeyStats>("/api/admin/keys/stats").then((r) => setKeyStats(r.data)).catch(() => {});
@@ -21,6 +22,9 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
       const weekAgo = Date.now() - 7 * 86400000;
       setRecentKeys(r.data.keys.filter((k) => new Date(k.createdAt).getTime() > weekAgo).length);
     }).catch(() => {});
+    api.get<{ registrations: any[] }>("/api/admin/verifications?status=pending_verification")
+      .then((r) => setPendingVerifications(r.data.registrations.length))
+      .catch(() => {});
   }, []);
 
   const stats = keyStats || { total: 0, used: 0, available: 0, expired: 0 };
@@ -132,6 +136,15 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
               View Customers
             </button>
+            {pendingVerifications > 0 && (
+              <button className="btn" onClick={() => onNavigate?.("verifications")}
+                style={{ background: "linear-gradient(135deg, #f59e0b22, #ef444422)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.3)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                {pendingVerifications} Awaiting Approval
+              </button>
+            )}
           </div>
         </div>
 

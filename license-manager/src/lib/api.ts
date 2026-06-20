@@ -27,9 +27,12 @@ export type Customer = {
   id: string;
   email: string;
   role: string;
+  name: string | null;
+  notes: string | null;
   createdAt: string;
   productKey: string | null;
   keyStatus: string | null;
+  keys: { id: string; key: string; status: string; createdAt: string }[];
 };
 
 export type EmailLog = {
@@ -52,6 +55,40 @@ export type Transaction = {
   provider: string;
   productKey: string | null;
   timestamp: string;
+};
+
+export type PendingRegistration = {
+  id: string;
+  pendingId: string;
+  name: string | null;
+  email: string;
+  plan: "free" | "pro" | "enterprise" | null;
+  paymentStatus: string;
+  status: string;
+  transactionId: string | null;
+  createdAt: string;
+};
+
+export type Plan = {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  period: string;
+  description: string;
+  features: string[];
+  popular: boolean;
+  active: boolean;
+  maxUsers: number | null;
+  maxTestCases: number | null;
+  aiProviders: number | null;
+  advancedExport: boolean;
+  regressionTesting: boolean;
+  prioritySupport: boolean;
+  customIntegrations: boolean;
+  onPremise: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type KeyStats = {

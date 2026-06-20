@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Card } from "./ui/Card";
-import { getBuildWebhooks } from "../lib/api";
+
 
 export function WebhookTestPanel({ webhooks }: { webhooks: { platform: string; url: string }[] }) {
   const [testResult, setTestResult] = useState<string>("");

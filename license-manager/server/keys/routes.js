@@ -1,5 +1,5 @@
 import { getDb } from "../db.js";
-import { generateProductKeys, listProductKeys, revokeProductKey, getKeyStats } from "./service.js";
+import { generateProductKeys, listProductKeys, revokeProductKey, getKeyStats, updateProductKey, deleteProductKey } from "./service.js";
 
 function sendJson(res, status, data) {
   res.statusCode = status;
@@ -60,9 +60,41 @@ async function handleStats(req, res, url, body, admin) {
   sendJson(res, 200, stats);
 }
 
+async function handleUpdate(req, res, url, body, admin) {
+  const id = url.pathname.replace("/api/admin/keys/", "");
+  if (!id || id.includes("/")) {
+    sendJson(res, 400, { error: "Key ID is required." });
+    return;
+  }
+  const ok = await updateProductKey(id, { notes: body.notes, customerEmail: body.customerEmail });
+  if (!ok) {
+    sendJson(res, 404, { error: "Key not found or nothing to update." });
+    return;
+  }
+  sendJson(res, 200, { ok: true });
+  return { action: "update_key", resourceId: id, details: { id, notes: body.notes, customerEmail: body.customerEmail } };
+}
+
+async function handleDelete(req, res, url, body, admin) {
+  const id = url.pathname.replace("/api/admin/keys/", "");
+  if (!id || id.includes("/")) {
+    sendJson(res, 400, { error: "Key ID is required." });
+    return;
+  }
+  const ok = await deleteProductKey(id);
+  if (!ok) {
+    sendJson(res, 404, { error: "Key not found." });
+    return;
+  }
+  sendJson(res, 200, { ok: true });
+  return { action: "delete_key", resourceId: id, details: { id } };
+}
+
 export const KEY_ROUTES = [
   { path: "/api/admin/keys/generate", method: "POST", handler: handleGenerate },
-  { path: "/api/admin/keys", method: "GET", handler: handleList },
   { path: "/api/admin/keys/revoke", method: "POST", handler: handleRevoke },
   { path: "/api/admin/keys/stats", method: "GET", handler: handleStats },
+  { path: "/api/admin/keys", method: "GET", handler: handleList },
+  { pathprefix: "/api/admin/keys/", method: "PUT", handler: handleUpdate },
+  { pathprefix: "/api/admin/keys/", method: "DELETE", handler: handleDelete },
 ];

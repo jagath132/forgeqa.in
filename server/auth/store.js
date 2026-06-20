@@ -36,7 +36,23 @@ export const authStore = {
     return db.collection("users").countDocuments();
   },
 
-  async createUser({ email, password }) {
+  async createUserFromHash({ email, passwordHash, salt, name }) {
+    const db = getDb();
+    const userCount = await this.countUsers();
+    const role = userCount === 0 ? "Admin" : "Member";
+    const doc = {
+      email: email.trim().toLowerCase(),
+      passwordHash,
+      salt,
+      name: name || null,
+      role,
+      createdAt: new Date().toISOString(),
+    };
+    const result = await db.collection("users").insertOne(doc);
+    return { id: result.insertedId.toString(), email: doc.email, role: doc.role, createdAt: doc.createdAt };
+  },
+
+  async createUser({ email, password, name }) {
     const db = getDb();
     const salt = crypto.randomBytes(16).toString("hex");
     const passwordHash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 64, "sha512").toString("hex");
@@ -46,11 +62,12 @@ export const authStore = {
       email: email.trim().toLowerCase(),
       passwordHash,
       salt,
+      name: name || null,
       role,
       createdAt: new Date().toISOString(),
     };
     const result = await db.collection("users").insertOne(doc);
-    return { id: result.insertedId.toString(), email: doc.email, role: doc.role, createdAt: doc.createdAt };
+    return { id: result.insertedId.toString(), email: doc.email, name: doc.name, role: doc.role, createdAt: doc.createdAt };
   },
 
   async getEncryptedApiKey(userId, provider) {

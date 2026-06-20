@@ -1,5 +1,5 @@
 import { useIsDesktop } from "../hooks/useIsDesktop";
-import { TestForgeIcon } from "./ui/TestForgeLogo";
+import { Logo } from "./ui/Logo";
 
 export function DesktopOnlyGuard({ children }: { children: React.ReactNode }) {
   const isDesktop = useIsDesktop();
@@ -9,7 +9,7 @@ export function DesktopOnlyGuard({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center animate-fade-in">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl mb-5" style={{ background: "var(--gradient-rainbow)" }}>
-        <TestForgeIcon size="md" />
+        <Logo variant="mark" />
       </div>
       <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>
         Desktop Required
@@ -18,7 +18,7 @@ export function DesktopOnlyGuard({ children }: { children: React.ReactNode }) {
         Test case and test script generation is computationally intensive and requires a desktop or laptop browser.
       </p>
       <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-        Please open TestForge on a computer to access this workspace.
+        Please open NexTest on a computer to access this workspace.
       </p>
       <div className="mt-8 flex items-center gap-2 rounded-lg px-5 py-3 text-sm" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
         <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

@@ -7,10 +7,10 @@ pipeline {
 
     environment {
         MONGO_URI       = credentials('mongo-uri')
-        MONGO_DB_NAME   = 'testforge_ci'
+        MONGO_DB_NAME   = 'nextest_ci'
         JWT_SECRET      = credentials('jwt-secret')
         ENCRYPTION_SECRET = credentials('encryption-secret')
-        CORS_ORIGIN     = 'https://testforge.vercel.app'
+        CORS_ORIGIN     = 'https://nextest.app'
     }
 
     stages {
@@ -52,12 +52,12 @@ pipeline {
         stage('Test') {
             steps {
                 sh '''
-                    docker rm -f testforge-mongo 2>/dev/null || true
-                    docker run -d --name testforge-mongo -p 27017:27017 mongo:7
+                    docker rm -f nextest-mongo 2>/dev/null || true
+                    docker run -d --name nextest-mongo -p 27017:27017 mongo:7
                 '''
                 sh '''
                     for i in $(seq 1 30); do
-                        docker exec testforge-mongo mongosh --eval "db.runCommand({ ping: 1 })" && break
+                        docker exec nextest-mongo mongosh --eval "db.runCommand({ ping: 1 })" && break
                         sleep 1
                     done
                 '''
@@ -65,7 +65,7 @@ pipeline {
             }
             post {
                 always {
-                    sh 'docker rm -f testforge-mongo || true'
+                    sh 'docker rm -f nextest-mongo || true'
                 }
             }
         }
@@ -77,7 +77,7 @@ pipeline {
                     sh '''
                         npm install -g @railway/cli
                         railway login --token $RAILWAY_TOKEN
-                        railway up --service testforge-api --detach
+                        railway up --service nextest-api --detach
                     '''
                 }
             }
@@ -101,7 +101,7 @@ pipeline {
         failure {
             emailext(
                 to: 'team@example.com',
-                subject: "TestForge Pipeline Failed: #${env.BUILD_NUMBER}",
+                subject: "NexTest Pipeline Failed: #${env.BUILD_NUMBER}",
                 body: "Branch: ${env.BRANCH_NAME}\nURL: ${env.BUILD_URL}"
             )
         }

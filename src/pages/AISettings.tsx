@@ -17,28 +17,55 @@ const providerOptions: { id: AiProvider; label: string; description: string; col
 
 export function AISettings() {
   const storeProvider = useAppStore((s) => s.provider);
+  const activeProvider = useAppStore((s) => s.activeProvider);
   const setProvider = useAppStore((s) => s.setProvider);
+  const setActiveProvider = useAppStore((s) => s.setActiveProvider);
   const savedProviderKeys = useAppStore((s) => s.savedProviderKeys);
   const setSavedProviderKeys = useAppStore((s) => s.setSavedProviderKeys);
 
+  const [selectedProvider, setSelectedProvider] = useState<AiProvider | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState("");
+  const [savingProvider, setSavingProvider] = useState(false);
 
   const hasDbKey = storeProvider ? !!savedProviderKeys[storeProvider] : false;
-  const selectedProvider = storeProvider ? providerOptions.find((option) => option.id === storeProvider) : undefined;
+  const activeProviderObj = storeProvider ? providerOptions.find((option) => option.id === storeProvider) : undefined;
+  const selectedProviderObj = selectedProvider ? providerOptions.find((option) => option.id === selectedProvider) : undefined;
+  const noProviderSaved = !activeProvider;
 
-  async function handleSave() {
-    if (!storeProvider) { setSettingsError("Select a provider first."); setSettingsMessage(""); return; }
+  async function handleSaveProvider() {
+    if (!selectedProvider) return;
+    setSavingProvider(true);
+    setSettingsError("");
+    setSettingsMessage("");
+    try {
+      await api.put("/api/settings/active-provider", { provider: selectedProvider });
+      setActiveProvider(selectedProvider);
+      setProvider(selectedProvider);
+      setSettingsMessage(`Provider set to ${selectedProviderObj?.label || selectedProvider}.`);
+      window.setTimeout(() => setSettingsMessage(""), 3000);
+    } catch (err) {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.error ?? err.message : "Failed to save provider.";
+      setSettingsError(msg);
+    } finally {
+      setSavingProvider(false);
+    }
+  }
+
+  async function handleSaveApiKey() {
+    if (!selectedProvider && !storeProvider) { setSettingsError("Select a provider first."); setSettingsMessage(""); return; }
     const key = apiKeyInput.trim();
+    const targetProvider = selectedProvider || storeProvider;
+    if (!targetProvider) return;
     if (!key) { setSettingsError("Please enter an API key before saving."); setSettingsMessage(""); return; }
     try {
-      await api.post("/api/settings/api-key", { provider: storeProvider, apiKey: key });
+      await api.post("/api/settings/api-key", { provider: targetProvider, apiKey: key });
       const hashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-      window.localStorage.setItem("qacopilot_ai_settings", JSON.stringify({ provider: storeProvider, keyHash: hashHex }));
-      setSavedProviderKeys({ ...savedProviderKeys, [storeProvider]: true });
+      window.localStorage.setItem("qacopilot_ai_settings", JSON.stringify({ provider: targetProvider, keyHash: hashHex }));
+      setSavedProviderKeys({ ...savedProviderKeys, [targetProvider]: true });
       setApiKeyInput("");
       setSettingsMessage("API key saved successfully."); setSettingsError("");
       window.setTimeout(() => setSettingsMessage(""), 3000);
@@ -48,12 +75,13 @@ export function AISettings() {
     }
   }
 
-  async function handleClear() {
-    if (!storeProvider) return;
+  async function handleClearApiKey() {
+    const targetProvider = selectedProvider || storeProvider;
+    if (!targetProvider) return;
     try {
-      await api.delete(`/api/settings/api-key?provider=${encodeURIComponent(storeProvider)}`);
+      await api.delete(`/api/settings/api-key?provider=${encodeURIComponent(targetProvider)}`);
       window.localStorage.removeItem("qacopilot_ai_settings");
-      setSavedProviderKeys({ ...savedProviderKeys, [storeProvider]: false });
+      setSavedProviderKeys({ ...savedProviderKeys, [targetProvider]: false });
       setApiKeyInput(""); setSettingsMessage("Saved API key has been removed."); setSettingsError("");
       window.setTimeout(() => setSettingsMessage(""), 3000);
     } catch (error) {
@@ -62,9 +90,23 @@ export function AISettings() {
     }
   }
 
+  const saveDisabled = !selectedProvider || selectedProvider === activeProvider || savingProvider;
+
   return (
     <section className="space-y-6 animate-fade-in">
       <MobilePageHeader pageKey="ai-settings" />
+
+      {/* Warning banner when no provider saved */}
+      {noProviderSaved && (
+        <div className="flex items-start gap-3 rounded-xl px-5 py-4" style={{ background: "var(--warning-soft)", border: "1px solid color-mix(in srgb, var(--warning) 25%, transparent)" }}>
+          <svg className="w-5 h-5 shrink-0 mt-0.5" style={{ color: "var(--warning)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm" style={{ color: "var(--text-primary)" }}>
+            <strong>No provider selected yet</strong> — choose one below and save it. Test generation stays disabled until you do.
+          </div>
+        </div>
+      )}
 
       <Card>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -82,38 +124,62 @@ export function AISettings() {
       </Card>
 
       <Card>
-        <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Select Active Provider</h3>
-        <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Choose a provider to route prompts through for test generation.</p>
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: "var(--text-secondary)" }}>Select Active Provider</h3>
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>Click a card to select it, then save to activate.</p>
+          </div>
+          <button type="button" disabled={saveDisabled} onClick={handleSaveProvider}
+            className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={{
+              background: saveDisabled ? "var(--bg-tertiary)" : "var(--gradient-rainbow)",
+              color: saveDisabled ? "var(--text-muted)" : "#fff",
+              border: saveDisabled ? "1px solid var(--border-default)" : "none",
+            }}
+          >
+            {savingProvider ? (
+              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            Save provider
+          </button>
+        </div>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {providerOptions.map((option) => {
-            const isSelected = storeProvider === option.id;
+            const isActive = storeProvider === option.id;
+            const isSelected = selectedProvider === option.id;
+            const cardStyle = isActive
+              ? { background: "var(--accent-soft)", borderColor: "var(--accent)", outline: "none" }
+              : isSelected
+              ? { background: "var(--bg-secondary)", borderColor: "var(--accent)", outline: "2px solid var(--accent)", outlineOffset: "-2px" }
+              : { background: "var(--bg-secondary)", borderColor: "var(--border-subtle)", outline: "none" };
+
             return (
-              <button key={option.id} type="button" onClick={() => { setProvider(option.id); setSettingsMessage(""); setSettingsError(""); }}
+              <button key={option.id} type="button"
+                onClick={() => { setSelectedProvider((prev) => prev === option.id ? null : option.id); setSettingsMessage(""); setSettingsError(""); }}
                 className="rounded-lg p-5 text-left transition-all cursor-pointer min-h-[130px] flex flex-col justify-between"
-                style={{
-                  background: isSelected ? "var(--accent-soft)" : "var(--bg-secondary)",
-                  border: `1px solid ${isSelected ? "color-mix(in srgb, var(--accent) 30%, transparent)" : "var(--border-subtle)"}`,
-                  outline: !storeProvider && !isSelected ? "2px dashed var(--border-default)" : undefined,
-                  outlineOffset: !storeProvider && !isSelected ? "2px" : undefined,
-                }}
+                style={cardStyle}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2.5">
                     <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{option.label}</p>
-                    {isSelected ? (
-                      <span className="flex h-2 w-2 rounded-full" style={{ background: "var(--accent)" }} />
-                    ) : (
-                      <span className="flex h-2 w-2 rounded-full" style={{ background: "var(--border-default)" }} />
-                    )}
+                    {isActive ? (
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded" style={{ background: "var(--accent)", color: "#fff" }}>Active</span>
+                    ) : isSelected ? (
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>Selected</span>
+                    ) : null}
                   </div>
                   <p className="mt-2 text-xs leading-normal" style={{ color: "var(--text-secondary)" }}>{option.description}</p>
                 </div>
-                {!storeProvider && !isSelected ? (
-                  <span className="text-xs font-semibold mt-2 uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Click to select</span>
-                ) : isSelected ? (
-                  <span className="text-xs font-semibold mt-2 uppercase tracking-wider" style={{ color: "var(--accent)" }}>Active</span>
-                ) : null}
+                {isActive ? (
+                  <span className="text-xs font-semibold mt-2" style={{ color: "var(--accent)" }}>Active provider</span>
+                ) : (
+                  <span className="text-xs font-semibold mt-2" style={{ color: "var(--text-muted)" }}>{isSelected ? "Click to deselect" : "Click to select"}</span>
+                )}
               </button>
             );
           })}
@@ -125,10 +191,10 @@ export function AISettings() {
           <div>
             <h3 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Provider Credentials</h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-              Secure authorization parameters for {selectedProvider?.label ?? "active provider"}.
+              Secure authorization parameters for {selectedProviderObj?.label ?? activeProviderObj?.label ?? "selected provider"}.
             </p>
           </div>
-          <span className="badge badge-primary self-start">{selectedProvider?.label}</span>
+          <span className="badge badge-primary self-start">{selectedProviderObj?.label ?? activeProviderObj?.label ?? "Not selected"}</span>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -136,7 +202,7 @@ export function AISettings() {
             API Authorization Token
             <input className="input-modern w-full px-4 py-3 text-sm" type="password" value={apiKeyInput}
               onChange={(event) => setApiKeyInput(event.target.value)}
-              placeholder={`Enter ${selectedProvider?.label ?? "provider"} API key...`}
+              placeholder={`Enter ${selectedProviderObj?.label ?? activeProviderObj?.label ?? "provider"} API key...`}
             />
           </label>
 
@@ -151,10 +217,10 @@ export function AISettings() {
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" className="btn-primary px-5 py-2.5 text-sm font-semibold" onClick={handleSave}>
+          <button type="button" className="btn-primary px-5 py-2.5 text-sm font-semibold" onClick={handleSaveApiKey}>
             Save API Key
           </button>
-          <button type="button" className="btn-secondary px-5 py-2.5 text-sm font-semibold" onClick={handleClear}>
+          <button type="button" className="btn-secondary px-5 py-2.5 text-sm font-semibold" onClick={handleClearApiKey}>
             Clear Credentials
           </button>
         </div>

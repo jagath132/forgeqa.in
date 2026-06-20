@@ -56,6 +56,8 @@ export function DashboardPage() {
     <div className="space-y-6 animate-fade-in">
       <MobilePageHeader pageKey="dashboard" />
 
+
+
       <Card className="overflow-hidden !p-0 card-highlight">
         <div className="grid lg:grid-cols-[1.2fr_0.8fr]">
           <div className="p-6 sm:p-8 lg:p-10">

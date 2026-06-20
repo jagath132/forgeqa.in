@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import multer from "multer";
-import { connectDb } from "./db.js";
+import { connectDb, getDb } from "./db.js";
 import { createKnowledgeService } from "./knowledge/service.js";
 import { createKnowledgeStore } from "./storage/index.js";
 import { buildQaPrompt, generateWithGemini, generateWithGeminiStream, parseSafeJson } from "./ai/gemini.js";
@@ -127,6 +127,18 @@ export function createApiMiddleware(env) {
     knowledge = createKnowledgeService(store, env);
     const { seedPlans } = await import("./billing/plans.js");
     await seedPlans();
+    const plansDb = getDb();
+    const planCount = await plansDb.collection("plans").countDocuments();
+    if (planCount === 0) {
+      const defaults = [
+        { id: "free", name: "Free", price: 0, currency: "usd", period: "forever", description: "Personal projects & evaluation", features: ["Up to 100 test cases/mo", "1 AI provider", "Basic export", "Community support"], popular: false, active: true, maxUsers: 1, maxTestCases: 100, aiProviders: 1, advancedExport: false, regressionTesting: false, prioritySupport: false, customIntegrations: false, onPremise: false },
+        { id: "pro", name: "Pro", price: 2900, currency: "usd", period: "monthly", description: "Professional QA teams", features: ["Unlimited test cases", "All AI providers", "Advanced export (PDF/XLSX)", "Priority support", "Regression testing", "Team collaboration"], popular: true, active: true, maxUsers: 10, maxTestCases: null, aiProviders: null, advancedExport: true, regressionTesting: true, prioritySupport: true, customIntegrations: false, onPremise: false },
+        { id: "enterprise", name: "Enterprise", price: 9900, currency: "usd", period: "monthly", description: "Large-scale testing", features: ["Everything in Pro", "Unlimited team members", "Custom integrations", "Dedicated support", "SLA guarantee", "On-premise deployment"], popular: false, active: true, maxUsers: null, maxTestCases: null, aiProviders: null, advancedExport: true, regressionTesting: true, prioritySupport: true, customIntegrations: true, onPremise: true },
+      ];
+      const now = new Date().toISOString();
+      await plansDb.collection("plans").insertMany(defaults.map((p) => ({ ...p, createdAt: now, updatedAt: now })));
+      console.log("Seeded 3 default plans.");
+    }
   }).catch((err) => {
     console.error("Failed to connect to MongoDB:", err);
     process.exit(1);
@@ -151,9 +163,52 @@ export function createApiMiddleware(env) {
     await dbReady;
 
     try {
+      // 0. Plans lookup — public (used during registration flow)
+      if (url.pathname === "/api/plans" && req.method === "GET") {
+        const db = getDb();
+        const plans = await db.collection("plans").find({ active: true }).sort({ price: 1 }).toArray();
+        sendJson(res, 200, { plans: plans.map((p) => ({ ...p, id: p.id })) });
+        return;
+      }
+
       // 1. Try auth routes (register, login, forgot-password, reset-password, /me, api-keys)
       const matched = await handleAuthRoute(req, res, url);
       if (matched) return;
+
+      // 1b. Payment routes (unauthenticated — part of registration flow)
+      if (url.pathname === "/api/payments/create-checkout" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { pendingId, plan, email } = JSON.parse(rawBody || "{}");
+        if (!pendingId || !plan || !email) {
+          sendJson(res, 400, { error: "pendingId, plan, and email are required." });
+          return;
+        }
+        try {
+          const { createCheckoutSession } = await import("./payments/stripe.js");
+          const result = await createCheckoutSession({ pendingId, email, plan });
+          sendJson(res, 200, result);
+        } catch (err) {
+          sendJson(res, 400, { error: err.message });
+        }
+        return;
+      }
+
+      if (url.pathname === "/api/payments/create-order" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { pendingId, plan, email } = JSON.parse(rawBody || "{}");
+        if (!pendingId || !plan || !email) {
+          sendJson(res, 400, { error: "pendingId, plan, and email are required." });
+          return;
+        }
+        try {
+          const { createRazorpayOrder } = await import("./payments/razorpay.js");
+          const result = await createRazorpayOrder({ pendingId, email, plan });
+          sendJson(res, 200, result);
+        } catch (err) {
+          sendJson(res, 400, { error: err.message });
+        }
+        return;
+      }
 
       // 2. All remaining /api/* routes require authentication
       let user;
@@ -319,7 +374,8 @@ export function createApiMiddleware(env) {
 
       if (url.pathname === "/api/generate-test-cases" && req.method === "POST") {
         const rawBody = await readRequestBody(req);
-        const { requirement, apiKey: requestApiKey, model, provider = "gemini" } = JSON.parse(rawBody || "{}");
+        const { requirement, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || "{}");
+        if (!provider) { sendJson(res, 400, { error: "provider is required." }); return; }
         const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
 
         if (!apiKey) {
@@ -328,9 +384,7 @@ export function createApiMiddleware(env) {
         }
 
         if (!requirement || requirement.trim().length < 10) {
-          sendJson(res, 400, {
-            error: "Requirement text must be at least 10 characters.",
-          });
+          sendJson(res, 400, { error: "Requirement text must be at least 10 characters." });
           return;
         }
 
@@ -378,7 +432,8 @@ export function createApiMiddleware(env) {
 
       if (url.pathname === "/api/generate-test-cases/stream" && req.method === "POST") {
         const rawBody = await readRequestBody(req);
-        const { requirement, apiKey: requestApiKey, model, provider = "gemini" } = JSON.parse(rawBody || "{}");
+        const { requirement, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || "{}");
+        if (!provider) { sendJson(res, 400, { error: "provider is required." }); return; }
         const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
 
         if (!apiKey) {
@@ -479,8 +534,9 @@ export function createApiMiddleware(env) {
           testCases,
           apiKey: requestApiKey,
           model,
-          provider = "gemini",
+          provider,
         } = JSON.parse(rawBody || "{}");
+        if (!provider) { sendJson(res, 400, { error: "provider is required." }); return; }
 
         const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
 
@@ -526,7 +582,8 @@ export function createApiMiddleware(env) {
 
       if (url.pathname === "/api/regression/generate" && req.method === "POST") {
         const rawBody = await readRequestBody(req);
-        const { requirement, testCases, platform, apiKey: requestApiKey, model, provider = "gemini" } = JSON.parse(rawBody || "{}");
+        const { requirement, testCases, platform, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || "{}");
+        if (!provider) { sendJson(res, 400, { error: "provider is required." }); return; }
         const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
         if (!apiKey) { sendJson(res, 500, { error: `Missing ${provider} API key.` }); return; }
         if (!requirement || requirement.trim().length < 10) { sendJson(res, 400, { error: "Requirement text must be at least 10 characters." }); return; }
@@ -537,7 +594,8 @@ export function createApiMiddleware(env) {
 
       if (url.pathname === "/api/regression/scripts" && req.method === "POST") {
         const rawBody = await readRequestBody(req);
-        const { testCases, platform, framework, language, targetUrl, apiKey: requestApiKey, model, provider = "gemini" } = JSON.parse(rawBody || "{}");
+        const { testCases, platform, framework, language, targetUrl, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || "{}");
+        if (!provider) { sendJson(res, 400, { error: "provider is required." }); return; }
         const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
         if (!apiKey) { sendJson(res, 500, { error: `Missing ${provider} API key.` }); return; }
         if (!Array.isArray(testCases) || !testCases.length) { sendJson(res, 400, { error: "At least one test case is required." }); return; }

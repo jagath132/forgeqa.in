@@ -11,10 +11,10 @@ describe("TOTP", () => {
 
   it("generates a valid OTP auth URI", () => {
     const secret = generateTOTPSecret();
-    const uri = generateTOTPUri("test@example.com", secret, "TestForge");
+    const uri = generateTOTPUri("test@example.com", secret, "NexTest");
     expect(uri).toContain("otpauth://totp/");
     expect(uri).toContain("secret=" + secret);
-    expect(uri).toContain("issuer=TestForge");
+    expect(uri).toContain("issuer=NexTest");
   });
 
   it("verifyTOTP rejects bad token", () => {

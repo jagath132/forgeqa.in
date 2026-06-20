@@ -3,8 +3,10 @@ import axios from "axios";
 export type User = {
   id: string;
   email: string;
+  name?: string | null;
   role: string;
   createdAt: string;
+  activeProvider?: AiProvider | null;
 };
 
 export type AuthResponse = {
@@ -288,4 +290,24 @@ export async function saveBuildWebhook(platform: "android" | "web", url: string)
 export async function getBuildWebhooks() {
   const res = await api.get<{ webhooks: { platform: string; url: string }[] }>("/api/regression/builds/webhook");
   return res.data.webhooks;
+}
+
+export async function startRegistration(data: { name: string; email: string; password: string }) {
+  const res = await api.post<{ pendingId: string; email: string }>("/api/auth/start-registration", data);
+  return res.data;
+}
+
+export async function selectPlan(data: { pendingId: string; plan: string }) {
+  const res = await api.post<{ status: string; email?: string; pendingId?: string; plan?: string; message?: string }>("/api/auth/select-plan", data);
+  return res.data;
+}
+
+export async function completeRegistration(data: { email: string; productKey: string }) {
+  const res = await api.post<AuthResponse>("/api/auth/complete-registration", data);
+  return res.data;
+}
+
+export async function createCheckoutSession(data: { pendingId: string; plan: string; email: string }) {
+  const res = await api.post<{ url: string }>("/api/payments/create-checkout", data);
+  return res.data;
 }

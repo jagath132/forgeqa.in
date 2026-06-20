@@ -1,14 +1,18 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { RegressionBuildManager } from "../components/RegressionBuildManager";
 import { RegressionRunner } from "../components/RegressionRunner";
 import { RegressionResultsTable } from "../components/RegressionResultsTable";
 import { WebhookTestPanel } from "../components/WebhookTestPanel";
 import { useRegressionStore } from "../store/useRegressionStore";
+import { useAppStore } from "../store/useAppStore";
 import { regressionGenerate, regressionGenerateScripts, createRegressionRun, getBuildWebhooks, TestCase, TestScriptResponse } from "../lib/api";
 
 export function RegressionPage() {
+  const navigate = useNavigate();
   const { loadRuns } = useRegressionStore();
+  const provider = useAppStore((s) => s.provider);
   const [activeStep, setActiveStep] = useState<"generate" | "scripts" | "execute">("generate");
 
   const [requirement, setRequirement] = useState("");
@@ -52,6 +56,7 @@ export function RegressionPage() {
   }
 
   async function handleGenerate() {
+    if (!provider) { navigate("/ai-settings"); setError("Select an AI provider to continue."); return; }
     if (requirement.trim().length < 10) { setError("Requirement text must be at least 10 characters."); return; }
     setIsGenerating(true);
     setError("");
@@ -59,7 +64,7 @@ export function RegressionPage() {
       const result = await regressionGenerate({
         requirement: requirement.trim(),
         platform,
-        provider: "gemini",
+        provider,
       });
       if (result.testCases?.length) {
         setGeneratedTestCases(result.testCases);
@@ -76,6 +81,7 @@ export function RegressionPage() {
   }
 
   async function handleGenerateScripts() {
+    if (!provider) { navigate("/ai-settings"); setError("Select an AI provider to continue."); return; }
     if (!generatedTestCases.length) return;
     setIsScripting(true);
     setError("");
@@ -86,7 +92,7 @@ export function RegressionPage() {
         framework,
         language,
         targetUrl: platform === "web" ? targetUrl : undefined,
-        provider: "gemini",
+        provider,
       });
       setGeneratedScripts(result.scripts || []);
       resetStep("execute");

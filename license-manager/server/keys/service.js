@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { ObjectId } from "mongodb";
 import { getDb } from "../db.js";
 
 function keyColl() {
@@ -106,4 +107,21 @@ export async function assignKeyToCustomer(email) {
     { returnDocument: "after" }
   );
   return key;
+}
+
+export async function updateProductKey(id, updates) {
+  const allowed = {};
+  if (updates.notes !== undefined) allowed.notes = updates.notes;
+  if (updates.customerEmail !== undefined) allowed.customerEmail = updates.customerEmail.toLowerCase().trim();
+  if (Object.keys(allowed).length === 0) return false;
+  const result = await keyColl().updateOne(
+    { _id: new ObjectId(id) },
+    { $set: allowed }
+  );
+  return result.modifiedCount > 0;
+}
+
+export async function deleteProductKey(id) {
+  const result = await keyColl().deleteOne({ _id: new ObjectId(id) });
+  return result.deletedCount > 0;
 }

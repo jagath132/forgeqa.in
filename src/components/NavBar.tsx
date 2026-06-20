@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppStore, getProviderLabel } from "../store/useAppStore";
-import { TestForgeLogo, TestForgeIcon } from "./ui/TestForgeLogo";
+import { Logo } from "./ui/Logo";
 import { UserDropdown } from "./UserDropdown";
 import { GlobalSearch } from "./GlobalSearch";
 
@@ -79,7 +79,7 @@ export function NavBar() {
               </svg>
             </button>
             <button onClick={() => handleNav("/dashboard")} type="button" className="cursor-pointer">
-              <TestForgeLogo size="sm" showWordmark={false} />
+              <Logo variant="mark" />
             </button>
             <div className="hidden lg:flex items-center gap-1">
               {navItems.map((item) => (
@@ -141,7 +141,7 @@ export function NavBar() {
           <div className="fixed inset-0 z-40 lg:hidden" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }} onClick={() => setNavDrawerOpen(false)} />
           <aside className="fixed top-0 left-0 z-50 h-full w-64 border-r animate-slide-in" style={{ background: "var(--bg-card)", borderColor: "var(--border-default)" }}>
             <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border-default)" }}>
-              <TestForgeIcon size="sm" />
+              <Logo variant="mark" />
               <button onClick={() => setNavDrawerOpen(false)} type="button" className="h-8 w-8 flex items-center justify-center rounded-lg btn-ghost cursor-pointer" aria-label="Close">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

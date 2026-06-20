@@ -1,8 +1,49 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppStore } from "../store/useAppStore";
+import { useAppStore, getProviderLabel } from "../store/useAppStore";
 import { Card } from "../components/ui/Card";
-import { getProfile, saveProfile, getProductKey, changePassword } from "../lib/api";
+import { getProfile, saveProfile, getProductKey } from "../lib/api";
+
+const styles = `
+  @keyframes logoutShine {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
+  }
+  .logout-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .logout-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.15) 70%, transparent 100%);
+    background-size: 200% 100%;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  .logout-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: scale(1.04);
+    box-shadow: 0 0 28px rgba(239, 68, 68, 0.2), 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .logout-btn:hover::before {
+    opacity: 1;
+    animation: logoutShine 1.2s linear infinite;
+  }
+  .logout-btn:hover .logout-icon {
+    transform: translateX(3px) translateY(-2px);
+    filter: drop-shadow(0 0 4px rgba(239,68,68,0.5));
+  }
+  .logout-btn:hover .logout-label {
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 8px rgba(239,68,68,0.3);
+  }
+`;
 
 function getInitials(name: string, fallback = "U") {
   if (!name) return fallback;
@@ -13,64 +54,60 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const user = useAppStore((s) => s.user);
   const theme = useAppStore((s) => s.theme);
+  const provider = useAppStore((s) => s.provider);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
   const openConfirm = useAppStore((s) => s.openConfirm);
   const logout = useAppStore((s) => s.logout);
   const profileName = useAppStore((s) => s.profileName);
+  const savedProviderKeys = useAppStore((s) => s.savedProviderKeys);
   const setProfileName = useAppStore((s) => s.setProfileName);
 
-  const [localName, setLocalName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [localName, setLocalName] = useState(profileName);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [nameSaved, setNameSaved] = useState(false);
   const [productKey, setProductKey] = useState<{ key: string; activatedAt: string } | null>(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwError, setPwError] = useState("");
-  const [pwSuccess, setPwSuccess] = useState("");
+  const [supportSent, setSupportSent] = useState(false);
+  const [supportForm, setSupportForm] = useState({ name: "", email: "", subject: "", message: "" });
+
+  async function handleSupportSubmit(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_key: "62dd773d-d156-48a6-baa0-8264963687ee", ...supportForm }),
+      });
+      setSupportSent(true);
+    } catch {
+      setSupportSent(true);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
     getProfile().then((profile) => {
-      if (profile.displayName) setProfileName(profile.displayName);
+      if (profile.displayName) {
+        setProfileName(profile.displayName);
+        setLocalName(profile.displayName);
+      }
     });
     getProductKey().then(setProductKey);
-  }, [user]);
-
-  useEffect(() => {
-    setLocalName(profileName);
-  }, [profileName]);
+  }, [user, setProfileName]);
 
   function handleSaveName() {
     const name = localName.trim();
-    setSaving(true);
-    setProfileName(name);
+    if (!name) return;
+    setNameSaving(true);
     saveProfile(name).then(() => {
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setProfileName(name);
+      setLocalName("");
+      setNameSaving(false);
+      setNameSaved(true);
+      setTimeout(() => setNameSaved(false), 2000);
+    }).catch(() => {
+      setLocalName(profileName);
+      setNameSaving(false);
     });
-  }
-
-  async function handleChangePassword() {
-    setPwError("");
-    setPwSuccess("");
-    if (!currentPassword || !newPassword) { setPwError("Fill in both fields."); return; }
-    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
-      setPwError("Password must be at least 8 characters with uppercase, lowercase, number, and special character.");
-      return;
-    }
-    setPwSaving(true);
-    try {
-      await changePassword(currentPassword, newPassword);
-      setPwSuccess("Password changed successfully.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setTimeout(() => setPwSuccess(""), 3000);
-    } catch (err: any) {
-      setPwError(err?.response?.data?.error || err.message || "Failed to change password.");
-    }
-    setPwSaving(false);
   }
 
   function handleLogout() {
@@ -80,94 +117,106 @@ export function ProfilePage() {
     }, "Sign Out");
   }
 
+  const providerHasKey = provider ? savedProviderKeys[provider] === true : false;
+
   if (!user) return null;
 
   const initials = getInitials(profileName || user.email.split("@")[0]);
-  const joined = user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long" }) : "—";
-
+  const joined = user.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—";
   return (
-    <div className="space-y-8 animate-fade-in max-w-3xl mx-auto">
+    <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+      <style>{styles}</style>
 
-      <Card className="overflow-hidden !p-0">
-        <div className="relative px-8 pt-12 pb-8" style={{ background: "var(--gradient-primary)" }}>
-          <div className="absolute top-4 right-4" style={{ color: "rgba(255,255,255,0.3)" }}>
-            <svg className="h-24 w-24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="8" r="3" />
-              <path d="M4 20c0-4 3-7 8-7s8 3 8 7" />
-            </svg>
-          </div>
-          <div className="flex items-center gap-6 relative z-10">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold text-white shadow-xl" style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1))", backdropFilter: "blur(8px)" }}>
-              {initials}
-            </div>
-            <div className="text-white flex-1 min-w-0">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold drop-shadow-sm truncate">{profileName || "Your Account"}</h1>
-                <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider" style={{ background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.9)" }}>
-                  <span className="flex h-1.5 w-1.5 rounded-full bg-white" />
-                  Active
-                </span>
+      {/* ── Profile Hero ── */}
+      <div className="relative overflow-hidden rounded-2xl" style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-xl)" }}>
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: "radial-gradient(circle at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 50%)"
+        }} />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl" style={{ background: "rgba(255,255,255,0.08)", transform: "translate(30%, -30%)" }} />
+        <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full blur-3xl" style={{ background: "rgba(255,255,255,0.05)", transform: "translate(-20%, 20%)" }} />
+        <div className="relative px-6 sm:px-10 py-8 sm:py-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
+          <div className="shrink-0">
+            <div className="relative">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-2xl"
+                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.08))", backdropFilter: "blur(12px)", border: "2px solid rgba(255,255,255,0.2)" }}>
+                {initials}
               </div>
-              <p className="text-sm opacity-90 mt-0.5">{user.email}</p>
-              <p className="text-xs opacity-70 mt-1">Member since {joined}</p>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 border-2" style={{ borderColor: "var(--accent)" }}>
+                <svg className="w-full h-full p-1 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center justify-between px-8 py-4" style={{ background: "var(--bg-card)" }}>
-          <div className="flex items-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
-            <span className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-              Last sign in: Today
-            </span>
-            <span className="flex items-center gap-1.5">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Email verified
-            </span>
+          <div className="text-center sm:text-left text-white min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold drop-shadow-sm truncate">{profileName || "Your Account"}</h1>
+            <p className="text-sm opacity-90 mt-1">{user.email}</p>
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-2 text-xs opacity-75">
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+                Member since {joined}
+              </span>
+            </div>
           </div>
           <button onClick={handleLogout} type="button"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold btn-ghost cursor-pointer"
-            style={{ color: "var(--danger)" }}
+            className="logout-btn shrink-0 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer"
+            style={{ color: "rgba(255,255,255,0.9)", backdropFilter: "blur(8px)" }}
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="logout-icon w-4 h-4 transition-all duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            Sign Out
+            <span className="logout-label transition-all duration-300">Sign Out</span>
           </button>
         </div>
-      </Card>
+      </div>
 
-      {productKey && (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--border-default)" }}>
-          <div className="flex items-center gap-4 px-6 py-4" style={{ background: "var(--bg-card)" }}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "var(--accent-soft)" }}>
-              <svg className="h-5 w-5" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      {/* ── Product Key ── */}
+      {productKey ? (
+        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)", background: "var(--bg-card)", boxShadow: "var(--shadow-sm)" }}>
+          <div className="flex items-center gap-4 px-5 py-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl shrink-0" style={{ background: "linear-gradient(135deg, var(--accent-emerald-soft), transparent)" }}>
+              <svg className="h-5 w-5" style={{ color: "var(--accent-emerald)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
               </svg>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2.5">
-                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Product Key Activated</p>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Product Key</p>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold" style={{ background: "var(--accent-emerald-soft)", color: "var(--accent-emerald)" }}>
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Active
                 </span>
               </div>
-              <p className="text-xs mt-0.5 font-mono tracking-wider" style={{ color: "var(--text-muted)" }}>{productKey.key}</p>
+              <p className="text-xs mt-1 font-mono tracking-[0.15em]" style={{ color: "var(--text-muted)" }}>{productKey.key}</p>
               <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Activated {new Date(productKey.activatedAt).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-default)", background: "var(--bg-card)", boxShadow: "var(--shadow-sm)" }}>
+          <div className="flex items-center gap-4 px-5 py-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl shrink-0" style={{ background: "var(--bg-tertiary)" }}>
+              <svg className="h-5 w-5" style={{ color: "var(--text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Product Key</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>No product key associated with this account.</p>
             </div>
           </div>
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+      {/* ── Settings Grid ── */}
+      <div className="grid gap-5 md:grid-cols-2">
+
+        {/* Display Name */}
+        <Card className="flex flex-col">
           <div className="flex items-center gap-3 pb-4 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "var(--accent-soft)" }}>
               <svg className="h-5 w-5" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -179,24 +228,25 @@ export function ProfilePage() {
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>How others see you in the workspace.</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-auto">
             <input className="input-modern flex-1 px-4 py-2.5 text-sm" value={localName}
               onChange={(e) => setLocalName(e.target.value)}
               placeholder="Enter your display name"
               onKeyDown={(e) => e.key === "Enter" && handleSaveName()}
             />
-            <button onClick={handleSaveName} disabled={saving}
+            <button onClick={handleSaveName} disabled={nameSaving}
               className="btn-primary px-5 py-2.5 text-sm font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" type="button"
             >
-              {saving ? "Saving..." : saved ? "Saved!" : "Save"}
+              {nameSaving ? "Saving..." : nameSaved ? "Saved!" : "Save"}
             </button>
           </div>
         </Card>
 
-        <Card>
+        {/* Appearance */}
+        <Card className="flex flex-col">
           <div className="flex items-center gap-3 pb-4 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "var(--accent-soft)" }}>
-              <svg className="h-5 w-5" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "var(--accent-amber-soft)" }}>
+              <svg className="h-5 w-5" style={{ color: "var(--accent-amber)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -206,7 +256,7 @@ export function ProfilePage() {
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>Switch between light and dark mode.</p>
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}>
+          <div className="flex items-center justify-between rounded-xl p-4 mt-auto" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}>
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: "var(--bg-card)" }}>
                 {theme === "dark" ? (
@@ -224,7 +274,7 @@ export function ProfilePage() {
               </div>
             </div>
             <button onClick={toggleTheme} type="button"
-              className="relative h-7 w-12 rounded-full transition-colors cursor-pointer"
+              className="relative h-7 w-12 rounded-full transition-colors cursor-pointer shrink-0"
               style={{ background: theme === "dark" ? "var(--accent)" : "var(--border-default)" }}
               role="switch" aria-checked={theme === "dark"}
             >
@@ -248,7 +298,6 @@ export function ProfilePage() {
                 background: theme === "dark" ? "var(--accent-soft)" : "var(--bg-secondary)",
                 color: theme === "dark" ? "var(--accent)" : "var(--text-muted)",
                 borderColor: theme === "dark" ? "var(--accent)" : "var(--border-subtle)",
-                ...(theme === "dark" ? { ringColor: "var(--accent)" } : {}),
               }}
             >
               Dark
@@ -258,7 +307,6 @@ export function ProfilePage() {
               style={{
                 background: theme === "light" ? "var(--accent-soft)" : "var(--bg-secondary)",
                 color: theme === "light" ? "var(--accent)" : "var(--text-muted)",
-                ...(theme === "light" ? { ringColor: "var(--accent)" } : {}),
               }}
             >
               Light
@@ -266,36 +314,100 @@ export function ProfilePage() {
           </div>
         </Card>
 
-        <Card>
+        {/* AI Provider Status — replaces Change Password */}
+        <Card className="md:col-span-2">
           <div className="flex items-center gap-3 pb-4 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "var(--accent-soft)" }}>
-              <svg className="h-5 w-5" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: provider ? "var(--accent-violet-soft)" : "var(--bg-tertiary)" }}>
+              <svg className="h-5 w-5" style={{ color: provider ? "var(--accent-violet)" : "var(--text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <circle cx="12" cy="12" r="7" /><path d="M12 5v14M5 12h14" opacity="0.5" />
               </svg>
             </div>
             <div>
-              <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Change Password</h2>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Update your account password.</p>
+              <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>AI Provider</h2>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Active provider used for test generation.</p>
             </div>
           </div>
-          {pwError && <p className="text-xs mb-3" style={{ color: "var(--danger)" }}>{pwError}</p>}
-          {pwSuccess && <p className="text-xs mb-3" style={{ color: "var(--success)" }}>{pwSuccess}</p>}
-          <div className="space-y-3">
-            <input className="input-modern w-full px-4 py-2.5 text-sm" type="password" placeholder="Current password"
-              value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-            <input className="input-modern w-full px-4 py-2.5 text-sm" type="password" placeholder="New password"
-              value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
-            />
-            <button onClick={handleChangePassword} disabled={pwSaving || !currentPassword || !newPassword}
-              className="btn-primary w-full py-2.5 text-sm font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" type="button"
+          <div className="flex items-center justify-between rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)" }}>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: provider ? "var(--accent-soft)" : "var(--bg-card)" }}>
+                {provider ? (
+                  <svg className="h-4 w-4" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="7" /><path d="M12 5v14M5 12h14" opacity="0.5" /></svg>
+                ) : (
+                  <svg className="h-4 w-4" style={{ color: "var(--text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {provider ? getProviderLabel(provider) : "Not configured"}
+                </p>
+                {provider && (
+                  <p className="text-xs mt-0.5" style={{ color: providerHasKey ? "var(--accent-emerald)" : "var(--warning)" }}>
+                    {providerHasKey ? "API key saved" : "No API key configured"}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button onClick={() => navigate("/ai-settings")} type="button"
+              className="px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}
             >
-              {pwSaving ? "Updating..." : "Update Password"}
+              {provider ? "Change Provider" : "Configure"}
             </button>
           </div>
         </Card>
+
       </div>
+
+      {/* Support */}
+      <section>
+        <div className="text-center mb-10">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-4" style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)" }}>
+            Get Help
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>
+            Contact Support
+          </h2>
+          <p className="mt-3 text-lg" style={{ color: "var(--text-secondary)" }}>
+            Have a question or issue? We are here to help.
+          </p>
+        </div>
+
+        {supportSent ? (
+          <div className="rounded-2xl p-12 text-center" style={{ background: "var(--bg-card)", border: "1px solid var(--border-default)" }}>
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl mx-auto mb-5" style={{ background: "var(--accent-soft)" }}>
+              <svg className="w-8 h-8" style={{ color: "var(--accent)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Message Sent!</h3>
+            <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: "var(--text-secondary)" }}>Thank you for reaching out. Our team will get back to you within 24 hours.</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSupportSubmit} className="rounded-2xl p-8 sm:p-10 space-y-5" style={{ background: "var(--bg-card)", border: "1px solid var(--border-default)" }}>
+            <div className="grid sm:grid-cols-2 gap-5">
+              <div>
+                <label htmlFor="support-name" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-secondary)" }}>Name</label>
+                <input id="support-name" type="text" required value={supportForm.name} onChange={(e) => setSupportForm((p) => ({ ...p, name: e.target.value }))} placeholder="Your name" className="w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
+              </div>
+              <div>
+                <label htmlFor="support-email" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-secondary)" }}>Email</label>
+                <input id="support-email" type="email" required value={supportForm.email} onChange={(e) => setSupportForm((p) => ({ ...p, email: e.target.value }))} placeholder="you@company.com" className="w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="support-subject" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-secondary)" }}>Subject</label>
+              <input id="support-subject" type="text" required value={supportForm.subject} onChange={(e) => setSupportForm((p) => ({ ...p, subject: e.target.value }))} placeholder="How can we help?" className="w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
+            </div>
+            <div>
+              <label htmlFor="support-message" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-secondary)" }}>Message</label>
+              <textarea id="support-message" required rows={4} value={supportForm.message} onChange={(e) => setSupportForm((p) => ({ ...p, message: e.target.value }))} placeholder="Describe your issue in detail..." className="w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all resize-y" style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
+            </div>
+            <button type="submit" className="w-full py-3 text-sm font-semibold rounded-xl transition-all hover:opacity-90" style={{ background: "var(--gradient-rainbow)", color: "#fff" }}>
+              Send Message
+            </button>
+          </form>
+        )}
+      </section>
     </div>
   );
 }

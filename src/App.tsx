@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore";
 import { LandingPage } from "./pages/LandingPage";
 import { AuthPage } from "./pages/AuthPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { CompleteRegistrationPage } from "./pages/CompleteRegistrationPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { GeneratorPage } from "./pages/GeneratorPage";
 import { TestScripts } from "./pages/TestScripts";
@@ -61,6 +63,7 @@ function AuthLoadingScreen() {
 }
 
 export default function App() {
+  const navigate = useNavigate();
   const user = useAppStore((s) => s.user);
   const authChecking = useAppStore((s) => s.authChecking);
   const theme = useAppStore((s) => s.theme);
@@ -68,6 +71,7 @@ export default function App() {
   const closeConfirm = useAppStore((s) => s.closeConfirm);
   const initialize = useAppStore((s) => s.initialize);
   const [showLanding, setShowLanding] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -86,21 +90,30 @@ export default function App() {
     initialize();
   }, [initialize]);
 
+  const publicPaths = ["/reset-password/", "/auth/complete-registration", "/register", "/auth"];
+  const isPublicPath = publicPaths.some((p) => location.pathname.startsWith(p));
+
   if (window.location.pathname.startsWith("/reset-password/")) {
     return <ResetPasswordPage />;
   }
 
   if (authChecking) return <AuthLoadingScreen />;
 
-  if (showLanding) {
+  if (location.pathname.startsWith("/auth/complete-registration")) {
+    return <CompleteRegistrationPage />;
+  }
+
+  if (location.pathname.startsWith("/register")) {
+    return <RegisterPage />;
+  }
+
+  if (showLanding && !isPublicPath) {
     return (
-      <LandingPage onGetStarted={() => {
-        setShowLanding(false);
-      }} />
+      <LandingPage onGetStarted={() => navigate("/register")} onSignIn={() => navigate("/auth")} />
     );
   }
 
-  if (!user) return <AuthPage onBackToLanding={() => setShowLanding(true)} />;
+  if (!user) return <AuthPage />;
 
   return (
     <>

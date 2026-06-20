@@ -14,6 +14,7 @@ interface AppState {
   authChecking: boolean;
   theme: ThemeMode;
   provider: AiProvider | null;
+  activeProvider: AiProvider | null;
   profileName: string;
   savedProviderKeys: ProviderKeyMap;
   qaResult: QaResponse | null;
@@ -29,6 +30,7 @@ interface AppState {
   setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
   setProvider: (provider: AiProvider | null) => void;
+  setActiveProvider: (provider: AiProvider | null) => void;
   setProfileName: (name: string) => void;
   setSavedProviderKeys: (keys: ProviderKeyMap) => void;
   setQaResult: (result: QaResponse | null) => void;
@@ -56,6 +58,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   authChecking: true,
   theme: loadTheme(),
   provider: null,
+  activeProvider: null,
   profileName: "",
   savedProviderKeys: {},
   qaResult: null,
@@ -78,6 +81,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
     set({ theme: next });
   },
   setProvider: (provider) => set({ provider }),
+  setActiveProvider: (activeProvider) => set({ activeProvider }),
   setProfileName: (profileName) => set({ profileName }),
   setSavedProviderKeys: (keys) => set({ savedProviderKeys: keys }),
   setQaResult: (qaResult) => {
@@ -128,19 +132,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   initialize: async () => {
-    const savedSettings = window.localStorage.getItem("qacopilot_ai_settings");
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings) as { provider: AiProvider; keyHash: string };
-        if (parsed.provider) set({ provider: parsed.provider });
-      } catch {
-        window.localStorage.removeItem("qacopilot_ai_settings");
-      }
-    }
-
     try {
       const res = await api.get<{ user: User }>("/api/auth/me");
-      set({ user: res.data.user });
+      const activeProv = res.data.user.activeProvider || null;
+      set({ user: res.data.user, activeProvider: activeProv, provider: activeProv });
       const [loadedHistory, loadedQaResult, settingsRes, loadedProfile] = await Promise.all([
         getHistory(),
         getQaResult(),

@@ -1,6 +1,4 @@
 import { getDb } from "../db.js";
-import { assignKeyToCustomer } from "../keys/service.js";
-import { sendProductKeyEmail } from "../email/service.js";
 
 export async function handleStripeWebhook(req, rawBody) {
   const stripeSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -34,12 +32,14 @@ export async function handleStripeWebhook(req, rawBody) {
   const session = event.data.object;
   const customerEmail = session.customer_details?.email || session.customer_email;
   const customerName = session.customer_details?.name || "";
+  const metadata = session.metadata || {};
 
   if (!customerEmail) {
     throw new Error("No customer email in Stripe session");
   }
 
-  const txColl = getDb().collection("payment_transactions");
+  const db = getDb();
+  const txColl = db.collection("payment_transactions");
   await txColl.insertOne({
     transactionId: session.id,
     email: customerEmail,
@@ -51,14 +51,38 @@ export async function handleStripeWebhook(req, rawBody) {
     timestamp: new Date().toISOString(),
   });
 
-  const key = await assignKeyToCustomer(customerEmail);
-  if (key) {
-    await txColl.updateOne(
-      { transactionId: session.id },
-      { $set: { productKey: key.key } }
+  // Queue for manual License Manager verification instead of auto-issuing a key.
+  // An admin will approve/reject in the License Manager's Verifications page.
+  const pendingReg = db.collection("pending_registrations");
+  const pending = await pendingReg.findOne({ email: customerEmail.toLowerCase().trim() });
+  if (pending) {
+    await pendingReg.updateOne(
+      { email: customerEmail.toLowerCase().trim() },
+      {
+        $set: {
+          paymentStatus: "completed",
+          status: "pending_verification",
+          plan: metadata.plan || pending.plan || "pro",
+          transactionId: session.id,
+          paymentProvider: "stripe",
+        }
+      }
     );
-    await sendProductKeyEmail(customerEmail, key.key, customerName);
+  } else {
+    // Payment without a prior registration — create a pending entry
+    const crypto = await import("node:crypto");
+    await pendingReg.insertOne({
+      pendingId: crypto.randomBytes(16).toString("hex"),
+      name: customerName,
+      email: customerEmail.toLowerCase().trim(),
+      plan: metadata.plan || "pro",
+      paymentStatus: "completed",
+      status: "pending_verification",
+      transactionId: session.id,
+      paymentProvider: "stripe",
+      createdAt: new Date().toISOString(),
+    });
   }
 
-  return { received: true, productKey: key?.key || null };
+  return { received: true, queued: true, email: customerEmail };
 }

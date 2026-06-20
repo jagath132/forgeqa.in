@@ -9,7 +9,7 @@ function corsify(res, req) {
   const origin = req?.headers?.origin || "*";
   res.setHeader("Access-Control-Allow-Origin", origin);
   if (origin !== "*") res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
@@ -84,6 +84,27 @@ export function createApiMiddleware(env) {
         return;
       }
 
+      // Internal endpoints (bypass admin auth)
+      if (url.pathname === "/api/internal/register-key" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { email, name } = JSON.parse(rawBody || "{}");
+        if (!email) {
+          sendJson(res, 400, { error: "Email is required." });
+          return;
+        }
+        try {
+          const { generateProductKeys, listProductKeys } = await import("./keys/service.js");
+          const keys = await generateProductKeys(1, { customerEmail: email, notes: "Free plan registration" });
+          const key = keys[0];
+          const { sendProductKeyEmail } = await import("./email/service.js");
+          await sendProductKeyEmail(email, key, name || "");
+          sendJson(res, 200, { key, email });
+        } catch (err) {
+          sendJson(res, 500, { error: err.message });
+        }
+        return;
+      }
+
       // Auth routes (login, me)
       const matched = await handleAuthRoute(req, res, url);
       if (matched) return;
@@ -101,7 +122,10 @@ export function createApiMiddleware(env) {
 
       // Key management routes
       for (const route of KEY_ROUTES) {
-        if (url.pathname === route.path && req.method === route.method) {
+        const match = route.pathprefix
+          ? url.pathname.startsWith(route.pathprefix) && req.method === route.method
+          : url.pathname === route.path && req.method === route.method;
+        if (match) {
           const rawBody = await readRequestBody(req);
           const body = rawBody ? JSON.parse(rawBody) : {};
           const result = await route.handler(req, res, url, body, admin);
@@ -138,30 +162,225 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // Customer list (users collection)
+      // Customer list and CRUD (users collection)
       if (url.pathname === "/api/admin/customers" && req.method === "GET") {
         const { getDb } = await import("./db.js");
         const db = getDb();
+
+        // Single customer detail
+        const idParam = url.searchParams.get("id");
+        if (idParam) {
+          const { ObjectId } = await import("mongodb");
+          let user;
+          try { user = await db.collection("users").findOne({ _id: new ObjectId(idParam) }); } catch { user = null; }
+          if (!user) {
+            sendJson(res, 404, { error: "Customer not found." });
+            return;
+          }
+          const keys = await db.collection("product_keys").find(
+            { $or: [{ customerEmail: user.email }, { registeredEmail: user.email }] }
+          ).sort({ createdAt: -1 }).toArray();
+          sendJson(res, 200, {
+            customer: {
+              id: user._id.toString(),
+              email: user.email,
+              role: user.role,
+              name: user.name || null,
+              notes: user.notes || null,
+              createdAt: user.createdAt,
+              productKey: keys[0]?.key || null,
+              keyStatus: keys[0]?.status || null,
+              keys: keys.map((k) => ({ id: k._id.toString(), key: k.key, status: k.status, createdAt: k.createdAt })),
+            },
+          });
+          return;
+        }
+
+        // Full list
         const users = await db.collection("users")
-          .find({}, { projection: { email: 1, role: 1, createdAt: 1 } })
+          .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
           .sort({ createdAt: -1 })
           .toArray();
 
         const customers = await Promise.all(users.map(async (u) => {
-          const keyDoc = await db.collection("product_keys").findOne(
+          const keys = await db.collection("product_keys").find(
             { $or: [{ customerEmail: u.email }, { registeredEmail: u.email }] }
-          );
+          ).sort({ createdAt: -1 }).toArray();
           return {
             id: u._id.toString(),
             email: u.email,
             role: u.role,
+            name: u.name || null,
+            notes: u.notes || null,
             createdAt: u.createdAt,
-            productKey: keyDoc?.key || null,
-            keyStatus: keyDoc?.status || null,
+            productKey: keys[0]?.key || null,
+            keyStatus: keys[0]?.status || null,
+            keys: keys.map((k) => ({ id: k._id.toString(), key: k.key, status: k.status, createdAt: k.createdAt })),
           };
         }));
 
         sendJson(res, 200, { customers });
+        return;
+      }
+
+      // Update customer
+      if (url.pathname.startsWith("/api/admin/customers/") && req.method === "PUT") {
+        const id = url.pathname.replace("/api/admin/customers/", "");
+        if (!id || id.includes("/")) {
+          sendJson(res, 400, { error: "Customer ID is required." });
+          return;
+        }
+        const { ObjectId } = await import("mongodb");
+        const rawBody = await readRequestBody(req);
+        const { role, notes } = JSON.parse(rawBody || "{}");
+        const update = {};
+        if (role) update.role = role;
+        if (notes !== undefined) update.notes = notes;
+        if (Object.keys(update).length === 0) {
+          sendJson(res, 400, { error: "No fields to update." });
+          return;
+        }
+        const { getDb } = await import("./db.js");
+        const result = await getDb().collection("users").updateOne(
+          { _id: new ObjectId(id) },
+          { $set: update }
+        );
+        if (result.matchedCount === 0) {
+          sendJson(res, 404, { error: "Customer not found." });
+          return;
+        }
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "update_customer", resource: "customer", resourceId: id, details: update, ip: clientIp });
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // Delete customer
+      if (url.pathname.startsWith("/api/admin/customers/") && req.method === "DELETE") {
+        const id = url.pathname.replace("/api/admin/customers/", "");
+        if (!id || id.includes("/")) {
+          sendJson(res, 400, { error: "Customer ID is required." });
+          return;
+        }
+        const { ObjectId } = await import("mongodb");
+        const { getDb } = await import("./db.js");
+        const db = getDb();
+        const user = await db.collection("users").findOne({ _id: new ObjectId(id) });
+        if (!user) {
+          sendJson(res, 404, { error: "Customer not found." });
+          return;
+        }
+        await db.collection("users").deleteOne({ _id: new ObjectId(id) });
+        await db.collection("product_keys").updateMany(
+          { $or: [{ customerEmail: user.email }, { registeredEmail: user.email }] },
+          { $set: { status: "available", usedBy: null, usedAt: null, registeredEmail: null } }
+        );
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "delete_customer", resource: "customer", resourceId: id, details: { email: user.email }, ip: clientIp });
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // ── Plan management ──────────────────────────────────────────────────────
+
+      // List all plans
+      if (url.pathname === "/api/admin/plans" && req.method === "GET") {
+        const { getDb } = await import("./db.js");
+        const plans = await getDb().collection("plans")
+          .find({})
+          .sort({ price: 1 })
+          .toArray();
+        sendJson(res, 200, {
+          plans: plans.map((p) => ({ id: p._id.toString(), ...p, _id: undefined })),
+        });
+        return;
+      }
+
+      // Create a plan
+      if (url.pathname === "/api/admin/plans" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { id, name, price, currency, period, description, features, popular, active, maxUsers, maxTestCases, aiProviders, advancedExport, regressionTesting, prioritySupport, customIntegrations, onPremise } = JSON.parse(rawBody || "{}");
+        if (!id || !name || price === undefined) {
+          sendJson(res, 400, { error: "Plan id, name, and price are required." });
+          return;
+        }
+        const { getDb } = await import("./db.js");
+        const db = getDb();
+        const existing = await db.collection("plans").findOne({ id });
+        if (existing) {
+          sendJson(res, 409, { error: "A plan with this id already exists." });
+          return;
+        }
+        const plan = {
+          id,
+          name,
+          price,
+          currency: currency || "usd",
+          period: period || "monthly",
+          description: description || "",
+          features: features || [],
+          popular: !!popular,
+          active: active !== false,
+          maxUsers: maxUsers ?? null,
+          maxTestCases: maxTestCases ?? null,
+          aiProviders: aiProviders ?? null,
+          advancedExport: !!advancedExport,
+          regressionTesting: !!regressionTesting,
+          prioritySupport: !!prioritySupport,
+          customIntegrations: !!customIntegrations,
+          onPremise: !!onPremise,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await db.collection("plans").insertOne(plan);
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "create_plan", resource: "plan", resourceId: id, details: plan, ip: clientIp });
+        sendJson(res, 201, { plan });
+        return;
+      }
+
+      // Update a plan
+      if (url.pathname.startsWith("/api/admin/plans/") && req.method === "PUT") {
+        const id = url.pathname.replace("/api/admin/plans/", "");
+        if (!id || id.includes("/")) {
+          sendJson(res, 400, { error: "Plan ID is required." });
+          return;
+        }
+        const rawBody = await readRequestBody(req);
+        const fields = JSON.parse(rawBody || "{}");
+        const allowed = ["name", "price", "currency", "period", "description", "features", "popular", "active", "maxUsers", "maxTestCases", "aiProviders", "advancedExport", "regressionTesting", "prioritySupport", "customIntegrations", "onPremise"];
+        const update = {};
+        for (const key of allowed) {
+          if (fields[key] !== undefined) update[key] = fields[key];
+        }
+        if (Object.keys(update).length === 0) {
+          sendJson(res, 400, { error: "No fields to update." });
+          return;
+        }
+        update.updatedAt = new Date().toISOString();
+        const { getDb } = await import("./db.js");
+        const result = await getDb().collection("plans").updateOne({ id }, { $set: update });
+        if (result.matchedCount === 0) {
+          sendJson(res, 404, { error: "Plan not found." });
+          return;
+        }
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "update_plan", resource: "plan", resourceId: id, details: update, ip: clientIp });
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // Delete a plan
+      if (url.pathname.startsWith("/api/admin/plans/") && req.method === "DELETE") {
+        const id = url.pathname.replace("/api/admin/plans/", "");
+        if (!id || id.includes("/")) {
+          sendJson(res, 400, { error: "Plan ID is required." });
+          return;
+        }
+        const { getDb } = await import("./db.js");
+        const result = await getDb().collection("plans").deleteOne({ id });
+        if (result.deletedCount === 0) {
+          sendJson(res, 404, { error: "Plan not found." });
+          return;
+        }
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "delete_plan", resource: "plan", resourceId: id, ip: clientIp });
+        sendJson(res, 200, { ok: true });
         return;
       }
 
@@ -193,6 +412,119 @@ export function createApiMiddleware(env) {
       if (url.pathname === "/api/admin/audit-logs" && req.method === "GET") {
         const logs = await getAuditLogs({ limit: 200 });
         sendJson(res, 200, { logs });
+        return;
+      }
+
+      // ── Verification routes ──────────────────────────────────────────────────
+
+      // List pending registrations (from main app shared DB)
+      if (url.pathname === "/api/admin/verifications" && req.method === "GET") {
+        const { getDb } = await import("./db.js");
+        const db = getDb();
+        const query = {};
+        const status = url.searchParams.get("status");
+        if (status) query.status = status;
+        const docs = await db.collection("pending_registrations")
+          .find(query)
+          .sort({ createdAt: -1 })
+          .limit(200)
+          .toArray();
+        const registrations = docs.map((d) => ({
+          id: d._id.toString(),
+          pendingId: d.pendingId,
+          name: d.name || null,
+          email: d.email,
+          plan: d.plan || null,
+          paymentStatus: d.paymentStatus || "pending",
+          status: d.status,
+          transactionId: d.transactionId || null,
+          createdAt: d.createdAt,
+        }));
+        sendJson(res, 200, { registrations });
+        return;
+      }
+
+      // Approve a pending registration
+      if (url.pathname === "/api/admin/verifications/approve" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { pendingId } = JSON.parse(rawBody || "{}");
+        if (!pendingId) {
+          sendJson(res, 400, { error: "pendingId is required." });
+          return;
+        }
+        const { getDb } = await import("./db.js");
+        const db = getDb();
+        const pending = await db.collection("pending_registrations").findOne({ pendingId });
+        if (!pending) {
+          sendJson(res, 404, { error: "Pending registration not found." });
+          return;
+        }
+        if (pending.status !== "pending_verification") {
+          sendJson(res, 400, { error: `Registration is in '${pending.status}' state, not 'pending_verification'.` });
+          return;
+        }
+        // Generate a product key for this user
+        const { generateProductKeys } = await import("./keys/service.js");
+        const keys = await generateProductKeys(1, { customerEmail: pending.email, notes: `${pending.plan || "free"} plan approval` });
+        const productKey = keys[0];
+        // Email the key to the user
+        await sendProductKeyEmail(pending.email, productKey, pending.name || "");
+        // Update the pending registration status to "ready" with the key
+        await db.collection("pending_registrations").updateOne(
+          { pendingId },
+          { $set: { status: "ready", productKey, approvedAt: new Date().toISOString(), approvedBy: admin.email } }
+        );
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "approve_registration", resource: "pending_registration", resourceId: pendingId, details: { email: pending.email, plan: pending.plan, productKey }, ip: clientIp });
+        sendJson(res, 200, { ok: true, productKey, email: pending.email });
+        return;
+      }
+
+      // Reject a pending registration
+      if (url.pathname === "/api/admin/verifications/reject" && req.method === "POST") {
+        const rawBody = await readRequestBody(req);
+        const { pendingId, reason } = JSON.parse(rawBody || "{}");
+        if (!pendingId) {
+          sendJson(res, 400, { error: "pendingId is required." });
+          return;
+        }
+        const { getDb } = await import("./db.js");
+        const db = getDb();
+        const pending = await db.collection("pending_registrations").findOne({ pendingId });
+        if (!pending) {
+          sendJson(res, 404, { error: "Pending registration not found." });
+          return;
+        }
+        // Send rejection email
+        try {
+          const transporter = (await import("nodemailer")).default;
+          const host = process.env.SMTP_HOST;
+          const port = parseInt(process.env.SMTP_PORT, 10) || 587;
+          const user = process.env.SMTP_USER;
+          const pass = process.env.SMTP_PASS;
+          let t;
+          if (host && pass) {
+            t = transporter.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+          } else {
+            const account = await transporter.createTestAccount();
+            t = transporter.createTransport({ host: "smtp.ethereal.email", port: 587, secure: false, auth: { user: account.user, pass: account.pass } });
+          }
+          const reasonHtml = reason ? `<p><strong>Reason:</strong> ${reason}</p>` : "";
+          await t.sendMail({
+            from: process.env.SMTP_FROM || "noreply@nextest.app",
+            to: pending.email,
+            subject: "NexTest Registration Update",
+            html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="color:#7c3aed;">NexTest</h1><p>Hello${pending.name ? " " + pending.name : ""},</p><p>We were unable to approve your NexTest registration at this time.</p>${reasonHtml}<p>If you believe this is an error, please contact support.</p><p style="color:#999;font-size:12px;">NexTest Team</p></body></html>`,
+          });
+        } catch (emailErr) {
+          console.warn("Rejection email failed:", emailErr.message);
+        }
+        // Delete or mark as rejected
+        await db.collection("pending_registrations").updateOne(
+          { pendingId },
+          { $set: { status: "rejected", rejectedAt: new Date().toISOString(), rejectedBy: admin.email, rejectionReason: reason || null } }
+        );
+        await logAudit({ adminId: admin.id, adminEmail: admin.email, action: "reject_registration", resource: "pending_registration", resourceId: pendingId, details: { email: pending.email, reason }, ip: clientIp });
+        sendJson(res, 200, { ok: true });
         return;
       }
 

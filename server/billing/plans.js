@@ -66,7 +66,7 @@ export async function getUserPlan(userId) {
   };
 }
 
-export async function checkBillingLimit(userId, action) {
+export async function checkBillingLimit(userId, _action) {
   const plan = await getUserPlan(userId);
   if (plan.subscriptionStatus === "past_due" || plan.subscriptionStatus === "canceled") {
     return { allowed: false, reason: "Subscription is " + plan.subscriptionStatus };

@@ -65,7 +65,7 @@ export async function generateTestScript({
   } else {
     throw new Error(`${provider} support is not implemented yet.`);
   }
-  const fileName = `testforge-${framework}-test-script.${language === "typescript" ? "ts" : language === "javascript" ? "js" : language === "python" ? "py" : language === "java" ? "java" : language === "csharp" ? "cs" : "txt"}`;
+  const fileName = `nextest-${framework}-test-script.${language === "typescript" ? "ts" : language === "javascript" ? "js" : language === "python" ? "py" : language === "java" ? "java" : language === "csharp" ? "cs" : "txt"}`;
 
   return {
     script,

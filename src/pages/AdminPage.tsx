@@ -43,8 +43,8 @@ export function AdminPage() {
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role } : u));
       setMessage("User role updated successfully.");
       setTimeout(() => setMessage(""), 3000);
-    } catch (err: any) {
-      setMessage(err?.response?.data?.error || "Failed to update user.");
+    } catch (err) {
+      setMessage((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to update user.");
     }
   }
 

@@ -39,8 +39,8 @@ export function TestScripts() {
 
   const testCases = useMemo(() => qaResult?.testCases ?? [], [qaResult]);
 
-  const [framework, setFramework] = useState<TestingFramework>("playwright");
-  const [language, setLanguage] = useState<ScriptLanguage>("typescript");
+  const [framework, setFramework] = useState<string>("");
+  const [language, setLanguage] = useState<string>("");
   const [targetUrl, setTargetUrl] = useState("https://example.com");
   const [headless, setHeadless] = useState(true);
   const [width, setWidth] = useState(1280);
@@ -61,7 +61,7 @@ export function TestScripts() {
     [selectedIds, testCases],
   );
 
-  const isReadyToGenerate = !!provider && testCases.length > 0 && selectedIds.length > 0 && targetUrl.trim().length > 0;
+  const isReadyToGenerate = !!provider && !!framework && !!language && testCases.length > 0 && selectedIds.length > 0 && targetUrl.trim().length > 0;
 
   async function handleGenerate() {
     if (!isReadyToGenerate) {
@@ -72,10 +72,13 @@ export function TestScripts() {
     setError("");
     setIsLoading(true);
     setScriptResult(null);
+    if (!framework || !language) return;
     const payload: TestScriptRequest = {
       testCaseIds: selectedTestCases.map((tc) => tc.tcId),
       testCases: selectedTestCases,
-      framework, language, provider, targetUrl,
+      framework: framework as TestingFramework,
+      language: language as ScriptLanguage,
+      provider, targetUrl,
       options: { headless, viewport: { width, height } },
     };
     try {
@@ -147,8 +150,9 @@ export function TestScripts() {
           <label className="flex flex-col gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
             Testing Framework
             <select className="input-modern px-3.5 py-2.5 text-sm" value={framework}
-              onChange={(event) => { const fw = event.target.value as TestingFramework; setFramework(fw); setLanguage(languageOptions[fw][0]); }}
+              onChange={(event) => { const fw = event.target.value as TestingFramework; if (!fw) return; setFramework(fw); setLanguage(""); }}
             >
+              <option value="" disabled>Choose a testing framework</option>
               {frameworkOptions.map((option) => (
                 <option key={option} value={option}>{getFrameworkLabel(option)}</option>
               ))}
@@ -160,9 +164,16 @@ export function TestScripts() {
             <select className="input-modern px-3.5 py-2.5 text-sm" value={language}
               onChange={(event) => setLanguage(event.target.value as ScriptLanguage)}
             >
-              {languageOptions[framework].map((option) => (
-                <option key={option} value={option}>{getLanguageLabel(option)}</option>
-              ))}
+                  {!framework ? (
+                    <option value="" disabled>Select framework first</option>
+                  ) : (
+                    <>
+                      <option value="" disabled>Choose a language</option>
+                      {languageOptions[framework as TestingFramework].map((option) => (
+                        <option key={option} value={option}>{getLanguageLabel(option)}</option>
+                      ))}
+                    </>
+                  )}
             </select>
           </label>
 

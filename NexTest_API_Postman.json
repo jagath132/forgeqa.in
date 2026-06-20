@@ -1,9 +1,9 @@
 {
   "info": {
-    "name": "TestForge API - Security Testing",
+    "name": "NexTest API - Security Testing",
     "description": "Complete API collection for security testing. All authenticated endpoints require a valid JWT token.\n\n## Setup\n1. Import this collection into Postman\n2. Set `baseUrl` collection variable (default: `http://localhost:3001`)\n3. Run **POST /api/auth/register** or **POST /api/auth/login** to get a token\n4. The `authToken` variable is auto-set from login/register responses\n\n## Security Testing Checklist\n- [ ] Rate limiting / brute force on login & register\n- [ ] SQL/NoSQL injection on all POST bodies & query params\n- [ ] JWT tampering (alter token, change alg to \"none\")\n- [ ] IDOR: try accessing other users' data by changing IDs\n- [ ] Mass assignment / privilege escalation\n- [ ] Path traversal on file upload & knowledge file DELETE\n- [ ] SSRF on SharePoint URL ingestion\n- [ ] API key leakage in responses / error messages\n- [ ] Password reset token brute force / predictability\n- [ ] File upload: malicious files (SVG with XSS, zip bombs)\n- [ ] Stream endpoint: DoS via slow reads\n- [ ] CORS misconfiguration\n- [ ] Token expiry & refresh handling",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "testforge-sec"
+    "_exporter_id": "nextest-sec"
   },
   "variable": [
     {

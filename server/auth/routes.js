@@ -1,12 +1,13 @@
 import crypto from "node:crypto";
 import { authStore } from "./store.js";
+import { getDb } from "../db.js";
 import { isDisposableEmail } from "./disposable-emails.js";
 import { authenticateToken, encryptApiKey, generateToken } from "./service.js";
 import { validateProductKey, claimProductKey, isValidKeyFormat } from "./productKeys.js";
 import { sendPasswordResetEmail } from "../email/index.js";
 import { checkRateLimit, checkAccountLockout, recordFailedAttempt, clearLockout } from "../rate-limit/index.js";
 import { verify2FA, is2FAEnabled } from "../2fa/index.js";
-import { getUserPlan, checkBillingLimit } from "../billing/plans.js";
+import { getUserPlan } from "../billing/plans.js";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
@@ -40,68 +41,6 @@ function sendJson(res, status, data) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(data));
-}
-
-async function handleRegister(req, res, body) {
-  const { email, password, productKey } = body;
-
-  if (!email || !password) {
-    sendJson(res, 400, { error: "Email and password are required." });
-    return;
-  }
-
-  if (!process.env.SKIP_PRODUCT_KEY) {
-    if (!productKey) {
-      sendJson(res, 400, { error: "A valid product key is required to register." });
-      return;
-    }
-
-    if (!isValidKeyFormat(productKey)) {
-      sendJson(res, 400, { error: "Product key format is invalid. Use XXXXX-XXXXX-XXXXX-XXXXX-XXXXX." });
-      return;
-    }
-
-    const validKey = await validateProductKey(productKey);
-    if (!validKey) {
-      sendJson(res, 400, { error: "Product key is invalid, expired, or already used." });
-      return;
-    }
-  }
-
-  if (!email.includes("@") || email.length > 254) {
-    sendJson(res, 400, { error: "Please enter a valid email address." });
-    return;
-  }
-
-  if (!PASSWORD_REGEX.test(password)) {
-    sendJson(res, 400, { error: "Password must be at least 8 characters with uppercase, lowercase, number, and special character." });
-    return;
-  }
-
-  if (isDisposableEmail(email)) {
-    sendJson(res, 400, { error: "Temporary email addresses are not allowed." });
-    return;
-  }
-
-  const existingUser = await authStore.findUserByEmail(email);
-  if (existingUser) {
-    sendJson(res, 409, { error: "An account with this email already exists. Try signing in instead." });
-    return;
-  }
-
-  const user = await authStore.createUser({ email, password });
-
-  if (!process.env.SKIP_PRODUCT_KEY && productKey) {
-    await claimProductKey(productKey, user.id, email);
-  }
-
-  const token = generateToken(user);
-  setAuthCookie(res, token);
-
-  sendJson(res, 201, {
-    token,
-    user: { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt },
-  });
 }
 
 async function handleValidateKey(req, res, body) {
@@ -195,7 +134,7 @@ async function handleLogin(req, res, body) {
 
   sendJson(res, 200, {
     token,
-    user: { id: userRecord._id.toString(), email: userRecord.email, role: userRecord.role || "Member", createdAt: userRecord.createdAt },
+    user: { id: userRecord._id.toString(), email: userRecord.email, name: userRecord.name || null, role: userRecord.role || "Member", createdAt: userRecord.createdAt },
   });
 }
 
@@ -276,21 +215,25 @@ async function handleChangePassword(req, res, url, body, user) {
 async function handleMe(req, res, url, body, user) {
   const plan = await getUserPlan(user.id);
   const twoFactor = await is2FAEnabled(user.id);
+  const db = getDb();
+  const userDoc = await db.collection("users").findOne({ _id: new (await import("mongodb")).ObjectId(user.id) }, { projection: { activeProvider: 1 } });
   sendJson(res, 200, {
     user: {
       id: user.id,
       email: user.email,
+      name: user.name || null,
       role: user.role || "Member",
       createdAt: user.createdAt,
       subscriptionTier: plan.tier,
       subscriptionStatus: plan.subscriptionStatus,
       twoFactorEnabled: twoFactor,
+      activeProvider: userDoc?.activeProvider || null,
     },
   });
 }
 
 async function handleSetup2FA(req, res, url, body, user) {
-  const { setup2FA, enable2FA } = await import("../2fa/index.js");
+  const { setup2FA } = await import("../2fa/index.js");
   const result = await setup2FA(user.id, user.email);
   sendJson(res, 200, result);
 }
@@ -352,8 +295,253 @@ async function handleDeleteApiKey(req, res, url, body, user) {
   sendJson(res, 200, { ok: true });
 }
 
+async function handleSetActiveProvider(req, res, url, body, user) {
+  const { provider } = body;
+  if (!provider) {
+    sendJson(res, 400, { error: "Provider is required." });
+    return;
+  }
+  const validProviders = ["gemini", "openai", "groq", "claude", "openrouter", "opencode"];
+  if (!validProviders.includes(provider)) {
+    sendJson(res, 400, { error: "Invalid provider." });
+    return;
+  }
+  const db = getDb();
+  await db.collection("users").updateOne(
+    { _id: new (await import("mongodb")).ObjectId(user.id) },
+    { $set: { activeProvider: provider } }
+  );
+  sendJson(res, 200, { activeProvider: provider });
+}
+
+async function handleClearActiveProvider(req, res, url, body, user) {
+  const db = getDb();
+  await db.collection("users").updateOne(
+    { _id: new (await import("mongodb")).ObjectId(user.id) },
+    { $set: { activeProvider: null } }
+  );
+  sendJson(res, 200, { activeProvider: null });
+}
+
+async function handleStartRegistration(req, res, body) {
+  const { name, email, password } = body;
+  if (!name || !email || !password) {
+    sendJson(res, 400, { error: "Name, email, and password are required." });
+    return;
+  }
+  if (!email.includes("@") || email.length > 254) {
+    sendJson(res, 400, { error: "Please enter a valid email address." });
+    return;
+  }
+  if (!PASSWORD_REGEX.test(password)) {
+    sendJson(res, 400, { error: "Password must be at least 8 characters with uppercase, lowercase, number, and special character." });
+    return;
+  }
+  if (isDisposableEmail(email)) {
+    sendJson(res, 400, { error: "Temporary email addresses are not allowed." });
+    return;
+  }
+  const existingUser = await authStore.findUserByEmail(email);
+  if (existingUser) {
+    sendJson(res, 409, { error: "An account with this email already exists. Try signing in instead." });
+    return;
+  }
+
+  const db = getDb();
+  const pendingId = crypto.randomBytes(16).toString("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = crypto.pbkdf2Sync(password, salt, 600000, 64, "sha512").toString("hex");
+
+  await db.collection("pending_registrations").updateOne(
+    { email: email.toLowerCase().trim() },
+    {
+      $set: {
+        pendingId,
+        name,
+        email: email.toLowerCase().trim(),
+        passwordHash,
+        salt,
+        plan: null,
+        paymentStatus: "pending",
+        productKey: null,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      },
+    },
+    { upsert: true }
+  );
+
+  sendJson(res, 200, { pendingId, email: email.toLowerCase().trim() });
+}
+
+async function handleSelectPlan(req, res, body) {
+  const { pendingId, plan, provider } = body;
+  if (!pendingId || !plan) {
+    sendJson(res, 400, { error: "Pending ID and plan are required." });
+    return;
+  }
+
+  const db = getDb();
+  const planDoc = await db.collection("plans").findOne({ id: plan, active: true });
+  if (!planDoc) {
+    sendJson(res, 400, { error: "Invalid or inactive plan." });
+    return;
+  }
+
+  const pending = await db.collection("pending_registrations").findOne({ pendingId });
+  if (!pending) {
+    sendJson(res, 404, { error: "Registration session not found. Please start over." });
+    return;
+  }
+
+  await db.collection("pending_registrations").updateOne(
+    { pendingId },
+    { $set: { plan, paymentProvider: provider || null } }
+  );
+
+  const isFree = planDoc.price === 0;
+  if (isFree) {
+    await db.collection("pending_registrations").updateOne(
+      { pendingId },
+      { $set: { paymentStatus: "completed", status: "pending_verification" } }
+    );
+    sendJson(res, 200, { status: "pending_verification", pendingId, email: pending.email, plan });
+    return;
+  }
+
+  await db.collection("pending_registrations").updateOne(
+    { pendingId },
+    { $set: { status: "pending_verification" } }
+  );
+  sendJson(res, 200, { status: "payment_required", pendingId, email: pending.email, plan });
+}
+
+async function handleCompletePayment(req, res, body) {
+  const { pendingId, transactionId, provider } = body;
+  if (!pendingId) {
+    sendJson(res, 400, { error: "Pending ID is required." });
+    return;
+  }
+
+  const db = getDb();
+  const pending = await db.collection("pending_registrations").findOne({ pendingId });
+  if (!pending) {
+    sendJson(res, 404, { error: "Registration session not found." });
+    return;
+  }
+
+  const txId = transactionId || "mock-tx-" + crypto.randomBytes(8).toString("hex");
+
+  // Update status to pending_verification and paymentStatus to completed
+  await db.collection("pending_registrations").updateOne(
+    { pendingId },
+    {
+      $set: {
+        paymentStatus: "completed",
+        status: "pending_verification",
+        paymentProvider: provider || "mock",
+        transactionId: txId,
+      }
+    }
+  );
+
+  // If there's a payment, also insert a transaction document
+  await db.collection("payment_transactions").insertOne({
+    transactionId: txId,
+    email: pending.email,
+    amount: pending.plan === "pro" ? 29 : pending.plan === "enterprise" ? 99 : 0,
+    currency: "usd",
+    status: "completed",
+    provider: provider || "mock",
+    productKey: null,
+    timestamp: new Date().toISOString(),
+  });
+
+  sendJson(res, 200, { status: "pending_verification", email: pending.email });
+}
+
+async function handleRegistrationStatus(req, res, body, url) {
+  const email = url.searchParams.get("email");
+  if (!email) {
+    sendJson(res, 400, { error: "Email parameter is required." });
+    return;
+  }
+
+  const db = getDb();
+  const pending = await db.collection("pending_registrations").findOne({ email: email.toLowerCase().trim() });
+  if (!pending) {
+    // If not found in pending, check if a user is already created!
+    const user = await db.collection("users").findOne({ email: email.toLowerCase().trim() });
+    if (user) {
+      // User is already registered and complete!
+      const keyDoc = await db.collection("product_keys").findOne({ usedBy: user._id.toString() });
+      sendJson(res, 200, { status: "completed", productKey: keyDoc?.key || null });
+      return;
+    }
+    sendJson(res, 404, { error: "No registration in progress found." });
+    return;
+  }
+
+  sendJson(res, 200, {
+    status: pending.status, // "pending", "pending_verification", "ready"
+    paymentStatus: pending.paymentStatus,
+    productKey: pending.productKey || null,
+  });
+}
+
+async function handleCompleteRegistration(req, res, body) {
+  const { email, productKey } = body;
+  if (!email || !productKey) {
+    sendJson(res, 400, { error: "Email and product key are required." });
+    return;
+  }
+
+  if (!isValidKeyFormat(productKey)) {
+    sendJson(res, 400, { error: "Invalid product key format." });
+    return;
+  }
+
+  const db = getDb();
+  const pending = await db.collection("pending_registrations").findOne({ email: email.toLowerCase().trim() });
+  if (!pending) {
+    sendJson(res, 404, { error: "No pending registration found for this email. Please start over." });
+    return;
+  }
+
+  const validKey = await validateProductKey(productKey);
+  if (!validKey) {
+    sendJson(res, 400, { error: "Product key is invalid, expired, or already used." });
+    return;
+  }
+
+  const existingUser = await authStore.findUserByEmail(email);
+  if (existingUser) {
+    sendJson(res, 409, { error: "An account with this email already exists. Try signing in instead." });
+    return;
+  }
+
+  const user = await authStore.createUserFromHash({
+    email: pending.email,
+    passwordHash: pending.passwordHash,
+    salt: pending.salt,
+    name: pending.name,
+  });
+
+  await claimProductKey(productKey, user.id, email);
+
+  await db.collection("pending_registrations").deleteOne({ email: email.toLowerCase().trim() });
+
+  const token = generateToken(user);
+  setAuthCookie(res, token);
+
+  sendJson(res, 201, {
+    token,
+    user: { id: user.id, email: user.email, role: user.role, name: pending.name, createdAt: user.createdAt },
+  });
+}
+
 const ROUTE_CONFIG = [
-  { path: "/api/auth/register", method: "POST", handler: handleRegister, auth: false },
+  // Removed: old /api/auth/register (bypasses new registration flow). Use start-registration + select-plan + complete-registration instead.
   { path: "/api/auth/validate-key", method: "POST", handler: handleValidateKey, auth: false },
   { path: "/api/auth/login", method: "POST", handler: handleLogin, auth: false },
   { path: "/api/auth/forgot-password", method: "POST", handler: handleForgotPassword, auth: false },
@@ -366,7 +554,14 @@ const ROUTE_CONFIG = [
   { path: "/api/auth/2fa/setup", method: "POST", handler: handleSetup2FA, auth: true },
   { path: "/api/auth/2fa/enable", method: "POST", handler: handleEnable2FA, auth: true },
   { path: "/api/auth/2fa/disable", method: "POST", handler: handleDisable2FA, auth: true },
+  { path: "/api/settings/active-provider", method: "PUT", handler: handleSetActiveProvider, auth: true },
+  { path: "/api/settings/active-provider", method: "DELETE", handler: handleClearActiveProvider, auth: true },
   { path: "/api/user/billing", method: "GET", handler: handleGetBilling, auth: true },
+  { path: "/api/auth/start-registration", method: "POST", handler: handleStartRegistration, auth: false },
+  { path: "/api/auth/select-plan", method: "POST", handler: handleSelectPlan, auth: false },
+  { path: "/api/auth/complete-payment", method: "POST", handler: handleCompletePayment, auth: false },
+  { path: "/api/auth/registration-status", method: "GET", handler: handleRegistrationStatus, auth: false },
+  { path: "/api/auth/complete-registration", method: "POST", handler: handleCompleteRegistration, auth: false },
 ];
 
 export async function handleAuthRoute(req, res, url) {
@@ -386,7 +581,7 @@ export async function handleAuthRoute(req, res, url) {
       sendJson(res, authError.statusCode || 401, { error: authError.message });
     }
   } else {
-    await routeConfig.handler(req, res, body);
+    await routeConfig.handler(req, res, body, url);
   }
 
   return true;

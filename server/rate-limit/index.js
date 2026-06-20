@@ -36,7 +36,6 @@ export async function checkRateLimit(ip, endpoint = "auth") {
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000;
-const LOCKOUT_CLEANUP_INTERVAL = 60 * 1000;
 
 export async function checkAccountLockout(identifier) {
   const db = getDb();

@@ -1,7 +1,7 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useAppStore } from "../store/useAppStore";
-import { api, type KnowledgeChunk, type QaResponse } from "../lib/api";
+import { api, type KnowledgeChunk, type KnowledgeFile, type QaResponse } from "../lib/api";
 import { Card } from "../components/ui/Card";
 import { TestCaseTable } from "../components/TestCaseTable";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
@@ -115,6 +115,13 @@ export function GeneratorPage() {
   const [requirement, setRequirement] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [knowledgeFileCount, setKnowledgeFileCount] = useState(0);
+
+  useEffect(() => {
+    api.get<{ files: KnowledgeFile[] }>("/api/knowledge/files").then((res) => {
+      setKnowledgeFileCount(res.data.files.length);
+    }).catch(() => {});
+  }, []);
   const [historySearch, setHistorySearch] = useState("");
   const [useStreaming, setUseStreaming] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -301,7 +308,9 @@ export function GeneratorPage() {
                     Clear
                   </button>
                 )}
-                <span className="badge badge-success"><span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />RAG Active</span>
+                {knowledgeFileCount > 0 && (
+                  <span className="badge badge-success"><span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />RAG Active</span>
+                )}
               </div>
             </div>
             <div className="relative">

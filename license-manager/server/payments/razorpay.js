@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
 import { getDb } from "../db.js";
-import { assignKeyToCustomer } from "../keys/service.js";
-import { sendProductKeyEmail } from "../email/service.js";
 
 export async function handleRazorpayWebhook(req, rawBody) {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -29,12 +27,14 @@ export async function handleRazorpayWebhook(req, rawBody) {
   const payment = event.payload.payment.entity;
   const customerEmail = payment.email;
   const customerName = payment.notes?.name || "";
+  const planFromNotes = payment.notes?.plan || null;
 
   if (!customerEmail) {
     throw new Error("No customer email in Razorpay payment");
   }
 
-  const txColl = getDb().collection("payment_transactions");
+  const db = getDb();
+  const txColl = db.collection("payment_transactions");
   await txColl.insertOne({
     transactionId: payment.id,
     email: customerEmail,
@@ -46,14 +46,37 @@ export async function handleRazorpayWebhook(req, rawBody) {
     timestamp: new Date().toISOString(),
   });
 
-  const key = await assignKeyToCustomer(customerEmail);
-  if (key) {
-    await txColl.updateOne(
-      { transactionId: payment.id },
-      { $set: { productKey: key.key } }
+  // Queue for manual License Manager verification instead of auto-issuing a key.
+  // An admin will approve/reject in the License Manager's Verifications page.
+  const pendingReg = db.collection("pending_registrations");
+  const pending = await pendingReg.findOne({ email: customerEmail.toLowerCase().trim() });
+  if (pending) {
+    await pendingReg.updateOne(
+      { email: customerEmail.toLowerCase().trim() },
+      {
+        $set: {
+          paymentStatus: "completed",
+          status: "pending_verification",
+          plan: planFromNotes || pending.plan || "pro",
+          transactionId: payment.id,
+          paymentProvider: "razorpay",
+        }
+      }
     );
-    await sendProductKeyEmail(customerEmail, key.key, customerName);
+  } else {
+    // Payment without a prior registration — create a pending entry
+    await pendingReg.insertOne({
+      pendingId: crypto.randomBytes(16).toString("hex"),
+      name: customerName,
+      email: customerEmail.toLowerCase().trim(),
+      plan: planFromNotes || "pro",
+      paymentStatus: "completed",
+      status: "pending_verification",
+      transactionId: payment.id,
+      paymentProvider: "razorpay",
+      createdAt: new Date().toISOString(),
+    });
   }
 
-  return { received: true, productKey: key?.key || null };
+  return { received: true, queued: true, email: customerEmail };
 }

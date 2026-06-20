@@ -37,7 +37,7 @@ function buildExportRows(testCases: TestCase[]) {
 
 function getExportFileName(extension: "xlsx" | "pdf") {
   const date = new Date().toISOString().slice(0, 10);
-  return `testforge-test-cases-${date}.${extension}`;
+  return `nextest-test-cases-${date}.${extension}`;
 }
 
 export function TestCaseTable({ title, testCases: rawTestCases }: { title: string; testCases: TestCase[] }) {
@@ -126,7 +126,7 @@ export function TestCaseTable({ title, testCases: rawTestCases }: { title: strin
       const worksheet = XLSX.utils.json_to_sheet(buildExportRows(filteredAndSorted));
       worksheet["!cols"] = [{ wch: 12 }, { wch: 18 }, { wch: 34 }, { wch: 48 }, { wch: 64 }, { wch: 48 }];
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "TestForge");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "NexTest");
       XLSX.writeFile(workbook, getExportFileName("xlsx"));
     } finally { setIsExportingExcel(false); }
   }
@@ -142,7 +142,7 @@ export function TestCaseTable({ title, testCases: rawTestCases }: { title: strin
       const columnWidths = [58, 76, 124, 168, 210, 168];
       let y = 44;
       doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-      doc.text("TestForge Test Cases", margin, y); y += 24;
+      doc.text("NexTest Test Cases", margin, y); y += 24;
       doc.setFontSize(8); doc.setFillColor(15, 23, 42); doc.setTextColor(255, 255, 255);
       doc.rect(margin, y, usableWidth, 22, "F");
       let x = margin;

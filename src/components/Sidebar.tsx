@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppStore, getProviderLabel } from "../store/useAppStore";
-import { TestForgeLogo } from "./ui/TestForgeLogo";
+import { Logo } from "./ui/Logo";
 import { UserProfile } from "./UserProfile";
 import { DashboardIcon3D, GeneratorIcon3D, ScriptsIcon3D, KnowledgeIcon3D, SettingsIcon3D } from "./ui/Icons3D";
 
@@ -75,7 +75,7 @@ export function Sidebar() {
       style={{ background: "var(--bg-card)", borderColor: "var(--border-default)" }}
     >
       <div className="flex items-center justify-between gap-3 px-5 py-5 border-b" style={{ borderColor: "var(--border-default)" }}>
-        <TestForgeLogo size="sm" />
+        <Logo variant="wordmark" />
         <button
           className="flex lg:hidden h-8 w-8 items-center justify-center rounded-lg btn-ghost"
           onClick={() => setSidebarOpen(false)}

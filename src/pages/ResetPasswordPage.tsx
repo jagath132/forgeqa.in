@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { api } from "../lib/api";
-import { TestForgeIcon } from "../components/ui/TestForgeLogo";
+import { NexTestIcon } from "../components/ui/NexTestLogo";
 
 export function ResetPasswordPage() {
   const { token } = useParams<{ token: string }>();
@@ -40,8 +40,8 @@ export function ResetPasswordPage() {
       <div className="absolute bottom-[-15%] right-[-10%] h-[300px] w-[300px] sm:h-[600px] sm:w-[600px] rounded-full opacity-[0.05] pointer-events-none animate-float-slow max-sm:hidden" style={{ background: "var(--accent-cyan)", filter: "blur(180px)" }} />
       <div className="relative w-full max-w-sm sm:max-w-md rounded-lg p-5 sm:p-8 animate-fade-in gradient-border" style={{ background: "var(--bg-card)" }}>
         <div className="flex flex-col items-center mb-8">
-          <TestForgeIcon size="lg" />
-          <h1 className="text-2xl font-bold tracking-tight mt-4 gradient-text-rainbow">TestForge</h1>
+          <NexTestIcon size="lg" />
+          <h1 className="text-2xl font-bold tracking-tight mt-4 gradient-text-rainbow">NexTest</h1>
           <p className="text-sm mt-1.5 text-center" style={{ color: "var(--text-muted)" }}>
             Set a new password for your account.
           </p>

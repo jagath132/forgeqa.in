@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
 import { api, type Customer } from "../lib/api";
+import { CustomerModal } from "../components/CustomerModal";
 
 export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchCustomers = () => {
     api.get<{ customers: Customer[] }>("/api/admin/customers")
       .then((r) => setCustomers(r.data.customers))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchCustomers(); }, []);
 
   const filtered = search
     ? customers.filter((c) => c.email.toLowerCase().includes(search.toLowerCase()))
@@ -57,16 +61,21 @@ export function CustomersPage() {
               <thead>
                 <tr>
                   <th>Email</th>
+                  <th>Name</th>
                   <th>Role</th>
                   <th>Product Key</th>
                   <th>Key Status</th>
                   <th>Registered</th>
+                  <th style={{ width: 80 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
-                  <tr key={c.id}>
+                  <tr key={c.id} style={{ cursor: "pointer" }} onClick={() => setSelectedId(c.id)}>
                     <td>{c.email}</td>
+                    <td style={{ color: c.name ? "var(--text-primary)" : "var(--text-muted)", fontSize: 13 }}>
+                      {c.name || "-"}
+                    </td>
                     <td><span className={`badge ${c.role === "admin" ? "badge-used" : "badge-available"}`}>{c.role}</span></td>
                     <td><span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{c.productKey || <span style={{ color: "var(--text-muted)" }}>-</span>}</span></td>
                     <td>
@@ -75,6 +84,13 @@ export function CustomersPage() {
                       ) : <span style={{ color: "var(--text-muted)", fontSize: 12 }}>-</span>}
                     </td>
                     <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: "4px 10px" }}
+                        onClick={(e) => { e.stopPropagation(); setSelectedId(c.id); }}
+                      >
+                        Manage
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -82,6 +98,14 @@ export function CustomersPage() {
           </div>
         )}
       </div>
+
+      {selectedId && (
+        <CustomerModal
+          customerId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onUpdated={() => { setSelectedId(null); fetchCustomers(); }}
+        />
+      )}
     </div>
   );
 }

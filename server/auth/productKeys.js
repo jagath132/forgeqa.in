@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "../db.js";
 
-const CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PRODUCT_KEY_REGEX = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/;
 
 export function isValidKeyFormat(key) {
@@ -45,7 +44,6 @@ export async function findProductKeyByUserId(userId) {
 }
 
 export async function getKeyStats() {
-  const db = getDb();
   const total = await keyColl().countDocuments();
   const used = await keyColl().countDocuments({ status: "used" });
   const available = await keyColl().countDocuments({ status: "available" });

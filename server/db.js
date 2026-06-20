@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
 
 const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017";
-const DB_NAME = process.env.MONGO_DB_NAME || "testforge";
+const DB_NAME = process.env.MONGO_DB_NAME || "nextest";
 
 let client = null;
 let db = null;
@@ -47,5 +47,18 @@ async function ensureIndexes(db) {
   await db.collection("audit_logs").createIndex({ adminId: 1 });
   await db.collection("audit_logs").createIndex({ action: 1 });
   await db.collection("subscription_plans").createIndex({ tier: 1 }, { unique: true });
+  await db.collection("plans").createIndex({ id: 1 }, { unique: true });
+  await db.collection("plans").createIndex({ price: 1 });
   await db.collection("totp_secrets").createIndex({ userId: 1 }, { unique: true });
+  try {
+    const pendingIdx = await db.collection("pending_registrations").indexExists("pendingId_1");
+    if (pendingIdx) {
+      await db.collection("pending_registrations").dropIndex("pendingId_1");
+    }
+  } catch { /* another server may be building — skip */ }
+  try {
+    await db.collection("pending_registrations").createIndex({ email: 1 }, { unique: true });
+    await db.collection("pending_registrations").createIndex({ pendingId: 1 }, { unique: true, sparse: true });
+    await db.collection("pending_registrations").createIndex({ createdAt: 1 }, { expireAfterSeconds: 86400 });
+  } catch (e) { console.error("Index setup partial failure:", e.message); }
 }
