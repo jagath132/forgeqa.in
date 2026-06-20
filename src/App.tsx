@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore";
 import { LandingPage } from "./pages/LandingPage";
@@ -19,7 +19,6 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { NavBar } from "./components/NavBar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
-import { hasSession } from "./lib/api";
 
 function AppLayout() {
   return (
@@ -70,7 +69,6 @@ export default function App() {
   const confirmDialog = useAppStore((s) => s.confirmDialog);
   const closeConfirm = useAppStore((s) => s.closeConfirm);
   const initialize = useAppStore((s) => s.initialize);
-  const [showLanding, setShowLanding] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -79,19 +77,8 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    if (!user && !hasSession()) {
-      setShowLanding(true);
-    } else {
-      setShowLanding(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
     initialize();
   }, [initialize]);
-
-  const publicPaths = ["/reset-password/", "/auth/complete-registration", "/register", "/auth"];
-  const isPublicPath = publicPaths.some((p) => location.pathname.startsWith(p));
 
   if (window.location.pathname.startsWith("/reset-password/")) {
     return <ResetPasswordPage />;
@@ -107,9 +94,9 @@ export default function App() {
     return <RegisterPage />;
   }
 
-  if (showLanding && !isPublicPath) {
+  if (location.pathname === "/") {
     return (
-      <LandingPage onGetStarted={() => navigate("/register")} onSignIn={() => navigate("/auth")} />
+      <LandingPage onGetStarted={() => navigate(user ? "/dashboard" : "/register")} onSignIn={() => navigate(user ? "/dashboard" : "/auth")} />
     );
   }
 

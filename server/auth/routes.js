@@ -12,10 +12,9 @@ import { getUserPlan } from "../billing/plans.js";
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 function setAuthCookie(res, token) {
-  const maxAge = 7 * 24 * 60 * 60;
   res.setHeader("Set-Cookie", [
-    `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`,
-    `session=active; SameSite=Strict; Path=/; Max-Age=${maxAge}`,
+    `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`,
+    `session=active; SameSite=Strict; Path=/`,
   ]);
 }
 

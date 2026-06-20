@@ -190,6 +190,8 @@ function FaqAccordion({ items }: { items: { q: string; a: string }[] }) {
 export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
   const theme = useAppStore((s) => s.theme);
   const toggleTheme = useAppStore((s) => s.toggleTheme);
+  const user = useAppStore((s) => s.user);
+  const isAuthed = user !== null;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /* Support form */
@@ -272,12 +274,20 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
             <button onClick={toggleTheme} type="button" className="h-9 w-9 flex items-center justify-center rounded-lg transition-all hover:opacity-80 cursor-pointer" style={{ background: "transparent", border: "1px solid var(--glass-border)", color: "var(--text-primary-landing)" }} aria-label="Toggle theme">
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            <button onClick={onSignIn} type="button" className="hidden sm:inline-flex text-sm font-semibold px-4 py-2 rounded-lg transition-all hover:opacity-80 cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
-              Sign In
-            </button>
-            <button onClick={onGetStarted} type="button" className="hidden sm:inline-flex text-sm font-semibold px-5 py-2 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
-              Get Started
-            </button>
+            {isAuthed ? (
+              <button onClick={onGetStarted} type="button" className="hidden sm:inline-flex text-sm font-semibold px-5 py-2 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                Dashboard
+              </button>
+            ) : (
+              <>
+                <button onClick={onSignIn} type="button" className="hidden sm:inline-flex text-sm font-semibold px-4 py-2 rounded-lg transition-all hover:opacity-80 cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
+                  Sign In
+                </button>
+                <button onClick={onGetStarted} type="button" className="hidden sm:inline-flex text-sm font-semibold px-5 py-2 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                  Get Started
+                </button>
+              </>
+            )}
             <button onClick={() => setMobileOpen(!mobileOpen)} type="button" className="md:hidden h-9 w-9 flex items-center justify-center rounded-lg cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "none" }} aria-label="Menu">
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -293,12 +303,20 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                 {link.label}
               </a>
             ))}
-            <button onClick={onSignIn} type="button" className="w-full text-sm font-semibold py-2 rounded-lg" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
-              Sign In
-            </button>
-            <button onClick={onGetStarted} type="button" className="w-full text-sm font-semibold py-2 rounded-lg" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
-              Get Started
-            </button>
+            {isAuthed ? (
+              <button onClick={onGetStarted} type="button" className="w-full text-sm font-semibold py-2 rounded-lg" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                Dashboard
+              </button>
+            ) : (
+              <>
+                <button onClick={onSignIn} type="button" className="w-full text-sm font-semibold py-2 rounded-lg" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
+                  Sign In
+                </button>
+                <button onClick={onGetStarted} type="button" className="w-full text-sm font-semibold py-2 rounded-lg" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                  Get Started
+                </button>
+              </>
+            )}
           </div>
         )}
       </nav>
@@ -314,12 +332,20 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
               Turn product requirements into structured test cases and executable scripts — powered by the AI provider you already trust.
             </p>
             <div className="flex flex-wrap gap-3 mt-8">
-              <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
-                Get Started <ArrowRight className="w-4 h-4" />
-              </button>
-              <button onClick={onSignIn} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
-                Sign In
-              </button>
+              {isAuthed ? (
+                <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                  Dashboard <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <>
+                  <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button onClick={onSignIn} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
+                    Sign In
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div>
@@ -438,7 +464,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                     border: tier.highlighted ? "none" : "1px solid var(--glass-border)",
                   }}
                 >
-                  {tier.cta}
+                  {isAuthed && tier.name !== "Enterprise" ? "Dashboard" : tier.cta}
                 </button>
               </div>
             </ScrollReveal>
@@ -472,12 +498,20 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
               Start your free trial — no credit card required. Set up in under 2 minutes.
             </p>
             <div className="flex flex-wrap justify-center gap-3 mt-8">
-              <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
-                Get Started <ArrowRight className="w-4 h-4" />
-              </button>
-              <button onClick={onSignIn} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
-                Sign In
-              </button>
+              {isAuthed ? (
+                <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                  Dashboard <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <>
+                  <button onClick={onGetStarted} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--bg-base)", background: "var(--text-primary-landing)", border: "none" }}>
+                    Get Started <ArrowRight className="w-4 h-4" />
+                  </button>
+                  <button onClick={onSignIn} type="button" className="inline-flex items-center gap-2 text-sm font-semibold px-6 py-3 rounded-lg transition-all cursor-pointer" style={{ color: "var(--text-primary-landing)", background: "transparent", border: "1px solid var(--glass-border)" }}>
+                    Sign In
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </ScrollReveal>
