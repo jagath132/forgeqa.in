@@ -46,7 +46,6 @@ export function createApiMiddleware(env) {
     await adminStore.seedDefaultAdmin();
   }).catch((err) => {
     console.error("MongoDB connection failed:", err);
-    process.exit(1);
   });
 
   return async function apiMiddleware(req, res, next) {
@@ -65,7 +64,13 @@ export function createApiMiddleware(env) {
       return;
     }
 
-    await dbReady;
+    try {
+      await dbReady;
+    } catch (dbError) {
+      console.error("MongoDB not ready:", dbError);
+      sendJson(res, 503, { error: "Database not connected. Please try again." });
+      return;
+    }
 
     try {
       // Stripe webhook needs raw body (not JSON parsed)
