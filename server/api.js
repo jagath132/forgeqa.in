@@ -160,7 +160,13 @@ export function createApiMiddleware(env) {
       return;
     }
 
-    await dbReady;
+    try {
+      await dbReady;
+    } catch (dbError) {
+      console.error("MongoDB not ready:", dbError);
+      sendJson(res, 503, { error: "Database not connected. Please try again." });
+      return;
+    }
 
     try {
       // 0. Plans lookup — public (used during registration flow)
@@ -766,6 +772,8 @@ export function createApiMiddleware(env) {
       sendJson(res, 404, { error: "API route not found." });
     } catch (error) {
       console.error("API error encountered:", error);
+      console.error("Request URL:", req.url);
+      if (error.stack) console.error("Stack:", error.stack.split("\n").slice(0, 4).join("\n"));
 
       const userMessage = error.statusCode && error.statusCode < 500
         ? (error.message ?? "Request failed.")

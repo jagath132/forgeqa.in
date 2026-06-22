@@ -631,7 +631,12 @@ export async function handleAuthRoute(req, res, url) {
       sendJson(res, authError.statusCode || 401, { error: authError.message });
     }
   } else {
-    await routeConfig.handler(req, res, body, url);
+    try {
+      await routeConfig.handler(req, res, body, url);
+    } catch (handlerError) {
+      console.error("Public auth route error:", handlerError);
+      sendJson(res, 500, { error: handlerError.message || "An internal error occurred." });
+    }
   }
 
   return true;
