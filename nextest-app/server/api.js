@@ -160,6 +160,12 @@ export function createApiMiddleware(env) {
       return;
     }
 
+    // 0a. Healthcheck — always responds immediately, no DB needed
+    if (url.pathname === "/api/health" && req.method === "GET") {
+      sendJson(res, 200, { status: "ok", uptime: process.uptime() });
+      return;
+    }
+
     try {
       await dbReady;
     } catch (dbError) {
@@ -169,7 +175,7 @@ export function createApiMiddleware(env) {
     }
 
     try {
-      // 0. Plans lookup — public (used during registration flow)
+      // 0b. Plans lookup — public (used during registration flow)
       if (url.pathname === "/api/plans" && req.method === "GET") {
         const db = getDb();
         const plans = await db.collection("plans").find({ active: true }).sort({ price: 1 }).toArray();
