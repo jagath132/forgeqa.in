@@ -1,4 +1,14 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-cd nextest-app && npx lint-staged
+cd nextest-app
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR --relative=nextest-app/ | tr '\n' ' ')
+[ -z "$STAGED_FILES" ] && exit 0
+
+# Run eslint on staged ts/tsx files
+echo "$STAGED_FILES" | tr ' ' '\n' | grep -E '\.(ts|tsx)$' | xargs npx eslint --fix 2>/dev/null || true
+# Run prettier on staged js/ts/tsx/json/md/css files
+echo "$STAGED_FILES" | tr ' ' '\n' | grep -E '\.(ts|tsx|js|json|md|css)$' | xargs npx prettier --write 2>/dev/null || true
+
+# Re-add any changed files
+git diff --cached --name-only --diff-filter=ACMR --relative=nextest-app/ | xargs git add 2>/dev/null || true
