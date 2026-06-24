@@ -4,11 +4,11 @@
   "type": "module",
   "private": true,
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5174",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5174",
     "start": "node server/index.js",
     "typecheck": "tsc --noEmit"
