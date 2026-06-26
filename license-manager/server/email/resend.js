@@ -2,7 +2,11 @@ import { Resend } from "resend";
 import { getDb } from "../db.js";
 
 function getResend() {
-  return new Resend(process.env.RESEND_API_KEY);
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    throw new Error("RESEND_API_KEY is not set. Add it to your Vercel environment variables or .env file.");
+  }
+  return new Resend(key);
 }
 const FROM = process.env.RESEND_FROM || "ForgeKey <onboarding@resend.dev>";
 
