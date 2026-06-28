@@ -19,7 +19,11 @@ export function PlansPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadPlans(); }, []);
+  useEffect(() => {
+    loadPlans();
+    const interval = setInterval(loadPlans, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatPrice = (cents: number) => {
     if (cents === 0) return "Free";

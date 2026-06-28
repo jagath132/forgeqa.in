@@ -7,10 +7,18 @@ export function PaymentsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<{ transactions: Transaction[] }>("/api/admin/transactions")
-      .then((r) => setTransactions(r.data.transactions))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    async function load() {
+      if (cancelled) return;
+      try {
+        const r = await api.get<{ transactions: Transaction[] }>("/api/admin/transactions");
+        if (!cancelled) setTransactions(r.data.transactions);
+      } catch { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    }
+    load();
+    const interval = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);

@@ -328,7 +328,8 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
       } catch { /* ignore */ }
     }
     load();
-    return () => { cancelled = true; };
+    const interval = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const planData = useMemo(() => {

@@ -17,7 +17,11 @@ export function CustomersPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCustomers(); }, []);
+  useEffect(() => {
+    fetchCustomers();
+    const interval = setInterval(fetchCustomers, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function openDetail(c: Customer) {
     setDetailCustomer(c);

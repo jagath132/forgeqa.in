@@ -548,7 +548,10 @@ async function handleCompleteRegistration(req, res, body) {
       salt: pending.salt,
       name: pending.name,
     });
-    await db.collection("pending_registrations").deleteOne({ email: email.toLowerCase().trim() });
+    await db.collection("pending_registrations").updateOne(
+      { email: email.toLowerCase().trim() },
+      { $set: { status: "completed", completedAt: new Date().toISOString() } }
+    );
   } else {
     const salt = crypto.randomBytes(16).toString("hex");
     const randomPassword = crypto.randomBytes(32).toString("hex");
