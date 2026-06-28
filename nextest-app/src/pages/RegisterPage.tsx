@@ -442,7 +442,7 @@ export function RegisterPage() {
                 <div className="grid gap-3">
                   {plans.map((plan) => {
                     const active = selectedPlan === plan.id;
-                    const displayPrice = plan.price === 0 ? "Free" : (plan.currency === "inr" ? "₹" + ((plan.price / 100).toLocaleString("en-IN")) : "$" + (plan.price / 100));
+                    const displayPrice = plan.id === "enterprise" ? "Custom" : (plan.currency === "inr" ? "₹" + ((plan.price / 100).toLocaleString("en-IN")) : "$" + (plan.price / 100));
                     const displayPeriod = plan.period === "forever" ? "" : "/" + (plan.period === "monthly" ? "mo" : plan.period === "yearly" ? "yr" : plan.period);
                     return (
                       <div key={plan.id}
