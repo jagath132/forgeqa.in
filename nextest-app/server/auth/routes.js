@@ -547,6 +547,7 @@ async function handleCompleteRegistration(req, res, body) {
       passwordHash: pending.passwordHash,
       salt: pending.salt,
       name: pending.name,
+      subscriptionTier: pending.plan || undefined,
     });
     await db.collection("pending_registrations").updateOne(
       { email: email.toLowerCase().trim() },

@@ -335,7 +335,8 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
   const planData = useMemo(() => {
     const counts: Record<string, number> = { Free: 0, Pro: 0, Enterprise: 0 };
     for (const r of registrations) {
-      const plan = r.plan ? r.plan.charAt(0).toUpperCase() + r.plan.slice(1) : "Free";
+      if (!r.plan) continue;
+      const plan = r.plan.charAt(0).toUpperCase() + r.plan.slice(1);
       if (counts[plan] !== undefined) counts[plan]++;
       else counts[plan] = 1;
     }

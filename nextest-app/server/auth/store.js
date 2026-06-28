@@ -36,7 +36,7 @@ export const authStore = {
     return db.collection("users").countDocuments();
   },
 
-  async createUserFromHash({ email, passwordHash, salt, name }) {
+  async createUserFromHash({ email, passwordHash, salt, name, subscriptionTier }) {
     const db = getDb();
     const userCount = await this.countUsers();
     const role = userCount === 0 ? "Admin" : "Member";
@@ -49,8 +49,13 @@ export const authStore = {
       createdAt: new Date().toISOString(),
       has_seen_welcome: false,
     };
+    if (subscriptionTier) {
+      doc.subscriptionTier = subscriptionTier;
+      doc.subscriptionStatus = "active";
+      doc.subscriptionEndsAt = null;
+    }
     const result = await db.collection("users").insertOne(doc);
-    return { id: result.insertedId.toString(), email: doc.email, role: doc.role, createdAt: doc.createdAt, has_seen_welcome: false };
+    return { id: result.insertedId.toString(), email: doc.email, role: doc.role, createdAt: doc.createdAt, has_seen_welcome: false, subscriptionTier: subscriptionTier || null };
   },
 
   async createUser({ email, password, name }) {
