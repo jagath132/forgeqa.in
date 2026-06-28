@@ -331,7 +331,7 @@ export function createApiMiddleware(env) {
         const { getDb } = await import("./db.js");
         const plans = await getDb().collection("plans")
           .find({})
-          .sort({ price: 1 })
+          .sort({ sortOrder: 1 })
           .toArray();
         sendJson(res, 200, {
           plans: plans.map((p) => ({ id: p._id.toString(), ...p, _id: undefined })),
