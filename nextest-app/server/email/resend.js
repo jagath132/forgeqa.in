@@ -3,7 +3,7 @@ import { Resend } from "resend";
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
-const FROM = process.env.RESEND_FROM || "ForgeQA <noreply@forgeqa.in>";
+const FROM = process.env.RESEND_FROM || "ForgeQA <onboarding@resend.dev>";
 
 export async function sendProductKeyEmailResend(to, productKey, customerName) {
   const baseUrl = process.env.APP_URL || "http://127.0.0.1:5173";
