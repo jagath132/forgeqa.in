@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "../components/ui/Logo";
 import { useAppStore } from "../store/useAppStore";
@@ -407,7 +407,6 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
   }
 
   /* Enterprise inquiry modal */
-  const navigate = useNavigate();
   const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
   const [enterpriseForm, setEnterpriseForm] = useState({ name: "", email: "", company: "", message: "" });
   const [enterpriseSent, setEnterpriseSent] = useState(false);
@@ -428,8 +427,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
     return errs;
   }, [enterpriseForm]);
 
-  async function handleEnterpriseSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleEnterpriseSubmit() {
     const errs = validateEnterprise();
     setEnterpriseErrors(errs);
     if (Object.keys(errs).length) return;
@@ -1084,7 +1082,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <form onSubmit={handleEnterpriseSubmit} className="p-6 space-y-4">
+                  <div className="p-6 space-y-4">
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <label htmlFor="enterprise-name" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--text-muted-landing)" }}>Name</label>
@@ -1127,7 +1125,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                       />
                       {enterpriseErrors.message && <p className="mt-1 text-xs" style={{ color: "var(--lp-Fail)" }}>{enterpriseErrors.message}</p>}
                     </div>
-                    <button type="submit" disabled={enterpriseSending}
+                    <button type="button" disabled={enterpriseSending} onClick={handleEnterpriseSubmit}
                       className="w-full py-3 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       style={{ color: "#fff", background: "var(--lp-Signal)", border: "none" }}
                     >
@@ -1137,7 +1135,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                         <>Submit Inquiry</>
                       )}
                     </button>
-                  </form>
+                  </div>
                 </>
               )}
             </motion.div>
