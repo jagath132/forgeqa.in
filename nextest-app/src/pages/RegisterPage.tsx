@@ -102,6 +102,7 @@ export function RegisterPage() {
 
 
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const [step, setStep] = useState<Step>("info");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
