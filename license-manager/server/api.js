@@ -241,11 +241,19 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Full list
+        // Full list — users + rejected registrations
         const users = await db.collection("users")
           .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
           .sort({ createdAt: -1 })
           .toArray();
+
+        const rejectedRegs = await db.collection("pending_registrations")
+          .find({ status: "rejected" }, { projection: { email: 1, name: 1, createdAt: 1, rejectionReason: 1, rejectedAt: 1, rejectedBy: 1, plan: 1 } })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        const userEmails = new Set(users.map((u) => u.email));
+        const uniqueRejected = rejectedRegs.filter((r) => !userEmails.has(r.email));
 
         const customers = await Promise.all(users.map(async (u) => {
           const keys = await db.collection("product_keys").find(
@@ -261,8 +269,29 @@ export function createApiMiddleware(env) {
             productKey: keys[0]?.key || null,
             keyStatus: keys[0]?.status || null,
             keys: keys.map((k) => ({ id: k._id.toString(), key: k.key, status: k.status, createdAt: k.createdAt })),
+            rejected: false,
           };
         }));
+
+        for (const r of uniqueRejected) {
+          customers.push({
+            id: r._id.toString(),
+            email: r.email,
+            role: "Rejected",
+            name: r.name || null,
+            notes: r.rejectionReason || null,
+            createdAt: r.createdAt || r.rejectedAt,
+            productKey: null,
+            keyStatus: "rejected",
+            keys: [],
+            rejected: true,
+            rejectedAt: r.rejectedAt || null,
+            rejectedBy: r.rejectedBy || null,
+            rejectionReason: r.rejectionReason || null,
+          });
+        }
+
+        customers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
         sendJson(res, 200, { customers });
         return;

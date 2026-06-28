@@ -33,6 +33,10 @@ export type Customer = {
   productKey: string | null;
   keyStatus: string | null;
   keys: { id: string; key: string; status: string; createdAt: string }[];
+  rejected?: boolean;
+  rejectedAt?: string | null;
+  rejectedBy?: string | null;
+  rejectionReason?: string | null;
 };
 
 export type EmailLog = {
