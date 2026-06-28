@@ -54,12 +54,6 @@ async function ensureIndexes(db) {
   await db.collection("plans").createIndex({ price: 1 });
   await db.collection("totp_secrets").createIndex({ userId: 1 }, { unique: true });
   try {
-    const pendingIdx = await db.collection("pending_registrations").indexExists("pendingId_1");
-    if (pendingIdx) {
-      await db.collection("pending_registrations").dropIndex("pendingId_1");
-    }
-  } catch { /* another server may be building — skip */ }
-  try {
     await db.collection("pending_registrations").createIndex({ email: 1 }, { unique: true });
     await db.collection("pending_registrations").createIndex({ pendingId: 1 }, { unique: true, sparse: true });
     await db.collection("pending_registrations").createIndex({ createdAt: 1 }, { expireAfterSeconds: 86400 });
