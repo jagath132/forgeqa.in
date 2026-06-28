@@ -29,6 +29,7 @@ export type Customer = {
   role: string;
   name: string | null;
   notes: string | null;
+  status: string;
   createdAt: string;
   productKey: string | null;
   keyStatus: string | null;

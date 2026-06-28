@@ -977,6 +977,27 @@ tbody tr:hover td {
   color: var(--color-accent);
 }
 
+.pill-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+  line-height: 1;
+}
+
+.pill.active .pill-count {
+  background: var(--color-accent);
+  color: #fff;
+}
+
 /* ============================
    ALERT
    ============================ */

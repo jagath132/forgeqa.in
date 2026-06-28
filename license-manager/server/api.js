@@ -241,28 +241,49 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Full list
+        // Full list — merge approved users + rejected pending_registrations, dedup by email
         const users = await db.collection("users")
           .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
           .sort({ createdAt: -1 })
           .toArray();
 
-        const customers = await Promise.all(users.map(async (u) => {
+        const approvedEmails = new Set(users.map((u) => u.email));
+
+        const rejectedRegs = await db.collection("pending_registrations")
+          .find({ status: "rejected" }, {
+            projection: { email: 1, name: 1, createdAt: 1, status: 1 },
+          })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        const dedupedRejected = rejectedRegs.filter(
+          (r) => !approvedEmails.has(r.email)
+        );
+
+        const mapUser = async (u, status) => {
           const keys = await db.collection("product_keys").find(
             { $or: [{ customerEmail: u.email }, { registeredEmail: u.email }] }
           ).sort({ createdAt: -1 }).toArray();
           return {
-            id: u._id.toString(),
+            id: u._id ? u._id.toString() : `rejected_${u.email}`,
             email: u.email,
-            role: u.role,
+            role: u.role || "user",
             name: u.name || null,
             notes: u.notes || null,
+            status,
             createdAt: u.createdAt,
             productKey: keys[0]?.key || null,
             keyStatus: keys[0]?.status || null,
             keys: keys.map((k) => ({ id: k._id.toString(), key: k.key, status: k.status, createdAt: k.createdAt })),
           };
-        }));
+        };
+
+        const approved = await Promise.all(users.map((u) => mapUser(u, "approved")));
+        const rejected = await Promise.all(dedupedRejected.map((r) => mapUser(r, "rejected")));
+
+        const customers = [...approved, ...rejected].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
         sendJson(res, 200, { customers });
         return;

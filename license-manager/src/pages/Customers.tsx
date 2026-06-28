@@ -6,6 +6,7 @@ export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "rejected">("all");
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [customerEmailLogs, setCustomerEmailLogs] = useState<EmailLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -30,9 +31,18 @@ export function CustomersPage() {
     setLoadingDetail(false);
   }
 
-  const filtered = search
-    ? customers.filter((c) => c.email.toLowerCase().includes(search.toLowerCase()))
-    : customers;
+  const statusCounts = {
+    approved: customers.filter((c) => c.status === "approved").length,
+    rejected: customers.filter((c) => c.status === "rejected").length,
+  };
+
+  const filtered = (search || statusFilter !== "all"
+    ? customers.filter((c) => {
+        if (statusFilter !== "all" && c.status !== statusFilter) return false;
+        if (search && !c.email.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      })
+    : customers);
 
   return (
     <div>
@@ -55,6 +65,20 @@ export function CustomersPage() {
         </div>
       </div>
 
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="pill-group">
+          <button className={`pill${statusFilter === "all" ? " active" : ""}`} onClick={() => setStatusFilter("all")}>
+            All <span className="pill-count">{customers.length}</span>
+          </button>
+          <button className={`pill${statusFilter === "approved" ? " active" : ""}`} onClick={() => setStatusFilter("approved")}>
+            Approved <span className="pill-count">{statusCounts.approved}</span>
+          </button>
+          <button className={`pill${statusFilter === "rejected" ? " active" : ""}`} onClick={() => setStatusFilter("rejected")}>
+            Rejected <span className="pill-count">{statusCounts.rejected}</span>
+          </button>
+        </div>
+      </div>
+
       <div className="card" style={{ padding: 0 }}>
         {loading ? (
           <div className="empty-state"><p>Loading customers...</p></div>
@@ -70,15 +94,16 @@ export function CustomersPage() {
           <div className="table-container">
             <table>
               <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Product Key</th>
-                  <th>Key Status</th>
-                  <th>Registered</th>
-                  <th style={{ width: 80 }}></th>
-                </tr>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Product Key</th>
+                    <th>Key Status</th>
+                    <th>Registered</th>
+                    <th style={{ width: 80 }}></th>
+                  </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
@@ -88,6 +113,7 @@ export function CustomersPage() {
                       {c.name || "-"}
                     </td>
                     <td><span className={`badge ${c.role === "admin" ? "badge-used" : "badge-available"}`}>{c.role}</span></td>
+                    <td><span className={`badge ${c.status === "rejected" ? "badge-expired" : "badge-used"}`} style={{ fontSize: 10 }}>{c.status}</span></td>
                     <td><span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{c.productKey || <span style={{ color: "var(--color-text-muted)" }}>-</span>}</span></td>
                     <td>
                       {c.keyStatus ? (
