@@ -6,6 +6,7 @@ export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "rejected">("all");
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [customerEmailLogs, setCustomerEmailLogs] = useState<EmailLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -34,9 +35,12 @@ export function CustomersPage() {
     setLoadingDetail(false);
   }
 
-  const filtered = search
-    ? customers.filter((c) => c.email.toLowerCase().includes(search.toLowerCase()))
-    : customers;
+  const filtered = customers.filter((c) => {
+    if (search && !c.email.toLowerCase().includes(search.toLowerCase())) return false;
+    if (statusFilter === "approved" && c.rejected) return false;
+    if (statusFilter === "rejected" && !c.rejected) return false;
+    return true;
+  });
 
   return (
     <div>
@@ -56,6 +60,20 @@ export function CustomersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+        </div>
+        <div className="flex gap-2 mt-3">
+          {(["all", "approved", "rejected"] as const).map((f) => (
+            <button key={f} onClick={() => setStatusFilter(f)}
+              className="py-1.5 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              style={{
+                background: statusFilter === f ? "var(--ink)" : "var(--mist)",
+                color: statusFilter === f ? "var(--paper)" : "var(--graphite)",
+                border: "none",
+              }}
+            >
+              {f === "all" ? "All" : f === "approved" ? "Approved" : "Rejected"}
+            </button>
+          ))}
         </div>
       </div>
 

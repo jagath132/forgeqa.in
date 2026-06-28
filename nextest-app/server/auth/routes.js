@@ -513,6 +513,35 @@ function handleLogout(req, res, _body) {
   sendJson(res, 200, { ok: true });
 }
 
+async function handleEnterpriseInquiry(req, res, body) {
+  const { pendingId, company, teamSize, requirements, contact } = body;
+  if (!pendingId || !company || !requirements) {
+    sendJson(res, 400, { error: "Company name and requirements are required." });
+    return;
+  }
+  const db = getDb();
+  const pending = await db.collection("pending_registrations").findOne({ pendingId });
+  if (!pending) {
+    sendJson(res, 404, { error: "Registration session not found." });
+    return;
+  }
+  await db.collection("pending_registrations").updateOne(
+    { pendingId },
+    { $set: { plan: "enterprise", status: "inquiry_submitted", company, teamSize: teamSize || null, requirements, contact: contact || null, inquiredAt: new Date().toISOString() } }
+  );
+  await db.collection("enterprise_inquiries").insertOne({
+    email: pending.email,
+    name: pending.name,
+    company,
+    teamSize: teamSize || null,
+    requirements,
+    contact: contact || null,
+    pendingId,
+    createdAt: new Date().toISOString(),
+  });
+  sendJson(res, 200, { ok: true });
+}
+
 async function handleCompleteRegistration(req, res, body) {
   const { email, productKey } = body;
   if (!email || !productKey) {
@@ -644,6 +673,7 @@ const ROUTE_CONFIG = [
   { path: "/api/auth/complete-payment", method: "POST", handler: handleCompletePayment, auth: false },
   { path: "/api/auth/registration-status", method: "GET", handler: handleRegistrationStatus, auth: false },
   { path: "/api/auth/complete-registration", method: "POST", handler: handleCompleteRegistration, auth: false },
+  { path: "/api/auth/enterprise-inquiry", method: "POST", handler: handleEnterpriseInquiry, auth: false },
 ];
 
 export async function handleAuthRoute(req, res, url) {

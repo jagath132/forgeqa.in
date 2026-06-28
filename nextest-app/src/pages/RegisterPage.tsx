@@ -117,6 +117,12 @@ export function RegisterPage() {
   const [plans, setPlans] = useState<PlanData[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansError, setPlansError] = useState(false);
+  const [showEnterpriseForm, setShowEnterpriseForm] = useState(false);
+  const [enterpriseCompany, setEnterpriseCompany] = useState("");
+  const [enterpriseTeamSize, setEnterpriseTeamSize] = useState("");
+  const [enterpriseRequirements, setEnterpriseRequirements] = useState("");
+  const [enterpriseContact, setEnterpriseContact] = useState("");
+  const [enterpriseSubmitting, setEnterpriseSubmitting] = useState(false);
 
   useEffect(() => {
     setPlansLoading(true);
@@ -452,7 +458,7 @@ export function RegisterPage() {
                           background: active ? "rgba(47,214,117,0.06)" : "transparent",
                           border: `1px solid ${active ? "var(--signal-green)" : "var(--mist)"}`,
                         }}
-                        onClick={() => handlePlanSelect(plan.id)}
+                        onClick={() => plan.id === "enterprise" ? setShowEnterpriseForm(true) : handlePlanSelect(plan.id)}
                       >
                         {plan.popular && (
                           <div className="absolute -top-2.5 right-3 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-widest" style={{ background: "var(--signal-green)", color: "var(--ink)" }}>
@@ -669,6 +675,63 @@ export function RegisterPage() {
           </div>
         </div>
       </div>
+
+      {/* Enterprise inquiry modal */}
+      {showEnterpriseForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="rounded-xl w-full max-w-md p-6 space-y-4" style={{ background: "var(--paper)", border: "1px solid var(--mist)" }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold" style={{ color: "var(--ink)" }}>Enterprise Inquiry</h3>
+              <button onClick={() => setShowEnterpriseForm(false)} className="cursor-pointer" style={{ background: "none", border: "none", color: "var(--graphite)" }}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs" style={{ color: "var(--graphite)" }}>Tell us about your organization and we'll get back to you with a custom plan.</p>
+            <div className="space-y-3">
+              <UnderlineInput label="Company Name" id="ecCompany" type="text" value={enterpriseCompany} onChange={setEnterpriseCompany} />
+              <UnderlineInput label="Team Size" id="ecTeam" type="text" value={enterpriseTeamSize} onChange={setEnterpriseTeamSize} placeholder="e.g. 10-50" />
+              <div>
+                <label htmlFor="ecReqs" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--graphite)" }}>Requirements</label>
+                <textarea id="ecReqs" rows={3} value={enterpriseRequirements} onChange={(e) => setEnterpriseRequirements(e.target.value)}
+                  className="w-full text-sm outline-none transition-all p-2 rounded-lg resize-none"
+                  style={{ color: "var(--ink)", background: "var(--mist)", border: "1px solid var(--mist)", fontFamily: "var(--font-sans)" }}
+                  placeholder="Describe your testing needs, integrations, etc."
+                />
+              </div>
+              <UnderlineInput label="Contact Info (optional)" id="ecContact" type="text" value={enterpriseContact} onChange={setEnterpriseContact} placeholder="Phone or preferred contact method" />
+            </div>
+            {error && <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>}
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setShowEnterpriseForm(false)}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-lg cursor-pointer"
+                style={{ background: "transparent", color: "var(--graphite)", border: "1px solid var(--mist)" }}
+              >
+                Cancel
+              </button>
+              <button onClick={async () => {
+                if (!enterpriseCompany.trim() || !enterpriseRequirements.trim()) { setError("Company name and requirements are required."); return; }
+                setEnterpriseSubmitting(true); setError("");
+                try {
+                  await api.post("/api/auth/enterprise-inquiry", { pendingId, company: enterpriseCompany.trim(), teamSize: enterpriseTeamSize.trim(), requirements: enterpriseRequirements.trim(), contact: enterpriseContact.trim() });
+                  navigate("/auth");
+                } catch (err) {
+                  setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to submit inquiry.");
+                  setEnterpriseSubmitting(false);
+                }
+              }} disabled={enterpriseSubmitting}
+                className="flex-1 py-2.5 text-sm font-semibold rounded-lg flex items-center justify-center gap-2 cursor-pointer"
+                style={{ background: "var(--ink)", color: "var(--paper)", border: "none" }}
+              >
+                {enterpriseSubmitting ? (
+                  <span className="h-4 w-4 rounded-full border-2 border-[var(--paper)] border-t-transparent animate-spin" />
+                ) : "Submit Inquiry"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
