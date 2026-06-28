@@ -101,7 +101,7 @@ pipeline {
         failure {
             emailext(
                 to: 'team@example.com',
-                subject: "NexTest Pipeline Failed: #${env.BUILD_NUMBER}",
+                subject: "ForgeQA Pipeline Failed: #${env.BUILD_NUMBER}",
                 body: "Branch: ${env.BRANCH_NAME}\nURL: ${env.BUILD_URL}"
             )
         }

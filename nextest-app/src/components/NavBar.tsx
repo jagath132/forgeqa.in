@@ -57,7 +57,7 @@ export function NavBar() {
             style={{ padding: "6px 6px 6px 2px", borderRadius: 10 }}
           >
             <Logo variant="mark" />
-            <span className="hidden lg:inline text-sm font-bold" style={{ color: ink, letterSpacing: "-0.01em" }}>NexTest</span>
+            <span className="hidden lg:inline text-sm font-bold" style={{ color: ink, letterSpacing: "-0.01em" }}>ForgeQA</span>
           </button>
 
           {/* Spacer */}

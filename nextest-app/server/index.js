@@ -83,7 +83,7 @@ async function main() {
   });
 
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`NexTest production server running on http://0.0.0.0:${PORT}`);
+    console.log(`ForgeQA production server running on http://0.0.0.0:${PORT}`);
   });
 }
 

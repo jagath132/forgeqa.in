@@ -18,7 +18,7 @@ export function DesktopOnlyGuard({ children }: { children: React.ReactNode }) {
         Test case and test script generation is computationally intensive and requires a desktop or laptop browser.
       </p>
       <p className="mt-1 text-sm" style={{ color: "var(--text-muted)" }}>
-        Please open NexTest on a computer to access this workspace.
+        Please open ForgeQA on a computer to access this workspace.
       </p>
       <div className="mt-8 flex items-center gap-2 rounded-lg px-5 py-3 text-sm" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>
         <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>

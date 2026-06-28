@@ -37,7 +37,7 @@ const PROVIDERS = [
 ];
 
 const PIPELINE_STAGES = [
-  { step: "01", icon: FileText, title: "Parse requirements", desc: "Drop a PRD, ticket, or plain-text spec. NexTest extracts intent, edge cases, and acceptance criteria automatically." },
+  { step: "01", icon: FileText, title: "Parse requirements", desc: "Drop a PRD, ticket, or plain-text spec. ForgeQA extracts intent, edge cases, and acceptance criteria automatically." },
   { step: "02", icon: LayoutList, title: "Generate test matrix", desc: "Structured test cases with preconditions, steps, expected results, and priority — mapped to your existing test suite." },
   { step: "03", icon: Code, title: "Export scripts", desc: "One-click export to Selenium, Cypress, Playwright, or your CI pipeline. No manual translation." },
 ];
@@ -55,8 +55,8 @@ const PRICING_TIERS = [
 ];
 
 const FAQ_ITEMS = [
-  { q: "How does NexTest handle my data?", a: "Your requirements and generated test cases are stored in your dedicated MongoDB instance. We never share or sell your data. API keys are encrypted at rest with AES-256-GCM." },
-  { q: "Which AI provider sees my data?", a: "The provider you choose. When you bring your own API key (BYOK), requests go directly to that provider — NexTest never proxies through a shared pool. You control exactly which model processes your requirements." },
+  { q: "How does ForgeQA handle my data?", a: "Your requirements and generated test cases are stored in your dedicated MongoDB instance. We never share or sell your data. API keys are encrypted at rest with AES-256-GCM." },
+  { q: "Which AI provider sees my data?", a: "The provider you choose. When you bring your own API key (BYOK), requests go directly to that provider — ForgeQA never proxies through a shared pool. You control exactly which model processes your requirements." },
   { q: "Can I bring my own API key?", a: "Yes — every AI provider supports BYOK. Your key is encrypted and stored securely. You can rotate or revoke it at any time from the settings panel." },
   { q: "What export formats are supported?", a: "PDF, CSV, XLSX, and JUnit XML. Direct CI integrations include GitHub Actions, GitLab CI, and Jenkins via webhook." },
   { q: "What is your cancellation policy?", a: "Cancel anytime. Your data remains accessible for 30 days after cancellation. Annual plans are prorated and refunded for the unused portion." },
@@ -597,7 +597,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                     </div>
                     <div>
                       <p className="text-sm font-semibold" style={{ color: "var(--text-primary-landing)" }}>Email us</p>
-                      <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>hello@nextest.app</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>hello@forgeqa.in</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -720,7 +720,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
           </div>
           {/* Bottom */}
           <div className="mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4" style={{ borderTop: "1px solid var(--glass-border)" }}>
-            <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>&copy; {new Date().getFullYear()} NexTest. All rights reserved.</p>
+            <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>&copy; {new Date().getFullYear()} ForgeQA. All rights reserved.</p>
           </div>
         </div>
       </footer>

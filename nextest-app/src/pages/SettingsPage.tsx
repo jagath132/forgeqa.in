@@ -571,7 +571,7 @@ export function SettingsPage() {
             </div>
             <div className="mt-4 flex gap-3">
               <button className="btn-primary px-5 py-2.5 text-sm font-semibold cursor-pointer" type="button" onClick={() => {
-                openConfirm("Upgrade Plan", "Plan management is not yet available in the self-hosted version. Contact sales@nextest.app for enterprise pricing.", () => {}, "Close");
+                openConfirm("Upgrade Plan", "Plan management is not yet available in the self-hosted version. Contact sales@forgeqa.in for enterprise pricing.", () => {}, "Close");
               }}>
                 Upgrade Plan
               </button>
@@ -613,7 +613,7 @@ export function SettingsPage() {
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>Expires 12/2027</p>
                 </div>
               </div>
-              <button className="btn-secondary px-4 py-1.5 text-xs font-semibold cursor-pointer" type="button" onClick={() => openConfirm("Payment Method", "Payment method management is not yet available in the self-hosted version. Contact sales@nextest.app for assistance.", () => {}, "Close")}>Update</button>
+              <button className="btn-secondary px-4 py-1.5 text-xs font-semibold cursor-pointer" type="button" onClick={() => openConfirm("Payment Method", "Payment method management is not yet available in the self-hosted version. Contact sales@forgeqa.in for assistance.", () => {}, "Close")}>Update</button>
             </div>
           </Card>
         </div>

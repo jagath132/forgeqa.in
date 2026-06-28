@@ -133,7 +133,7 @@ export function AuthPage() {
               <path d="M6 12l4 4 8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <span className="text-sm font-bold" style={{ color: "var(--paper)", fontFamily: "var(--font-sans)" }}>NexTest</span>
+          <span className="text-sm font-bold" style={{ color: "var(--paper)", fontFamily: "var(--font-sans)" }}>ForgeQA</span>
         </div>
 
         {/* Headline */}

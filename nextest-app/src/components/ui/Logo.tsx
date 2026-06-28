@@ -12,7 +12,7 @@ export function Logo({ variant = "wordmark", className = "" }: LogoProps) {
     return (
       <img
         src="/logo/logo-mark-gradient.svg"
-        alt="NexTest"
+        alt="ForgeQA"
         className={className}
         width={32}
         height={32}
@@ -24,7 +24,7 @@ export function Logo({ variant = "wordmark", className = "" }: LogoProps) {
   return (
     <img
       src={src}
-      alt="NexTest"
+      alt="ForgeQA"
       className={className}
       width={132}
       height={34}
