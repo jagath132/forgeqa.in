@@ -115,14 +115,18 @@ export function RegisterPage() {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [plans, setPlans] = useState<PlanData[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
-
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
+  const [plansError, setPlansError] = useState(false);
 
   useEffect(() => {
+    setPlansLoading(true);
+    setPlansError(false);
     api.get<{ plans: PlanData[] }>("/api/plans").then((res) => {
       setPlans(res.data.plans);
       setPlansLoading(false);
-    }).catch(() => setPlansLoading(false));
+    }).catch(() => {
+      setPlansLoading(false);
+      setPlansError(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -416,16 +420,30 @@ export function RegisterPage() {
           {/* STEP 2: PLANS */}
           {step === "plan" && (
             <div className="space-y-5 animate-fade-in">
-              {plansLoading ? (
+              {plansError ? (
+                <div className="text-center py-8">
+                  <p className="text-sm mb-4" style={{ color: "var(--danger)" }}>Failed to load plans.</p>
+                  <button onClick={() => { setPlansError(false); setPlansLoading(true); api.get<{ plans: PlanData[] }>("/api/plans").then((r) => { setPlans(r.data.plans); setPlansLoading(false); }).catch(() => { setPlansLoading(false); setPlansError(true); }); }}
+                    className="py-2 px-4 text-sm font-semibold rounded-lg cursor-pointer"
+                    style={{ background: "var(--ink)", color: "var(--paper)", border: "none" }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : plansLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <span className="h-6 w-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--ink)", borderTopColor: "transparent" }} />
+                </div>
+              ) : plans.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm" style={{ color: "var(--graphite)" }}>No plans available right now.</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
                   {plans.map((plan) => {
                     const active = selectedPlan === plan.id;
-                    const displayPrice = plan.price === 0 ? "$0" : "$" + (plan.price / 100);
-                    const displayPeriod = plan.period === "forever" ? "forever" : "/" + (plan.period === "monthly" ? "month" : plan.period === "yearly" ? "year" : plan.period);
+                    const displayPrice = plan.price === 0 ? "Free" : (plan.currency === "inr" ? "₹" + ((plan.price / 100).toLocaleString("en-IN")) : "$" + (plan.price / 100));
+                    const displayPeriod = plan.period === "forever" ? "" : "/" + (plan.period === "monthly" ? "mo" : plan.period === "yearly" ? "yr" : plan.period);
                     return (
                       <div key={plan.id}
                         className="relative rounded-lg cursor-pointer transition-all duration-200 p-4"

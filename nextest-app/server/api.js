@@ -162,91 +162,93 @@ export function createApiMiddleware(env) {
       const { seedPlans } = await import('./billing/plans.js');
       await seedPlans();
       const plansDb = getDb();
-      const planCount = await plansDb.collection('plans').countDocuments();
-      if (planCount === 0) {
-        const defaults = [
-          {
-            id: 'free',
-            name: 'Free',
-            price: 0,
-            currency: 'usd',
-            period: 'forever',
-            description: 'Personal projects & evaluation',
-            features: [
-              'Up to 100 test cases/mo',
-              '1 AI provider',
-              'Basic export',
-              'Community support',
-            ],
-            popular: false,
-            active: true,
-            maxUsers: 1,
-            maxTestCases: 100,
-            aiProviders: 1,
-            advancedExport: false,
-            regressionTesting: false,
-            prioritySupport: false,
-            customIntegrations: false,
-            onPremise: false,
-          },
-          {
-            id: 'pro',
-            name: 'Pro',
-            price: 2900,
-            currency: 'usd',
-            period: 'monthly',
-            description: 'Professional QA teams',
-            features: [
-              'Unlimited test cases',
-              'All AI providers',
-              'Advanced export (PDF/XLSX)',
-              'Priority support',
-              'Regression testing',
-              'Team collaboration',
-            ],
-            popular: true,
-            active: true,
-            maxUsers: 10,
-            maxTestCases: null,
-            aiProviders: null,
-            advancedExport: true,
-            regressionTesting: true,
-            prioritySupport: true,
-            customIntegrations: false,
-            onPremise: false,
-          },
-          {
-            id: 'enterprise',
-            name: 'Enterprise',
-            price: 9900,
-            currency: 'usd',
-            period: 'monthly',
-            description: 'Large-scale testing',
-            features: [
-              'Everything in Pro',
-              'Unlimited team members',
-              'Custom integrations',
-              'Dedicated support',
-              'SLA guarantee',
-              'On-premise deployment',
-            ],
-            popular: false,
-            active: true,
-            maxUsers: null,
-            maxTestCases: null,
-            aiProviders: null,
-            advancedExport: true,
-            regressionTesting: true,
-            prioritySupport: true,
-            customIntegrations: true,
-            onPremise: true,
-          },
-        ];
-        const now = new Date().toISOString();
-        await plansDb
-          .collection('plans')
-          .insertMany(defaults.map((p) => ({ ...p, createdAt: now, updatedAt: now })));
-        console.log('Seeded 3 default plans.');
+      const defaults = [
+        {
+          id: 'free',
+          name: 'Free',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Get started with essential testing tools at no cost.',
+          features: [
+            '100 test cases/month',
+            '1 AI provider',
+            'Basic reporting',
+            'Community support',
+            '1 user',
+          ],
+          popular: false,
+          active: true,
+          maxUsers: 1,
+          maxTestCases: 100,
+          aiProviders: 1,
+          advancedExport: false,
+          regressionTesting: false,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'pro',
+          name: 'Pro',
+          price: 99900,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'For teams that need advanced testing and analytics.',
+          features: [
+            'Unlimited test cases',
+            '5 AI providers',
+            'Advanced reporting & export',
+            'Regression testing',
+            'Email support',
+            'Up to 10 users',
+          ],
+          popular: true,
+          active: true,
+          maxUsers: 10,
+          maxTestCases: null,
+          aiProviders: 5,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'enterprise',
+          name: 'Enterprise',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Custom solutions for large organizations. Contact us for pricing.',
+          features: [
+            'Everything in Pro',
+            'Unlimited users',
+            'All AI providers',
+            'Custom integrations',
+            'On-premise deployment',
+            'Priority support',
+            'Dedicated account manager',
+            'SLA guarantee',
+          ],
+          popular: false,
+          active: true,
+          maxUsers: null,
+          maxTestCases: null,
+          aiProviders: null,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: true,
+          customIntegrations: true,
+          onPremise: true,
+        },
+      ];
+      for (const plan of defaults) {
+        await plansDb.collection('plans').updateOne(
+          { id: plan.id },
+          { $set: { ...plan, updatedAt: new Date().toISOString() }, $setOnInsert: { createdAt: new Date().toISOString() } },
+          { upsert: true }
+        );
       }
     })
     .catch((err) => {
@@ -291,7 +293,7 @@ export function createApiMiddleware(env) {
         const plans = await db
           .collection('plans')
           .find({ active: true })
-          .sort({ price: 1 })
+          .sort({ sortOrder: 1 })
           .toArray();
         sendJson(res, 200, { plans: plans.map((p) => ({ ...p, id: p.id })) });
         return;
