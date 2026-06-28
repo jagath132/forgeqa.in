@@ -713,7 +713,7 @@ export function RegisterPage() {
           <div className="rounded-xl w-full max-w-md p-6 space-y-4" style={{ background: "var(--paper)", border: "1px solid var(--mist)" }}>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold" style={{ color: "var(--ink)" }}>Enterprise Inquiry</h3>
-              <button onClick={() => setShowEnterpriseForm(false)} className="cursor-pointer" style={{ background: "none", border: "none", color: "var(--graphite)" }}>
+              <button type="button" onClick={() => setShowEnterpriseForm(false)} className="cursor-pointer" style={{ background: "none", border: "none", color: "var(--graphite)" }}>
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -735,17 +735,18 @@ export function RegisterPage() {
             </div>
             {error && <p className="text-xs" style={{ color: "var(--danger)" }}>{error}</p>}
             <div className="flex gap-3 pt-1">
-              <button onClick={() => setShowEnterpriseForm(false)}
+              <button type="button" onClick={() => setShowEnterpriseForm(false)}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-lg cursor-pointer"
                 style={{ background: "transparent", color: "var(--graphite)", border: "1px solid var(--mist)" }}
               >
                 Cancel
               </button>
-              <button onClick={async () => {
+              <button type="button" onClick={async () => {
                 if (!enterpriseCompany.trim() || !enterpriseRequirements.trim()) { setError("Company name and requirements are required."); return; }
                 setEnterpriseSubmitting(true); setError("");
                 try {
                   await api.post("/api/auth/enterprise-inquiry", { pendingId, company: enterpriseCompany.trim(), teamSize: enterpriseTeamSize.trim(), requirements: enterpriseRequirements.trim(), contact: enterpriseContact.trim(), email });
+                  setEnterpriseSubmitting(false);
                   setEnterpriseSubmitted(true);
                 } catch (err) {
                   setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to submit inquiry.");
