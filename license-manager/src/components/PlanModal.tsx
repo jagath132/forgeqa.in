@@ -93,8 +93,9 @@ export function PlanModal({ plan, onClose, onSaved }: Props) {
     setSending(false);
   }
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (cents: number, currency = "usd") => {
     if (cents === 0) return "Free";
+    if (currency === "inr") return `₹${(cents / 100).toLocaleString("en-IN")}`;
     return `$${(cents / 100).toFixed(2)}`;
   };
 
@@ -258,7 +259,7 @@ export function PlanModal({ plan, onClose, onSaved }: Props) {
                 <div className="plan-card-name">{form.name}</div>
                 <div className="plan-card-id">{form.id}</div>
                 <div className={`plan-card-price${form.price === 0 ? " free" : ""}`}>
-                  {formatPrice(form.price)}
+                  {formatPrice(form.price, form.currency)}
                   <span className="plan-card-period">
                     {form.period === "forever" ? "" : `/${form.period === "yearly" ? "yr" : "mo"}`}
                   </span>
@@ -275,7 +276,7 @@ export function PlanModal({ plan, onClose, onSaved }: Props) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div className="plan-info-card">
                   <div className="header">Pricing</div>
-                  <div className="main">{form.currency.toUpperCase()} {formatPrice(form.price)}</div>
+                  <div className="main">{formatPrice(form.price, form.currency)}</div>
                   <div className="sub">per {form.period}</div>
                 </div>
                 <div className="plan-info-card">
