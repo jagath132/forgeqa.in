@@ -91,7 +91,11 @@ export function EmailLogPage() {
     setLoading(false);
   }, [buildParams, showToast]);
 
-  useEffect(() => { loadLogs(1); }, [loadLogs]);
+  useEffect(() => {
+    loadLogs(1);
+    const interval = setInterval(() => loadLogs(page), 30000);
+    return () => clearInterval(interval);
+  }, [loadLogs, page]);
 
   const groups = useMemo(() => groupEntries(logs), [logs]);
 

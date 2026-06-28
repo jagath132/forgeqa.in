@@ -36,7 +36,11 @@ export function VerificationsPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
+  }, [filter]);
 
   async function handleApprove(item: PendingRegistration) {
     setActionLoading(item.pendingId);

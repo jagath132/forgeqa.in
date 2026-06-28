@@ -33,7 +33,11 @@ export function KeysPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadKeys(); }, [statusFilter, emailFilter]);
+  useEffect(() => {
+    loadKeys();
+    const interval = setInterval(loadKeys, 30000);
+    return () => clearInterval(interval);
+  }, [statusFilter, emailFilter]);
 
   async function handleGenerate() {
     try {

@@ -162,91 +162,96 @@ export function createApiMiddleware(env) {
       const { seedPlans } = await import('./billing/plans.js');
       await seedPlans();
       const plansDb = getDb();
-      const planCount = await plansDb.collection('plans').countDocuments();
-      if (planCount === 0) {
-        const defaults = [
-          {
-            id: 'free',
-            name: 'Free',
-            price: 0,
-            currency: 'usd',
-            period: 'forever',
-            description: 'Personal projects & evaluation',
-            features: [
-              'Up to 100 test cases/mo',
-              '1 AI provider',
-              'Basic export',
-              'Community support',
-            ],
-            popular: false,
-            active: true,
-            maxUsers: 1,
-            maxTestCases: 100,
-            aiProviders: 1,
-            advancedExport: false,
-            regressionTesting: false,
-            prioritySupport: false,
-            customIntegrations: false,
-            onPremise: false,
-          },
-          {
-            id: 'pro',
-            name: 'Pro',
-            price: 2900,
-            currency: 'usd',
-            period: 'monthly',
-            description: 'Professional QA teams',
-            features: [
-              'Unlimited test cases',
-              'All AI providers',
-              'Advanced export (PDF/XLSX)',
-              'Priority support',
-              'Regression testing',
-              'Team collaboration',
-            ],
-            popular: true,
-            active: true,
-            maxUsers: 10,
-            maxTestCases: null,
-            aiProviders: null,
-            advancedExport: true,
-            regressionTesting: true,
-            prioritySupport: true,
-            customIntegrations: false,
-            onPremise: false,
-          },
-          {
-            id: 'enterprise',
-            name: 'Enterprise',
-            price: 9900,
-            currency: 'usd',
-            period: 'monthly',
-            description: 'Large-scale testing',
-            features: [
-              'Everything in Pro',
-              'Unlimited team members',
-              'Custom integrations',
-              'Dedicated support',
-              'SLA guarantee',
-              'On-premise deployment',
-            ],
-            popular: false,
-            active: true,
-            maxUsers: null,
-            maxTestCases: null,
-            aiProviders: null,
-            advancedExport: true,
-            regressionTesting: true,
-            prioritySupport: true,
-            customIntegrations: true,
-            onPremise: true,
-          },
-        ];
-        const now = new Date().toISOString();
-        await plansDb
-          .collection('plans')
-          .insertMany(defaults.map((p) => ({ ...p, createdAt: now, updatedAt: now })));
-        console.log('Seeded 3 default plans.');
+      const defaults = [
+        {
+          id: 'free',
+          name: 'Free',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Get started with essential testing tools at no cost.',
+          features: [
+            '100 test cases/month',
+            '1 AI provider',
+            'Basic reporting',
+            'Community support',
+            '1 user',
+          ],
+          popular: false,
+          active: true,
+          sortOrder: 1,
+          maxUsers: 1,
+          maxTestCases: 100,
+          aiProviders: 1,
+          advancedExport: false,
+          regressionTesting: false,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'pro',
+          name: 'Pro',
+          price: 99900,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'For teams that need advanced testing and analytics.',
+          features: [
+            'Unlimited test cases',
+            '5 AI providers',
+            'Advanced reporting & export',
+            'Regression testing',
+            'Email support',
+            'Up to 10 users',
+          ],
+          popular: true,
+          active: true,
+          sortOrder: 2,
+          maxUsers: 10,
+          maxTestCases: null,
+          aiProviders: 5,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'enterprise',
+          name: 'Enterprise',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Custom solutions for large organizations. Contact us for pricing.',
+          features: [
+            'Everything in Pro',
+            'Unlimited users',
+            'All AI providers',
+            'Custom integrations',
+            'On-premise deployment',
+            'Priority support',
+            'Dedicated account manager',
+            'SLA guarantee',
+          ],
+          popular: false,
+          active: true,
+          sortOrder: 3,
+          maxUsers: null,
+          maxTestCases: null,
+          aiProviders: null,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: true,
+          customIntegrations: true,
+          onPremise: true,
+        },
+      ];
+      for (const plan of defaults) {
+        await plansDb.collection('plans').updateOne(
+          { id: plan.id },
+          { $set: { ...plan, updatedAt: new Date().toISOString() }, $setOnInsert: { createdAt: new Date().toISOString() } },
+          { upsert: true }
+        );
       }
     })
     .catch((err) => {
@@ -291,7 +296,7 @@ export function createApiMiddleware(env) {
         const plans = await db
           .collection('plans')
           .find({ active: true })
-          .sort({ price: 1 })
+          .sort({ sortOrder: 1 })
           .toArray();
         sendJson(res, 200, { plans: plans.map((p) => ({ ...p, id: p.id })) });
         return;
@@ -1026,6 +1031,47 @@ export function createApiMiddleware(env) {
         const rawBody = await readRequestBody(req);
         const { result } = JSON.parse(rawBody || '{}');
         await authStore.saveUserData(user.id, 'qaResult', result || null);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // Landing page enterprise inquiry (no pending registration needed)
+      if (url.pathname === '/api/enterprise-inquiry' && req.method === 'POST') {
+        const rawBody = await readRequestBody(req);
+        const { name, email, company, message } = JSON.parse(rawBody || '{}');
+        if (!name || !email || !company || !message) {
+          sendJson(res, 400, { error: 'All fields are required.' });
+          return;
+        }
+        const db = getDb();
+        await db.collection('enterprise_inquiries').insertOne({
+          name, email, company, message,
+          source: 'landing_page',
+          createdAt: new Date().toISOString(),
+        });
+        try {
+          const transporter = (await import('nodemailer')).default;
+          const host = process.env.SMTP_HOST;
+          const port = parseInt(process.env.SMTP_PORT, 10) || 587;
+          const user = process.env.SMTP_USER;
+          const pass = process.env.SMTP_PASS;
+          const supportEmail = process.env.SUPPORT_EMAIL || 'support@forgeqa.in';
+          let t;
+          if (host && pass) {
+            t = transporter.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+          } else {
+            const account = await transporter.createTestAccount();
+            t = transporter.createTransport({ host: 'smtp.ethereal.email', port: 587, secure: false, auth: { user: account.user, pass: account.pass } });
+          }
+          await t.sendMail({
+            from: process.env.SMTP_FROM || 'ForgeQA <onboarding@resend.dev>',
+            to: supportEmail,
+            subject: `Enterprise Inquiry from ${company}`,
+            html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h2>New Enterprise Inquiry</h2><table style="width:100%;border-collapse:collapse;"><tr><td style="padding:8px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Name</td><td style="padding:8px;border:1px solid #ddd;">${name}</td></tr><tr><td style="padding:8px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Email</td><td style="padding:8px;border:1px solid #ddd;">${email}</td></tr><tr><td style="padding:8px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Company</td><td style="padding:8px;border:1px solid #ddd;">${company}</td></tr><tr><td style="padding:8px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Message</td><td style="padding:8px;border:1px solid #ddd;">${message}</td></tr></table><p style="color:#999;font-size:12px;">Submitted from ForgeQA landing page</p></body></html>`,
+          });
+        } catch (emailErr) {
+          console.warn('Failed to send enterprise inquiry email:', emailErr.message);
+        }
         sendJson(res, 200, { ok: true });
         return;
       }

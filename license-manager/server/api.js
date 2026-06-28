@@ -251,7 +251,7 @@ export function createApiMiddleware(env) {
 
         const rejectedRegs = await db.collection("pending_registrations")
           .find({ status: "rejected" }, {
-            projection: { email: 1, name: 1, createdAt: 1, status: 1 },
+            projection: { email: 1, name: 1, createdAt: 1, status: 1, rejectionReason: 1, rejectedAt: 1, rejectedBy: 1, plan: 1 },
           })
           .sort({ createdAt: -1 })
           .toArray();
@@ -352,7 +352,7 @@ export function createApiMiddleware(env) {
         const { getDb } = await import("./db.js");
         const plans = await getDb().collection("plans")
           .find({})
-          .sort({ price: 1 })
+          .sort({ sortOrder: 1 })
           .toArray();
         sendJson(res, 200, {
           plans: plans.map((p) => ({ id: p._id.toString(), ...p, _id: undefined })),

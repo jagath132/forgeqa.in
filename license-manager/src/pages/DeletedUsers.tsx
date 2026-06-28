@@ -16,10 +16,18 @@ export function DeletedUsersPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    api.get<{ deletedUsers: DeletedUser[] }>("/api/admin/deleted-users")
-      .then((r) => setDeletedUsers(r.data.deletedUsers))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    async function load() {
+      if (cancelled) return;
+      try {
+        const r = await api.get<{ deletedUsers: DeletedUser[] }>("/api/admin/deleted-users");
+        if (!cancelled) setDeletedUsers(r.data.deletedUsers);
+      } catch { /* ignore */ }
+      if (!cancelled) setLoading(false);
+    }
+    load();
+    const interval = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const filtered = search

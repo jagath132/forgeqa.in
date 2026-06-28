@@ -18,7 +18,11 @@ export function CustomersPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchCustomers(); }, []);
+  useEffect(() => {
+    fetchCustomers();
+    const interval = setInterval(fetchCustomers, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   async function openDetail(c: Customer) {
     setDetailCustomer(c);
@@ -107,7 +111,7 @@ export function CustomersPage() {
               </thead>
               <tbody>
                 {filtered.map((c) => (
-                  <tr key={c.id} style={{ cursor: "pointer" }} onClick={() => openDetail(c)}>
+                  <tr key={c.id} style={{ cursor: "pointer", opacity: c.status === "rejected" ? 0.6 : 1 }} onClick={() => openDetail(c)}>
                     <td>{c.email}</td>
                     <td style={{ color: c.name ? "var(--color-text-primary)" : "var(--color-text-muted)", fontSize: 13 }}>
                       {c.name || "-"}
@@ -157,17 +161,44 @@ export function CustomersPage() {
               </div>
 
               <div className="customer-info-grid">
-                <span className="lbl">Role</span>
-                <span className="val"><span className={`badge ${detailCustomer.role === "admin" ? "badge-used" : "badge-available"}`} style={{ fontSize: 10 }}>{detailCustomer.role}</span></span>
+                <span className="lbl">Role / Status</span>
+                <span className="val">
+                  {detailCustomer.rejected ? (
+                    <span className="badge badge-expired" style={{ fontSize: 10 }}>Rejected</span>
+                  ) : (
+                    <span className={`badge ${detailCustomer.role === "admin" ? "badge-used" : "badge-available"}`} style={{ fontSize: 10 }}>{detailCustomer.role}</span>
+                  )}
+                </span>
 
                 <span className="lbl">Key</span>
                 <span className="val text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{detailCustomer.productKey || "-"}</span>
 
                 <span className="lbl">Key Status</span>
-                <span className="val">{detailCustomer.keyStatus ? <span className={`badge badge-${detailCustomer.keyStatus}`} style={{ fontSize: 10 }}>{detailCustomer.keyStatus}</span> : "-"}</span>
+                <span className="val">{detailCustomer.keyStatus ? <span className={`badge ${detailCustomer.rejected ? "badge-expired" : `badge-${detailCustomer.keyStatus}`}`} style={{ fontSize: 10 }}>{detailCustomer.keyStatus}</span> : "-"}</span>
 
                 <span className="lbl">Registered</span>
                 <span className="val">{new Date(detailCustomer.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+
+                {detailCustomer.rejected && detailCustomer.rejectedAt && (
+                  <>
+                    <span className="lbl">Rejected</span>
+                    <span className="val">{new Date(detailCustomer.rejectedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+                  </>
+                )}
+
+                {detailCustomer.rejected && detailCustomer.rejectedBy && (
+                  <>
+                    <span className="lbl">Rejected By</span>
+                    <span className="val">{detailCustomer.rejectedBy}</span>
+                  </>
+                )}
+
+                {detailCustomer.rejected && detailCustomer.rejectionReason && (
+                  <>
+                    <span className="lbl">Reason</span>
+                    <span className="val">{detailCustomer.rejectionReason}</span>
+                  </>
+                )}
 
                 <span className="lbl">Notes</span>
                 <span className="val" style={{ color: detailCustomer.notes ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{detailCustomer.notes || "-"}</span>

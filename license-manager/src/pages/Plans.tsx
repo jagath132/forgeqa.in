@@ -19,10 +19,15 @@ export function PlansPage() {
     setLoading(false);
   }
 
-  useEffect(() => { loadPlans(); }, []);
+  useEffect(() => {
+    loadPlans();
+    const interval = setInterval(loadPlans, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (cents: number, currency = "usd") => {
     if (cents === 0) return "Free";
+    if (currency === "inr") return `₹${(cents / 100).toLocaleString("en-IN")}`;
     return `$${(cents / 100).toFixed(2)}`;
   };
 
@@ -72,7 +77,7 @@ export function PlansPage() {
                   <div className="plan-card-name">{p.name}</div>
                   <div className="plan-card-tier">{p.id}</div>
                   <div className={`plan-card-price${p.price === 0 ? " free" : ""}`}>
-                    {formatPrice(p.price)}
+                    {formatPrice(p.price, p.currency)}
                     <span className="plan-card-period">
                       {p.period === "forever" ? "" : `/${p.period === "yearly" ? "yr" : "mo"}`}
                     </span>
@@ -147,7 +152,7 @@ export function PlansPage() {
                       </div>
                     </td>
                     <td style={{ fontWeight: 600, fontSize: 15, color: p.price === 0 ? "var(--color-text-muted)" : "var(--color-text-primary)" }}>
-                      {formatPrice(p.price)}
+                      {formatPrice(p.price, p.currency)}
                     </td>
                     <td style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{p.period}</td>
                     <td>

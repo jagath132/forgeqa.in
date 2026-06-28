@@ -229,25 +229,29 @@ export function CompleteRegistrationPage() {
             </div>
           )}
 
-          {btnSuccess ? (
-            <div className="text-center py-4 animate-slide-up">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "rgba(47,214,117,0.12)" }}>
-                <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="var(--signal-green)" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          {btnSuccess && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center animate-fade-in" style={{ background: "rgba(0,0,0,0.6)" }}>
+              <div className="w-full max-w-sm mx-4 p-8 rounded-2xl text-center animate-slide-up" style={{ background: "var(--paper)" }}>
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(255,183,77,0.15)" }}>
+                  <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L20 8V16L12 22L4 16V8L12 2Z" fill="#FFB74D" stroke="#FFA726" strokeWidth="1.5" />
+                    <polygon points="12,6 16,9 16,15 12,18 8,15 8,9" fill="var(--paper)" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2" style={{ color: "var(--ink)" }}>Welcome to ForgeQA</h2>
+                <p className="text-sm mb-7" style={{ color: "var(--graphite)" }}>
+                  Your account is all set. Sign in to start testing.
+                </p>
+                <button onClick={() => navigate("/auth")}
+                  className="w-full py-2.5 text-sm font-semibold rounded-lg cursor-pointer transition-all hover:opacity-85"
+                  style={{ background: "var(--ink)", color: "var(--paper)", border: "none" }}
+                >
+                  Sign In
+                </button>
               </div>
-              <h2 className="text-xl font-bold mb-2" style={{ color: "var(--signal-green)" }}>Key Verified</h2>
-              <p className="text-sm mb-6" style={{ color: "var(--graphite)" }}>
-                Your account has been activated. Sign in with the email and password you used during registration.
-              </p>
-              <button onClick={() => navigate("/auth")}
-                className="w-full py-2.5 text-sm font-semibold rounded-lg cursor-pointer"
-                style={{ background: "var(--ink)", color: "var(--paper)", border: "none" }}
-              >
-                Sign In →
-              </button>
             </div>
-          ) : (
+          )}
+          {!btnSuccess && (
             <form onSubmit={handleSubmit} autoComplete="off" className="space-y-5">
               <div>
                 <label htmlFor="activation_email" className="block text-xs font-semibold mb-1.5" style={{ color: "var(--graphite)" }}>Email</label>
