@@ -123,6 +123,8 @@ export function RegisterPage() {
   const [enterpriseRequirements, setEnterpriseRequirements] = useState("");
   const [enterpriseContact, setEnterpriseContact] = useState("");
   const [enterpriseSubmitting, setEnterpriseSubmitting] = useState(false);
+  const [enterpriseSubmitted, setEnterpriseSubmitted] = useState(false);
+  const [enterpriseEmail2, setEnterpriseEmail2] = useState("");
 
   useEffect(() => {
     setPlansLoading(true);
@@ -676,6 +678,35 @@ export function RegisterPage() {
         </div>
       </div>
 
+      {/* Enterprise thank-you overlay */}
+      {enterpriseSubmitted && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="rounded-xl w-full max-w-sm p-8 text-center space-y-5" style={{ background: "var(--paper)", border: "1px solid var(--mist)" }}>
+            <div className="flex justify-center">
+              <div style={{
+                width: 72, height: 72, borderRadius: "50%",
+                background: "rgba(47,214,117,0.12)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg className="w-9 h-9" style={{ color: "var(--signal-green)", animation: "scaleIn 0.4s ease-out" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold" style={{ color: "var(--ink)" }}>Thank You!</h3>
+              <p className="text-sm" style={{ color: "var(--graphite)" }}>We've received your inquiry. Our team will reach out to you at <strong style={{ color: "var(--ink)" }}>{email}</strong> with a custom enterprise plan.</p>
+            </div>
+            <button onClick={() => { setEnterpriseSubmitted(false); setShowEnterpriseForm(false); navigate("/"); }}
+              className="w-full py-2.5 text-sm font-semibold rounded-lg cursor-pointer"
+              style={{ background: "var(--ink)", color: "var(--paper)", border: "none" }}
+            >
+              Back to Home
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Enterprise inquiry modal */}
       {showEnterpriseForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
@@ -714,8 +745,8 @@ export function RegisterPage() {
                 if (!enterpriseCompany.trim() || !enterpriseRequirements.trim()) { setError("Company name and requirements are required."); return; }
                 setEnterpriseSubmitting(true); setError("");
                 try {
-                  await api.post("/api/auth/enterprise-inquiry", { pendingId, company: enterpriseCompany.trim(), teamSize: enterpriseTeamSize.trim(), requirements: enterpriseRequirements.trim(), contact: enterpriseContact.trim() });
-                  navigate("/auth");
+                  await api.post("/api/auth/enterprise-inquiry", { pendingId, company: enterpriseCompany.trim(), teamSize: enterpriseTeamSize.trim(), requirements: enterpriseRequirements.trim(), contact: enterpriseContact.trim(), email });
+                  setEnterpriseSubmitted(true);
                 } catch (err) {
                   setError((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "Failed to submit inquiry.");
                   setEnterpriseSubmitting(false);

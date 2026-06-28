@@ -64,12 +64,15 @@ export function CustomersPage() {
         <div className="flex gap-2 mt-3">
           {(["all", "approved", "rejected"] as const).map((f) => (
             <button key={f} onClick={() => setStatusFilter(f)}
-              className="py-1.5 px-3 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              className="py-1.5 px-4 text-xs font-bold rounded-full transition-all cursor-pointer tracking-wide uppercase"
               style={{
-                background: statusFilter === f ? "var(--ink)" : "var(--mist)",
-                color: statusFilter === f ? "var(--paper)" : "var(--graphite)",
-                border: "none",
+                background: statusFilter === f ? "var(--color-accent)" : "transparent",
+                color: statusFilter === f ? "#fff" : "var(--color-text-muted)",
+                border: `1.5px solid ${statusFilter === f ? "var(--color-accent)" : "var(--color-border)"}`,
+                opacity: statusFilter === f ? 1 : 0.7,
               }}
+              onMouseEnter={(e) => { if (statusFilter !== f) { e.currentTarget.style.opacity = "1"; e.currentTarget.style.borderColor = "var(--color-accent)"; e.currentTarget.style.color = "var(--color-text-primary)"; }}}
+              onMouseLeave={(e) => { if (statusFilter !== f) { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.borderColor = "var(--color-border)"; e.currentTarget.style.color = "var(--color-text-muted)"; }}}
             >
               {f === "all" ? "All" : f === "approved" ? "Approved" : "Rejected"}
             </button>

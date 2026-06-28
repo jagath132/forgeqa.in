@@ -539,6 +539,31 @@ async function handleEnterpriseInquiry(req, res, body) {
     pendingId,
     createdAt: new Date().toISOString(),
   });
+  // Send email notification to support
+  try {
+    const transporter = (await import("nodemailer")).default;
+    const host = process.env.SMTP_HOST;
+    const port = parseInt(process.env.SMTP_PORT, 10) || 587;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const supportEmail = process.env.SUPPORT_EMAIL || "support@forgeqa.in";
+    let t;
+    if (host && pass) {
+      t = transporter.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+    } else {
+      const account = await transporter.createTestAccount();
+      t = transporter.createTransport({ host: "smtp.ethereal.email", port: 587, secure: false, auth: { user: account.user, pass: account.pass } });
+    }
+    await t.sendMail({
+      from: process.env.SMTP_FROM || "ForgeQA <onboarding@resend.dev>",
+      to: supportEmail,
+      subject: `Enterprise Inquiry from ${company}`,
+      html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="color:#F59E0B;">ForgeQA</h1><h2 style="color:#333;">New Enterprise Inquiry</h2><table style="width:100%;border-collapse:collapse;margin:16px 0;"><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Name</td><td style="padding:8px 12px;border:1px solid #ddd;">${pending.name || "Not provided"}</td></tr><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Email</td><td style="padding:8px 12px;border:1px solid #ddd;">${pending.email}</td></tr><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Company</td><td style="padding:8px 12px;border:1px solid #ddd;">${company}</td></tr><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Team Size</td><td style="padding:8px 12px;border:1px solid #ddd;">${teamSize || "Not specified"}</td></tr><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Contact</td><td style="padding:8px 12px;border:1px solid #ddd;">${contact || "Not specified"}</td></tr><tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;border:1px solid #ddd;">Requirements</td><td style="padding:8px 12px;border:1px solid #ddd;">${requirements}</td></tr></table><p style="color:#999;font-size:12px;">Submitted from ForgeQA registration page</p></body></html>`,
+    });
+    console.log("Enterprise inquiry email sent to", supportEmail);
+  } catch (emailErr) {
+    console.warn("Failed to send enterprise inquiry email:", emailErr.message);
+  }
   sendJson(res, 200, { ok: true });
 }
 
