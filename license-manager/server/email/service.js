@@ -42,7 +42,7 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
   }
   const transporter = await getTransporter();
 
-  const from = process.env.SMTP_FROM || "ForgeKey <onboarding@resend.dev>";
+  const from = process.env.SMTP_FROM || "jagathwork372@gmail.com";
   const subject = "Your ForgeKey Product Key";
   const buttonUrl = completeUrl || (process.env.APP_URL || "http://127.0.0.1:5173") + "/auth/complete-registration?email=" + encodeURIComponent(toEmail);
 

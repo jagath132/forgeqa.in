@@ -336,6 +336,7 @@ export function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => voi
     const counts: Record<string, number> = { Free: 0, Pro: 0, Enterprise: 0 };
     for (const r of registrations) {
       if (!r.plan) continue;
+      if (r.status !== "ready" && r.status !== "completed") continue;
       const plan = r.plan.charAt(0).toUpperCase() + r.plan.slice(1);
       if (counts[plan] !== undefined) counts[plan]++;
       else counts[plan] = 1;

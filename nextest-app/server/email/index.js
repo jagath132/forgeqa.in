@@ -31,7 +31,7 @@ async function getTransport() {
   return etherealTransporter;
 }
 
-const FROM = process.env.SMTP_FROM || "noreply@forgeqa.in";
+const FROM = process.env.SMTP_FROM || "jagathwork372@gmail.com";
 const BRAND = "ForgeQA";
 
 export async function sendPasswordResetEmail(to, resetUrl) {
@@ -121,7 +121,7 @@ export async function sendSupportEmail({ name, email, subject, message }) {
   if (process.env.RESEND_API_KEY) {
     return sendSupportEmailResend({ name, email, subject, message });
   }
-  const adminEmail = process.env.SUPPORT_EMAIL || "admin@forgeqa.in";
+  const adminEmail = process.env.SUPPORT_EMAIL || "jagathwork372@gmail.com";
   const html = [
     '<!DOCTYPE html><html><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',

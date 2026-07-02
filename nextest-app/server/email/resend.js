@@ -3,7 +3,7 @@ import { Resend } from "resend";
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
-const FROM = process.env.RESEND_FROM || "ForgeQA <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM || "jagathwork372@gmail.com";
 
 export async function sendProductKeyEmailResend(to, productKey, customerName) {
   const baseUrl = process.env.APP_URL || "http://127.0.0.1:5173";
@@ -41,7 +41,7 @@ export async function sendPasswordResetEmailResend(to, resetUrl) {
 }
 
 export async function sendSupportEmailResend({ name, email, subject, message }) {
-  const adminEmail = process.env.SUPPORT_EMAIL || "admin@forgeqa.in";
+  const adminEmail = process.env.SUPPORT_EMAIL || "jagathwork372@gmail.com";
   const { data, error } = await getResend().emails.send({
     from: FROM,
     to: [adminEmail],

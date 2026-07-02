@@ -8,7 +8,7 @@ function getResend() {
   }
   return new Resend(key);
 }
-const FROM = process.env.RESEND_FROM || "ForgeKey <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM || "jagathwork372@gmail.com";
 
 function logColl() {
   return getDb().collection("email_logs");

@@ -597,7 +597,7 @@ export function LandingPage({ onGetStarted, onSignIn }: LandingPageProps) {
                     </div>
                     <div>
                       <p className="text-sm font-semibold" style={{ color: "var(--text-primary-landing)" }}>Email us</p>
-                      <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>hello@forgeqa.in</p>
+                      <p className="text-xs" style={{ color: "var(--text-muted-landing)" }}>jagathwork372@gmail.com</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
