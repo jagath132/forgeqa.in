@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "./store/useAppStore";
 import { LandingPage } from "./pages/LandingPage";
@@ -13,7 +13,6 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
 import { SuitesPage } from "./pages/SuitesPage";
 import { RegressionPage } from "./pages/RegressionPage";
-import { AdminPage } from "./pages/AdminPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { NavBar } from "./components/NavBar";
 import { Sidebar } from "./components/Sidebar";
@@ -21,13 +20,16 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ConfirmDialog } from "./components/ui/ConfirmDialog";
 
 function AppLayout() {
+  const { pathname } = useLocation();
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { contentRef.current?.scrollTo(0, 0); }, [pathname]);
   return (
     <div className="flex min-h-screen" style={{ background: "var(--bg-primary)" }}>
       <Sidebar />
       <main className="flex-1 flex flex-col min-w-0 min-h-screen">
         <NavBar />
         <ErrorBoundary>
-          <div className="flex-1 px-4 py-6 lg:px-8 lg:py-8 overflow-y-auto">
+          <div ref={contentRef} className="flex-1 px-4 py-6 lg:px-8 lg:py-8 overflow-y-auto">
             <Routes>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/generator" element={<GeneratorPage />} />
@@ -39,7 +41,6 @@ function AppLayout() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/suites" element={<SuitesPage />} />
               <Route path="/regression" element={<RegressionPage />} />
-              <Route path="/admin" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>

@@ -109,7 +109,9 @@ export function Sidebar() {
     >
       {/* Logo header */}
       <div className="flex items-center justify-between gap-3 px-5 border-b shrink-0" style={{ borderColor: "var(--border-default)", height: 52 }}>
-        <Logo variant="wordmark" />
+        <button onClick={() => navigate("/dashboard")} type="button" className="cursor-pointer flex items-center" style={{ background: "none", border: "none", padding: 0 }}>
+          <Logo variant="wordmark" />
+        </button>
         <button
           className="flex lg:hidden h-8 w-8 items-center justify-center rounded-lg btn-ghost"
           onClick={() => setSidebarOpen(false)}
@@ -165,11 +167,7 @@ export function Sidebar() {
           <NavButton active={activeKey === "settings"} color="amber" label="Settings" onClick={() => navigateToPage("/settings")}
             icon={<SettingsIcon3D size={20} />}
           />
-          {user?.role === "Admin" && (
-            <NavButton active={activeKey === "admin"} color="rose" label="Admin" onClick={() => navigateToPage("/admin")}
-              icon={<InlineSvg path={ICONS.admin} size={20} />}
-            />
-          )}
+
         </div>
       </nav>
 
