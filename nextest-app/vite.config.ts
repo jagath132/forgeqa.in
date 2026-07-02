@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
     if (env[key]) process.env[key] ??= env[key];
   }
 
+  // Cache the API middleware so we don't re-import + rebuild on every request in dev
+  let apiMiddleware = null;
+
   return {
     plugins: [
       react(),
@@ -15,13 +18,31 @@ export default defineConfig(({ mode }) => {
         name: "nextest-node-api",
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
-            const { createApiMiddleware } = await import("./server/api.js");
-            const middleware = createApiMiddleware(env);
-            middleware(req, res, next);
+            if (!apiMiddleware) {
+              const { createApiMiddleware } = await import("./server/api.js");
+              apiMiddleware = createApiMiddleware(env);
+            }
+            apiMiddleware(req, res, next);
           });
         },
       },
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/react-dom")) return "react-vendor";
+            if (id.includes("node_modules/react")) return "react-vendor";
+            if (id.includes("node_modules/recharts")) return "charts";
+            if (id.includes("node_modules/lucide-react")) return "icons";
+            if (id.includes("node_modules/jspdf")) return "pdf";
+            if (id.includes("node_modules/xlsx")) return "xlsx";
+            if (id.includes("node_modules/tesseract")) return "ocr";
+            if (id.includes("node_modules/mammoth")) return "docs";
+          },
+        },
+      },
+    },
     test: {
       globals: true,
       environment: "jsdom",

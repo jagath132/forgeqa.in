@@ -8,16 +8,33 @@ export default defineConfig(({ mode }) => {
     if (env[key]) process.env[key] ??= env[key];
   }
 
+  // Cache the API middleware so we don't re-create on every request in dev
+  let apiMiddleware = null;
+
   return {
     plugins: [
       react(),
       {
         name: "forgekey-api",
         configureServer(server) {
-          server.middlewares.use(createApiMiddleware(env));
+          server.middlewares.use((req, res, next) => {
+            if (!apiMiddleware) apiMiddleware = createApiMiddleware(env);
+            apiMiddleware(req, res, next);
+          });
         },
       },
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes("node_modules/react-dom")) return "react-vendor";
+            if (id.includes("node_modules/react")) return "react-vendor";
+            if (id.includes("node_modules/recharts")) return "charts";
+          },
+        },
+      },
+    },
     server: {
       port: 5174,
     },

@@ -11,7 +11,12 @@ let db = null;
 
 export async function connectDb() {
   if (db) return db;
-  client = new MongoClient(MONGO_URI);
+  client = new MongoClient(MONGO_URI, {
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 30000,
+  });
   await client.connect();
   db = client.db(DB_NAME);
   await ensureIndexes(db);
@@ -53,9 +58,12 @@ async function ensureIndexes(db) {
   await db.collection("plans").createIndex({ id: 1 }, { unique: true });
   await db.collection("plans").createIndex({ price: 1 });
   await db.collection("totp_secrets").createIndex({ userId: 1 }, { unique: true });
+  await db.collection("enterprise_inquiries").createIndex({ email: 1 });
+  await db.collection("enterprise_inquiries").createIndex({ createdAt: -1 });
   try {
     await db.collection("pending_registrations").createIndex({ email: 1 }, { unique: true });
     await db.collection("pending_registrations").createIndex({ pendingId: 1 }, { unique: true, sparse: true });
     await db.collection("pending_registrations").createIndex({ createdAt: 1 }, { expireAfterSeconds: 86400 });
+    await db.collection("pending_registrations").createIndex({ status: 1 });
   } catch (e) { console.error("Index setup partial failure:", e.message); }
 }
