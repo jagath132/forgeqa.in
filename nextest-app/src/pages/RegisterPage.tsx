@@ -750,7 +750,7 @@ export function RegisterPage() {
             </div>
             <div className="space-y-1">
               <h3 className="text-lg font-bold" style={{ color: "var(--ink)" }}>Thank You!</h3>
-              <p className="text-sm" style={{ color: "var(--graphite)" }}>We've received your inquiry. Our team will reach out to you at <strong style={{ color: "var(--ink)" }}>{email}</strong> with a custom enterprise plan.</p>
+              <p className="text-sm" style={{ color: "var(--graphite)" }}>We&apos;ve received your inquiry. Our team will reach out to you at <strong style={{ color: "var(--ink)" }}>{email}</strong> with a custom enterprise plan.</p>
             </div>
               <button onClick={() => { resetEnterpriseForm(); navigate("/"); }}
               className="w-full py-2.5 text-sm font-semibold rounded-lg cursor-pointer"
@@ -774,7 +774,7 @@ export function RegisterPage() {
                 </svg>
               </button>
             </div>
-            <p className="text-xs" style={{ color: "var(--graphite)" }}>Tell us about your organization and we'll get back to you with a custom plan.</p>
+            <p className="text-xs" style={{ color: "var(--graphite)" }}>Tell us about your organization and we&apos;ll get back to you with a custom plan.</p>
             <div className="space-y-3">
               <UnderlineInput label="Company Name" id="ecCompany" type="text" value={enterpriseCompany} onChange={setEnterpriseCompany} />
               <UnderlineInput label="Team Size" id="ecTeam" type="text" value={enterpriseTeamSize} onChange={setEnterpriseTeamSize} placeholder="e.g. 10-50" />

@@ -32,5 +32,11 @@ module.exports = {
     "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
     "react/prop-types": "off",
     "react/jsx-uses-react": "off",
+    "react/no-unknown-property": ["error", { "ignore": [
+      "position", "args", "geometry", "attach", "transparent", "intensity",
+      "count", "array", "itemSize", "sizeAttenuation", "fov", "dpr",
+      "material", "emissive", "metalness", "roughness", "distort", "speed",
+      "color", "wireframe", "opacity"
+    ] }],
   },
 };

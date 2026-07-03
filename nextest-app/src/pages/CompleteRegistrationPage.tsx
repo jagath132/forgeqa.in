@@ -209,10 +209,10 @@ export function CompleteRegistrationPage() {
               </p>
               <p className="text-xs font-mono tracking-widest" style={{ color: "var(--ink)" }}>{productKey}</p>
               {keyStatus === "valid" && (
-                <p className="text-xs mt-2" style={{ color: "var(--graphite)" }}>Key is valid. Click "Activate Account" to complete activation.</p>
+                <p className="text-xs mt-2" style={{ color: "var(--graphite)" }}>Key is valid. Click &quot;Activate Account&quot; to complete activation.</p>
               )}
               {keyStatus === "invalid" && (
-                <p className="text-xs mt-2" style={{ color: "var(--graphite)" }}>This key doesn't exist in our system. Try a different key or contact support.</p>
+                <p className="text-xs mt-2" style={{ color: "var(--graphite)" }}>This key doesn&apos;t exist in our system. Try a different key or contact support.</p>
               )}
             </div>
           )}

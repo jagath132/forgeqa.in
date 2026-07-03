@@ -48,9 +48,7 @@ interface AppState {
 }
 
 function loadTheme(): ThemeMode {
-  const saved = window.localStorage.getItem("qacopilot_theme") as ThemeMode | null;
-  if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return "light";
 }
 
 export const useAppStore = create<AppState>()((set, get) => ({

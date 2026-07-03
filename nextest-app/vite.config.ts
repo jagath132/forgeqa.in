@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
             if (id.includes("node_modules/xlsx")) return "xlsx";
             if (id.includes("node_modules/tesseract")) return "ocr";
             if (id.includes("node_modules/mammoth")) return "docs";
+            if (id.includes("node_modules/three")) return "three";
+            if (id.includes("node_modules/@react-three")) return "r3f";
           },
         },
       },

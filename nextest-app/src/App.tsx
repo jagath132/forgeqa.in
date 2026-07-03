@@ -75,9 +75,9 @@ export default function App() {
   const location = useLocation();
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
+    document.documentElement.dataset.theme = "light";
+    document.documentElement.style.colorScheme = "light";
+  }, []);
 
   useEffect(() => {
     initialize();

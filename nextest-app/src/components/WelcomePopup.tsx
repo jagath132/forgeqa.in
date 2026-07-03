@@ -23,7 +23,7 @@ export function WelcomePopup({ onDismiss }: { onDismiss: () => void }) {
         </div>
         <h2 className="text-xl font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>Welcome to ForgeQA!</h2>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          Thank you for choosing us. You're all set to generate test cases, automation scripts, and regression suites from your requirements.
+          Thank you for choosing us. You&apos;re all set to generate test cases, automation scripts, and regression suites from your requirements.
         </p>
         <button type="button" onClick={handleDismiss}
           className="mt-6 w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer"
