@@ -95,20 +95,42 @@ export default function App() {
     initialize();
   }, [initialize]);
 
-  /* ── Screenshot prevention ── */
+  /* ── Screenshot & screen capture prevention ── */
   useEffect(() => {
     function showScreenshotWarning() {
       const overlay = document.createElement("div");
       overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);";
-      overlay.innerHTML = '<div style="text-align:center;color:#fff;font-family:system-ui,sans-serif;max-width:400px;padding:2rem;"><div style="font-size:3rem;margin-bottom:1rem;">&#128274;</div><h2 style="font-size:1.25rem;font-weight:700;margin:0 0 0.5rem;">Screenshot Blocked</h2><p style="font-size:0.875rem;color:#94A3B8;margin:0;">Taking screenshots is not allowed. This action has been logged for security purposes.</p></div>';
+      overlay.innerHTML = '<div style="text-align:center;color:#fff;font-family:system-ui,sans-serif;max-width:400px;padding:2rem;"><div style="font-size:3rem;margin-bottom:1rem;">&#128274;</div><h2 style="font-size:1.25rem;font-weight:700;margin:0 0 0.5rem;">Screen Capture Blocked</h2><p style="font-size:0.875rem;color:#94A3B8;margin:0;">Screenshots, screen snips, and screen recording are not allowed on this page. This action has been logged for security purposes.</p></div>';
       document.body.appendChild(overlay);
       setTimeout(() => overlay.remove(), 3000);
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "PrintScreen" || (e.metaKey && e.shiftKey && (e.key === "3" || e.key === "4" || e.key === "5"))) {
+      const key = e.key.toLowerCase();
+      // PrintScreen, Cmd/Ctrl+Shift+3/4/5 (Mac screenshots)
+      if (e.key === "PrintScreen" || (e.metaKey && e.shiftKey && ["3","4","5"].includes(e.key))) {
         e.preventDefault();
         showScreenshotWarning();
+        return;
+      }
+      // Win+Shift+S (Windows Snipping Tool / Snip & Sketch)
+      if (e.key === "PrintScreen" || (e.location === 2 && (e.code === "ShiftLeft" || e.code === "ShiftRight"))) return;
+      if (e.getModifierState("Win") && e.shiftKey && key === "s") {
+        e.preventDefault();
+        showScreenshotWarning();
+        return;
+      }
+      // Alt+PrintScreen (Windows active window screenshot)
+      if (e.altKey && e.key === "PrintScreen") {
+        e.preventDefault();
+        showScreenshotWarning();
+        return;
+      }
+      // Ctrl+PrintScreen (some tools)
+      if (e.ctrlKey && e.key === "PrintScreen") {
+        e.preventDefault();
+        showScreenshotWarning();
+        return;
       }
     }
 
@@ -119,11 +141,26 @@ export default function App() {
       }
     }
 
+    function handleContextMenu(e: MouseEvent) {
+      e.preventDefault();
+    }
+
+    function handleDragStart(e: DragEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "IMG" || target.closest("img")) {
+        e.preventDefault();
+      }
+    }
+
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("dragstart", handleDragStart);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("keyup", handleKeyUp);
+      document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("dragstart", handleDragStart);
     };
   }, []);
 

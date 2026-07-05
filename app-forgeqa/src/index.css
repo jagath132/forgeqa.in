@@ -1639,3 +1639,18 @@ input:focus, textarea:focus, select:focus {
     --section-spacing: 3rem;
   }
 }
+
+/* ── Anti-screenshot / anti-snip ── */
+.protect-screen {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+.protect-screen img,
+.protect-screen svg,
+.protect-screen canvas {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+}

@@ -63,8 +63,6 @@ export function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [resetLink, setResetLink] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [require2FA, setRequire2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
@@ -99,9 +97,8 @@ export function AuthPage() {
           navigate(isNewUser ? "/dashboard?welcome=true" : "/dashboard");
         }, 400);
       } else {
-        const res = await api.post<{ message: string; resetLink?: string }>("/api/auth/forgot-password", { email });
+        const res = await api.post<{ message: string }>("/api/auth/forgot-password", { email });
         setSuccessMessage(res.data.message);
-        if (res.data.resetLink) setResetLink(res.data.resetLink);
       }
     } catch (err) {
       if (axios.isAxiosError(err)) {
@@ -118,7 +115,6 @@ export function AuthPage() {
     setMode(m);
     setError("");
     setSuccessMessage("");
-    setResetLink("");
     setRequire2FA(false);
     setTwoFactorCode("");
   };
@@ -214,18 +210,6 @@ export function AuthPage() {
             </div>
           )}
 
-          {/* Success (forgot mode) */}
-          {successMessage && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
-              style={{ background: "rgba(18,183,106,0.06)", color: "var(--signal-green)", border: "1px solid rgba(18,183,106,0.12)" }}
-            >
-              <svg className="h-5 w-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{successMessage}</span>
-            </div>
-          )}
-
           {/* Forgot success state */}
           {mode === "forgot" && successMessage ? (
             <div className="space-y-4">
@@ -235,31 +219,11 @@ export function AuthPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </div>
+                <p className="text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>Check your email</p>
                 <p className="text-sm max-w-xs" style={{ color: "var(--graphite)" }}>
-                  Check your inbox and click the reset link to continue.
+                  {successMessage}
                 </p>
               </div>
-              {resetLink && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "var(--bg-secondary)", border: "1.5px solid var(--mist)" }}>
-                    <input readOnly value={resetLink}
-                      className="flex-1 text-xs outline-none truncate" style={{ color: "var(--graphite)", background: "transparent", fontFamily: "var(--font-mono)" }}
-                    />
-                    <button type="button" onClick={() => { navigator.clipboard.writeText(resetLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
-                      className="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer"
-                      style={{ background: linkCopied ? "var(--signal-green)" : "var(--accent)", color: "#fff" }}
-                    >
-                      {linkCopied ? "Copied!" : "Copy"}
-                    </button>
-                  </div>
-                  <a href={resetLink}
-                    className="w-full py-2.5 text-sm font-semibold inline-block text-center no-underline cursor-pointer rounded-xl transition-all"
-                    style={{ background: "var(--ink)", color: "var(--paper)" }}
-                  >
-                    Open Reset Link
-                  </a>
-                </div>
-              )}
               <button onClick={() => switchMode("login")}
                 className="w-full py-2.5 text-sm font-semibold cursor-pointer rounded-xl transition-all"
                 style={{ background: "transparent", color: "var(--graphite)", border: "1.5px solid var(--mist)" }}

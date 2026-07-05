@@ -156,17 +156,21 @@ async function handleForgotPassword(req, res, body) {
     return;
   }
 
+  const user = await authStore.findUserByEmail(email);
+  if (!user) {
+    sendJson(res, 404, { error: "This email is not registered. Please provide the registered email address." });
+    return;
+  }
+
   const resetToken = await authStore.createPasswordResetToken(email);
-  let resetLink = null;
   if (resetToken) {
     const baseUrl = process.env.APP_URL || "http://127.0.0.1:5173";
-    resetLink = `${baseUrl}/auth/reset-password?token=${resetToken}`;
-    await sendPasswordResetEmail(email, resetLink);
+    const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+    await sendPasswordResetEmail(email, resetUrl);
   }
 
   sendJson(res, 200, {
-    message: "If an account exists with that email, password reset instructions have been sent.",
-    resetLink,
+    message: "Password reset link has been sent to your registered email. Please check your inbox and follow the instructions to reset your password.",
   });
 }
 
