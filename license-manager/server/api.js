@@ -578,7 +578,7 @@ export function createApiMiddleware(env) {
           }
           const reasonHtml = reason ? `<p><strong>Reason:</strong> ${reason}</p>` : "";
           await t.sendMail({
-            from: process.env.SMTP_FROM || "jagathwork372@gmail.com",
+            from: process.env.SMTP_FROM || "ForgeQA <noreply@app-forgeqa.in>",
             to: pending.email,
             subject: "ForgeKey Registration Update",
             html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="color:#F59E0B;">ForgeKey</h1><p>Hello${pending.name ? " " + pending.name : ""},</p><p>We were unable to approve your ForgeKey registration at this time.</p>${reasonHtml}<p>If you believe this is an error, please contact support.</p><p style="color:#999;font-size:12px;">ForgeKey Team</p></body></html>`,

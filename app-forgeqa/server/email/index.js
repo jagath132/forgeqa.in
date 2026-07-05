@@ -31,8 +31,8 @@ async function getTransport() {
   return etherealTransporter;
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] || "noreply@forgeqa.in";
-const FROM = process.env.RESEND_FROM || "ForgeQA <noreply@forgeqa.in>";
+const FROM_EMAIL = process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] || "noreply@app-forgeqa.in";
+const FROM = process.env.RESEND_FROM || "ForgeQA <noreply@app-forgeqa.in>";
 const BRAND = "ForgeQA";
 
 export async function sendPasswordResetEmail(to, resetUrl) {

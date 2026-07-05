@@ -12,7 +12,7 @@ function getResend() {
   }
   return resendClient;
 }
-const FROM = process.env.RESEND_FROM || "ForgeQA <noreply@forgeqa.in>";
+const FROM = process.env.RESEND_FROM || "ForgeQA <noreply@app-forgeqa.in>";
 
 export async function sendProductKeyEmailResend(to, productKey, customerName) {
   const client = getResend();
