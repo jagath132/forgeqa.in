@@ -71,7 +71,7 @@ async function handleLogin(req, res, body) {
     return;
   }
 
-  const { email, password } = body;
+  const { email, password, rememberDevice, deviceToken } = body;
 
   if (!email || !password) {
     sendJson(res, 400, { error: "Email and password are required." });
@@ -113,18 +113,39 @@ async function handleLogin(req, res, body) {
 
   clearLockout(lockoutKey);
 
+  const userId = userRecord._id.toString();
   const tfaCode = body.twoFactorCode;
-  const tfaEnabled = await is2FAEnabled(userRecord._id.toString());
+  const tfaEnabled = await is2FAEnabled(userId);
+
   if (tfaEnabled) {
-    if (!tfaCode) {
-      sendJson(res, 200, { require2FA: true, email: userRecord.email });
-      return;
-    }
-    const tfaOk = await verify2FA(userRecord._id.toString(), tfaCode);
-    if (!tfaOk) {
-      recordFailedAttempt(lockoutKey);
-      sendJson(res, 401, { error: "Invalid two-factor authentication code." });
-      return;
+    const { verifyTrustedDevice } = await import("../2fa/index.js");
+    const isTrusted = deviceToken && await verifyTrustedDevice(userId, deviceToken);
+
+    if (!isTrusted) {
+      if (!tfaCode) {
+        sendJson(res, 200, { require2FA: true, email: userRecord.email });
+        return;
+      }
+      const tfaOk = await verify2FA(userId, tfaCode);
+      if (!tfaOk) {
+        recordFailedAttempt(lockoutKey);
+        sendJson(res, 401, { error: "Invalid two-factor authentication code." });
+        return;
+      }
+      if (rememberDevice) {
+        const userAgent = req.headers["user-agent"] || "Unknown Browser";
+        const deviceName = extractDeviceName(userAgent);
+        const { addTrustedDevice } = await import("../2fa/index.js");
+        const device = await addTrustedDevice(userId, deviceName);
+        const token = generateToken(userRecord);
+        setAuthCookie(res, token);
+        sendJson(res, 200, {
+          token,
+          deviceToken: device.token,
+          user: { id: userId, email: userRecord.email, name: userRecord.name || null, role: userRecord.role || "Member", createdAt: userRecord.createdAt, has_seen_welcome: userRecord.has_seen_welcome || false },
+        });
+        return;
+      }
     }
   }
 
@@ -133,8 +154,18 @@ async function handleLogin(req, res, body) {
 
   sendJson(res, 200, {
     token,
-    user: { id: userRecord._id.toString(), email: userRecord.email, name: userRecord.name || null, role: userRecord.role || "Member", createdAt: userRecord.createdAt, has_seen_welcome: userRecord.has_seen_welcome || false },
+    user: { id: userId, email: userRecord.email, name: userRecord.name || null, role: userRecord.role || "Member", createdAt: userRecord.createdAt, has_seen_welcome: userRecord.has_seen_welcome || false },
   });
+}
+
+function extractDeviceName(userAgent) {
+  if (!userAgent) return "Unknown Device";
+  if (userAgent.includes("Firefox")) return "Firefox";
+  if (userAgent.includes("Edg")) return "Edge";
+  if (userAgent.includes("Chrome")) return "Chrome";
+  if (userAgent.includes("Safari")) return "Safari";
+  if (userAgent.includes("Opera") || userAgent.includes("OPR")) return "Opera";
+  return "Unknown Browser";
 }
 
 async function handleForgotPassword(req, res, body) {
@@ -280,6 +311,26 @@ async function handleDisable2FA(req, res, url, body, user) {
   const ok = await verify2FA(user.id, token);
   if (!ok) { sendJson(res, 400, { error: "Invalid verification code." }); return; }
   await disable2FA(user.id);
+  sendJson(res, 200, { ok: true });
+}
+
+async function handleGetTrustedDevices(req, res, url, body, user) {
+  const { getTrustedDevices } = await import("../2fa/index.js");
+  const devices = await getTrustedDevices(user.id);
+  sendJson(res, 200, { devices });
+}
+
+async function handleRemoveTrustedDevice(req, res, url, body, user) {
+  const { removeTrustedDevice } = await import("../2fa/index.js");
+  const { deviceId } = body;
+  if (!deviceId) { sendJson(res, 400, { error: "Device ID is required." }); return; }
+  await removeTrustedDevice(user.id, deviceId);
+  sendJson(res, 200, { ok: true });
+}
+
+async function handleRemoveAllTrustedDevices(req, res, url, body, user) {
+  const { removeAllTrustedDevices } = await import("../2fa/index.js");
+  await removeAllTrustedDevices(user.id);
   sendJson(res, 200, { ok: true });
 }
 
@@ -718,6 +769,9 @@ const ROUTE_CONFIG = [
   { path: "/api/auth/2fa/setup", method: "POST", handler: handleSetup2FA, auth: true },
   { path: "/api/auth/2fa/enable", method: "POST", handler: handleEnable2FA, auth: true },
   { path: "/api/auth/2fa/disable", method: "POST", handler: handleDisable2FA, auth: true },
+  { path: "/api/auth/trusted-devices", method: "GET", handler: handleGetTrustedDevices, auth: true },
+  { path: "/api/auth/trusted-devices", method: "DELETE", handler: handleRemoveTrustedDevice, auth: true },
+  { path: "/api/auth/trusted-devices/all", method: "DELETE", handler: handleRemoveAllTrustedDevices, auth: true },
   { path: "/api/settings/active-provider", method: "PUT", handler: handleSetActiveProvider, auth: true },
   { path: "/api/settings/active-provider", method: "DELETE", handler: handleClearActiveProvider, auth: true },
   { path: "/api/user/billing", method: "GET", handler: handleGetBilling, auth: true },

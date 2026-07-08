@@ -66,6 +66,7 @@ export function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [require2FA, setRequire2FA] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(false);
   const twoFARef = useRef<HTMLInputElement | null>(null);
   const [btnSuccess, setBtnSuccess] = useState(false);
 
@@ -76,15 +77,23 @@ export function AuthPage() {
     setIsLoading(true);
     try {
       if (mode === "login") {
-        const payload: Record<string, string> = { email, password };
-        if (require2FA && twoFactorCode) payload.twoFactorCode = twoFactorCode;
-        const res = await api.post<AuthResponse & { require2FA?: boolean; email?: string }>("/api/auth/login", payload);
+        const payload: Record<string, any> = { email, password };
+        if (require2FA && twoFactorCode) {
+          payload.twoFactorCode = twoFactorCode;
+          payload.rememberDevice = rememberDevice;
+          const storedDeviceToken = localStorage.getItem("forgeqa_device_token");
+          if (storedDeviceToken) payload.deviceToken = storedDeviceToken;
+        }
+        const res = await api.post<AuthResponse & { require2FA?: boolean; email?: string; deviceToken?: string }>("/api/auth/login", payload);
         if (res.data.require2FA) {
           setRequire2FA(true);
           setTwoFactorCode("");
           setTimeout(() => twoFARef.current?.focus(), 100);
           setIsLoading(false);
           return;
+        }
+        if (res.data.deviceToken) {
+          localStorage.setItem("forgeqa_device_token", res.data.deviceToken);
         }
         setBtnSuccess(true);
         setStoredToken(res.data.token);
@@ -333,7 +342,20 @@ export function AuthPage() {
                       onBlur={(e) => { e.target.style.borderColor = twoFactorCode.length === 6 ? "var(--signal-green)" : "var(--mist)"; e.target.style.boxShadow = "none"; }}
                     />
                   </div>
-                  <button type="button" onClick={() => { setRequire2FA(false); setTwoFactorCode(""); setError(""); }}
+                  <div className="flex items-center gap-2 mt-3">
+                    <input
+                      type="checkbox"
+                      id="rememberDevice"
+                      checked={rememberDevice}
+                      onChange={(e) => setRememberDevice(e.target.checked)}
+                      className="h-4 w-4 rounded cursor-pointer"
+                      style={{ accentColor: "var(--accent)" }}
+                    />
+                    <label htmlFor="rememberDevice" className="text-xs cursor-pointer" style={{ color: "var(--graphite)" }}>
+                      Remember this device for 30 days
+                    </label>
+                  </div>
+                  <button type="button" onClick={() => { setRequire2FA(false); setTwoFactorCode(""); setRememberDevice(false); setError(""); }}
                     className="mt-2 w-full text-xs py-1.5 font-semibold transition-opacity hover:opacity-70"
                     style={{ color: "var(--graphite)", background: "transparent", border: "none", cursor: "pointer" }}
                   >

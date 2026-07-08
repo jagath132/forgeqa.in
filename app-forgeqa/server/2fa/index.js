@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import QRCode from "qrcode";
 import { getDb } from "../db.js";
 
 export function generateTOTPSecret() {
@@ -8,6 +9,10 @@ export function generateTOTPSecret() {
 
 export function generateTOTPUri(email, secret, issuer = "ForgeQA") {
   return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
+async function generateQRCodeDataUrl(uri) {
+  return QRCode.toDataURL(uri, { width: 200, margin: 2, color: { dark: "#1E293B", light: "#FFFFFF" } });
 }
 
 function hmacSha1(key, message) {
@@ -47,13 +52,14 @@ export function verifyTOTP(secret, token) {
 export async function setup2FA(userId, email) {
   const secret = generateTOTPSecret();
   const uri = generateTOTPUri(email, secret);
+  const qrCode = await generateQRCodeDataUrl(uri);
   const db = getDb();
   await db.collection("totp_secrets").updateOne(
     { userId },
     { $set: { secret, enabled: false, createdAt: new Date().toISOString() } },
     { upsert: true }
   );
-  return { secret, uri };
+  return { secret, uri, qrCode };
 }
 
 export async function enable2FA(userId, token) {
@@ -90,4 +96,63 @@ export async function get2FAStatus(userId) {
   const db = getDb();
   const record = await db.collection("totp_secrets").findOne({ userId });
   return { enabled: record?.enabled || false, setup: !!record };
+}
+
+const DEVICE_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+export function generateDeviceToken() {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+export async function addTrustedDevice(userId, deviceName) {
+  const db = getDb();
+  const token = generateDeviceToken();
+  const expiresAt = new Date(Date.now() + DEVICE_TOKEN_EXPIRY).toISOString();
+  await db.collection("trusted_devices").insertOne({
+    userId,
+    token,
+    deviceName: deviceName || "Unknown Device",
+    createdAt: new Date().toISOString(),
+    expiresAt,
+  });
+  return { token, expiresAt };
+}
+
+export async function verifyTrustedDevice(userId, token) {
+  const db = getDb();
+  const device = await db.collection("trusted_devices").findOne({
+    userId,
+    token,
+    expiresAt: { $gt: new Date().toISOString() },
+  });
+  return !!device;
+}
+
+export async function getTrustedDevices(userId) {
+  const db = getDb();
+  const devices = await db.collection("trusted_devices")
+    .find({ userId })
+    .sort({ createdAt: -1 })
+    .toArray();
+  return devices.map((d) => ({
+    id: d._id.toString(),
+    deviceName: d.deviceName,
+    createdAt: d.createdAt,
+    expiresAt: d.expiresAt,
+    isExpired: new Date(d.expiresAt) < new Date(),
+  }));
+}
+
+export async function removeTrustedDevice(userId, deviceId) {
+  const db = getDb();
+  const { ObjectId } = await import("mongodb");
+  await db.collection("trusted_devices").deleteOne({
+    _id: new ObjectId(deviceId),
+    userId,
+  });
+}
+
+export async function removeAllTrustedDevices(userId) {
+  const db = getDb();
+  await db.collection("trusted_devices").deleteMany({ userId });
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore, getProviderLabel } from "../store/useAppStore";
 import { Card } from "../components/ui/Card";
-import { getProfile, saveProfile, getProductKey } from "../lib/api";
+import { getProfile, saveProfile, getProductKey, setup2FA, enable2FA, disable2FA, getTrustedDevices, removeTrustedDevice, removeAllTrustedDevices, type TrustedDevice } from "../lib/api";
 
 const styles = `
   @keyframes logoutShine {
@@ -69,6 +69,15 @@ export function ProfilePage() {
   const [supportSent, setSupportSent] = useState(false);
   const [supportForm, setSupportForm] = useState({ name: "", email: "", subject: "", message: "" });
 
+  // 2FA State
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [twoFASetup, setTwoFASetup] = useState<{ secret: string; uri: string; qrCode: string } | null>(null);
+  const [twoFAToken, setTwoFAToken] = useState("");
+  const [twoFAStep, setTwoFAStep] = useState<"idle" | "setup" | "verify" | "enabled">("idle");
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [twoFAError, setTwoFAError] = useState("");
+  const [trustedDevices, setTrustedDevices] = useState<TrustedDevice[]>([]);
+
   useEffect(() => {
     if (!supportSent) return;
     const timer = setTimeout(() => {
@@ -101,7 +110,97 @@ export function ProfilePage() {
       }
     });
     getProductKey().then(setProductKey);
+    check2FAStatus();
   }, [user, setProfileName]);
+
+  async function check2FAStatus() {
+    try {
+      const { api: apiClient } = await import("../lib/api");
+      const res = await apiClient.get<{ twoFactorEnabled: boolean }>("/api/auth/me");
+      setTwoFAEnabled(res.data.twoFactorEnabled);
+      setTwoFAStep(res.data.twoFactorEnabled ? "enabled" : "idle");
+      if (res.data.twoFactorEnabled) {
+        loadTrustedDevices();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function loadTrustedDevices() {
+    try {
+      const devices = await getTrustedDevices();
+      setTrustedDevices(devices);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleSetup2FA() {
+    setTwoFALoading(true);
+    setTwoFAError("");
+    try {
+      const result = await setup2FA();
+      setTwoFASetup(result);
+      setTwoFAStep("setup");
+    } catch (err: any) {
+      setTwoFAError(err.response?.data?.error || "Failed to setup 2FA");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  async function handleEnable2FA() {
+    if (twoFAToken.length !== 6) return;
+    setTwoFALoading(true);
+    setTwoFAError("");
+    try {
+      await enable2FA(twoFAToken);
+      setTwoFAEnabled(true);
+      setTwoFAStep("enabled");
+      setTwoFAToken("");
+      loadTrustedDevices();
+    } catch (err: any) {
+      setTwoFAError(err.response?.data?.error || "Invalid code");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  async function handleDisable2FA() {
+    if (twoFAToken.length !== 6) return;
+    setTwoFALoading(true);
+    setTwoFAError("");
+    try {
+      await disable2FA(twoFAToken);
+      setTwoFAEnabled(false);
+      setTwoFAStep("idle");
+      setTwoFAToken("");
+      setTrustedDevices([]);
+    } catch (err: any) {
+      setTwoFAError(err.response?.data?.error || "Invalid code");
+    } finally {
+      setTwoFALoading(false);
+    }
+  }
+
+  async function handleRemoveDevice(deviceId: string) {
+    try {
+      await removeTrustedDevice(deviceId);
+      setTrustedDevices((prev) => prev.filter((d) => d.id !== deviceId));
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleRemoveAllDevices() {
+    try {
+      await removeAllTrustedDevices();
+      setTrustedDevices([]);
+    } catch {
+      // ignore
+    }
+  }
 
   function handleSaveName() {
     const name = localName.trim();
@@ -366,6 +465,167 @@ export function ProfilePage() {
         </Card>
 
       </div>
+
+      {/* ── Two-Factor Authentication ── */}
+      <Card>
+        <div className="flex items-center gap-3 pb-4 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: twoFAEnabled ? "var(--accent-emerald-soft)" : "var(--bg-tertiary)" }}>
+            <svg className="h-5 w-5" style={{ color: twoFAEnabled ? "var(--accent-emerald)" : "var(--text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Two-Factor Authentication</h2>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>Add an extra layer of security to your account.</p>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            style={{ background: twoFAEnabled ? "var(--accent-emerald-soft)" : "var(--bg-tertiary)", color: twoFAEnabled ? "var(--accent-emerald)" : "var(--text-muted)" }}>
+            {twoFAEnabled ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+
+        {/* 2FA Disabled - Setup */}
+        {twoFAStep === "idle" && (
+          <div className="text-center py-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl mx-auto mb-4" style={{ background: "var(--bg-tertiary)" }}>
+              <svg className="h-8 w-8" style={{ color: "var(--text-muted)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
+              </svg>
+            </div>
+            <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>Protect your account with an authenticator app like Google Authenticator or Authy.</p>
+            <button onClick={handleSetup2FA} disabled={twoFALoading} type="button"
+              className="px-6 py-2.5 text-sm font-semibold rounded-xl transition-all cursor-pointer disabled:opacity-50"
+              style={{ background: "var(--accent)", color: "#fff" }}>
+              {twoFALoading ? "Setting up..." : "Enable 2FA"}
+            </button>
+          </div>
+        )}
+
+        {/* 2FA Setup - Show QR Code */}
+        {twoFAStep === "setup" && twoFASetup && (
+          <div className="py-6">
+            <div className="text-center mb-6">
+              <h3 className="text-base font-bold mb-2" style={{ color: "var(--text-primary)" }}>Scan QR Code</h3>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Scan this QR code with your authenticator app.</p>
+            </div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="p-4 rounded-2xl" style={{ background: "#fff", border: "2px solid var(--border-default)" }}>
+                <img src={twoFASetup.qrCode} alt="2FA QR Code" className="w-48 h-48" />
+              </div>
+              <div className="w-full max-w-sm">
+                <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Or enter this code manually:</p>
+                <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-default)" }}>
+                  <code className="flex-1 text-xs font-mono break-all" style={{ color: "var(--text-primary)" }}>{twoFASetup.secret}</code>
+                  <button onClick={() => navigator.clipboard.writeText(twoFASetup.secret)} type="button"
+                    className="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer"
+                    style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div className="w-full max-w-sm">
+                <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>Enter the 6-digit code from your app:</p>
+                <input type="text" inputMode="numeric" maxLength={6} value={twoFAToken}
+                  onChange={(e) => setTwoFAToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  className="w-full py-3 text-center text-2xl tracking-[0.5em] font-mono rounded-xl outline-none transition-all"
+                  style={{ background: "var(--bg-secondary)", border: `2px solid ${twoFAToken.length === 6 ? "var(--accent-emerald)" : "var(--border-default)"}`, color: "var(--text-primary)" }}
+                />
+                {twoFAError && <p className="text-xs mt-2 text-center" style={{ color: "var(--danger)" }}>{twoFAError}</p>}
+                <div className="flex gap-3 mt-4">
+                  <button onClick={() => { setTwoFAStep("idle"); setTwoFASetup(null); setTwoFAToken(""); setTwoFAError(""); }} type="button"
+                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer"
+                    style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)", border: "1px solid var(--border-default)" }}>
+                    Cancel
+                  </button>
+                  <button onClick={handleEnable2FA} disabled={twoFAToken.length !== 6 || twoFALoading} type="button"
+                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                    style={{ background: "var(--accent)", color: "#fff" }}>
+                    {twoFALoading ? "Verifying..." : "Verify & Enable"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2FA Enabled - Management */}
+        {twoFAStep === "enabled" && (
+          <div className="py-4">
+            <div className="rounded-xl p-4 mb-4" style={{ background: "var(--accent-emerald-soft)", border: "1px solid color-mix(in srgb, var(--accent-emerald) 20%, transparent)" }}>
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5" style={{ color: "var(--accent-emerald)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-semibold" style={{ color: "var(--accent-emerald)" }}>Two-factor authentication is enabled</span>
+              </div>
+            </div>
+
+            {/* Disable 2FA */}
+            <div className="rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-default)" }}>
+              <p className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Disable 2FA</p>
+              <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>Enter your current authenticator code to disable 2FA.</p>
+              <div className="flex gap-3">
+                <input type="text" inputMode="numeric" maxLength={6} value={twoFAToken}
+                  onChange={(e) => setTwoFAToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  className="flex-1 py-2.5 text-center text-lg tracking-[0.3em] font-mono rounded-xl outline-none"
+                  style={{ background: "var(--bg-card)", border: "1px solid var(--border-default)", color: "var(--text-primary)" }}
+                />
+                <button onClick={handleDisable2FA} disabled={twoFAToken.length !== 6 || twoFALoading} type="button"
+                  className="px-5 py-2.5 text-sm font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                  style={{ background: "rgba(239,68,68,0.1)", color: "var(--danger)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                  {twoFALoading ? "Disabling..." : "Disable"}
+                </button>
+              </div>
+              {twoFAError && <p className="text-xs mt-2" style={{ color: "var(--danger)" }}>{twoFAError}</p>}
+            </div>
+
+            {/* Trusted Devices */}
+            <div className="mt-4 rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-default)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Trusted Devices</p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>Devices that skip 2FA for 30 days.</p>
+                </div>
+                {trustedDevices.length > 0 && (
+                  <button onClick={handleRemoveAllDevices} type="button"
+                    className="text-xs font-semibold cursor-pointer"
+                    style={{ color: "var(--danger)" }}>
+                    Remove All
+                  </button>
+                )}
+              </div>
+              {trustedDevices.length === 0 ? (
+                <p className="text-xs py-3 text-center" style={{ color: "var(--text-muted)" }}>No trusted devices.</p>
+              ) : (
+                <div className="space-y-2">
+                  {trustedDevices.map((device) => (
+                    <div key={device.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)" }}>
+                      <div className="flex items-center gap-3">
+                        <svg className="h-4 w-4" style={{ color: device.isExpired ? "var(--text-muted)" : "var(--accent-emerald)" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 7.41A2.25 2.25 0 012.25 5.495V5.25" />
+                        </svg>
+                        <div>
+                          <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{device.deviceName}</p>
+                          <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                            {device.isExpired ? "Expired" : `Expires ${new Date(device.expiresAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      </div>
+                      <button onClick={() => handleRemoveDevice(device.id)} type="button"
+                        className="text-xs font-semibold cursor-pointer"
+                        style={{ color: "var(--danger)" }}>
+                        Revoke
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Support */}
       <section>
