@@ -65,6 +65,10 @@ export function CompleteRegistrationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  useEffect(() => {
+    document.title = 'Complete Registration — ForgeQA';
+  }, []);
+
   const emailFromUrl = searchParams.get('email') || '';
   const keyFromUrl = searchParams.get('key') || '';
   const [email, setEmail] = useState(emailFromUrl);

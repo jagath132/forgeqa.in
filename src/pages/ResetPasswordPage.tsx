@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { api } from '../lib/api';
 import { ForgeQAIcon } from '../components/ui/ForgeQALogo';
 
 export function ResetPasswordPage() {
+  useEffect(() => {
+    document.title = 'Reset Password — ForgeQA';
+  }, []);
+
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');

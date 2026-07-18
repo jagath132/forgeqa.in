@@ -1,8 +1,19 @@
 import crypto from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { authStore } from './store.js';
 import { getDb } from '../db.js';
 import { isDisposableEmail } from './disposable-emails.js';
-import { authenticateToken, encryptApiKey, generateToken } from './service.js';
+import {
+  authenticateToken,
+  encryptApiKey,
+  generateToken,
+  generateRefreshToken,
+  revokeRefreshToken,
+  rotateRefreshToken,
+  verifyRefreshToken,
+  parseCookies,
+  getAuthToken,
+} from './service.js';
 import { validateProductKey, claimProductKey, isValidKeyFormat } from './productKeys.js';
 import { sendPasswordResetEmail, sendSupportEmail } from '../email/index.js';
 import {
@@ -16,11 +27,16 @@ import { getUserPlan } from '../billing/plans.js';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
-function setAuthCookie(res, token) {
-  res.setHeader('Set-Cookie', [
-    `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/`,
-    `session=active; SameSite=Strict; Path=/`,
-  ]);
+function setAuthCookie(res, token, refreshToken) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookies = [
+    `token=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}`,
+    refreshToken
+      ? `refreshToken=${encodeURIComponent(refreshToken)}; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}`
+      : '',
+    `session=active; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}`,
+  ].filter(Boolean);
+  res.setHeader('Set-Cookie', cookies);
 }
 
 function readRequestBody(req) {
@@ -85,14 +101,20 @@ async function handleLogin(req, res, body) {
 
   const lockoutKey = `login:${email.trim().toLowerCase()}`;
   if (await checkAccountLockout(lockoutKey)) {
+    const db = getDb();
+    const lockoutRecord = await db
+      .collection('rate_limits')
+      .findOne({ ip: `lockout:${lockoutKey}`, endpoint: 'lockout' });
+    const lockedUntil = lockoutRecord?.lockedUntil;
+    const remainingMs = lockedUntil ? Math.max(0, lockedUntil - Date.now()) : 0;
+    const remainingMinutes = Math.ceil(remainingMs / 60000);
+    res.setHeader('Retry-After', String(remainingMinutes * 60));
     sendJson(res, 429, {
-      error: 'Account temporarily locked due to too many failed attempts. Try again later.',
+      error: 'Invalid email or password.',
+      lockout: true,
+      remainingMinutes: remainingMinutes || 15,
+      unlockAt: lockedUntil || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     });
-    return;
-  }
-
-  if (isDisposableEmail(email)) {
-    sendJson(res, 400, { error: 'Temporary email addresses are not allowed.' });
     return;
   }
 
@@ -132,24 +154,21 @@ async function handleLogin(req, res, body) {
     const { verifyTrustedDevice } = await import('../2fa/index.js');
     const isTrusted = deviceToken && (await verifyTrustedDevice(userId, deviceToken));
 
-    if (!isTrusted) {
-      if (!tfaCode) {
-        sendJson(res, 200, { require2FA: true, email: userRecord.email });
-        return;
-      }
+    if (tfaCode) {
       const tfaOk = await verify2FA(userId, tfaCode);
       if (!tfaOk) {
         recordFailedAttempt(lockoutKey);
         sendJson(res, 401, { error: 'Invalid two-factor authentication code.' });
         return;
       }
-      if (rememberDevice) {
+      if (rememberDevice && !isTrusted) {
         const userAgent = req.headers['user-agent'] || 'Unknown Browser';
         const deviceName = extractDeviceName(userAgent);
         const { addTrustedDevice } = await import('../2fa/index.js');
         const device = await addTrustedDevice(userId, deviceName);
         const token = generateToken(userRecord);
-        setAuthCookie(res, token);
+        const refreshToken = await generateRefreshToken(userRecord);
+        setAuthCookie(res, token, refreshToken);
         sendJson(res, 200, {
           token,
           deviceToken: device.token,
@@ -164,11 +183,15 @@ async function handleLogin(req, res, body) {
         });
         return;
       }
+    } else if (!isTrusted) {
+      sendJson(res, 200, { require2FA: true, email: userRecord.email });
+      return;
     }
   }
 
   const token = generateToken(userRecord);
-  setAuthCookie(res, token);
+  const refreshToken = await generateRefreshToken(userRecord);
+  setAuthCookie(res, token, refreshToken);
 
   sendJson(res, 200, {
     token,
@@ -213,23 +236,18 @@ async function handleForgotPassword(req, res, body) {
   }
 
   const user = await authStore.findUserByEmail(email);
-  if (!user) {
-    sendJson(res, 404, {
-      error: 'This email is not registered. Please provide the registered email address.',
-    });
-    return;
-  }
-
-  const resetToken = await authStore.createPasswordResetToken(email);
-  if (resetToken) {
-    const baseUrl = process.env.APP_URL || 'http://127.0.0.1:5173';
-    const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
-    await sendPasswordResetEmail(email, resetUrl);
+  if (user) {
+    const resetToken = await authStore.createPasswordResetToken(email);
+    if (resetToken) {
+      const baseUrl = process.env.APP_URL || 'http://127.0.0.1:5173';
+      const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+      await sendPasswordResetEmail(email, resetUrl);
+    }
   }
 
   sendJson(res, 200, {
     message:
-      'Password reset link has been sent to your registered email. Please check your inbox and follow the instructions to reset your password.',
+      'If this email is registered, a password reset link has been sent. Please check your inbox and follow the instructions to reset your password.',
   });
 }
 
@@ -258,6 +276,19 @@ async function handleResetPassword(req, res, body) {
     sendJson(res, 200, { message: 'Password has been reset successfully. You can now sign in.' });
   } catch (err) {
     sendJson(res, 400, { error: err.message || 'Unable to reset password.' });
+  }
+}
+
+async function handleRefreshToken(req, res, body) {
+  try {
+    const { user, rawToken } = await verifyRefreshToken(req);
+    const newAccessToken = generateToken(user);
+    const newRefreshToken = await rotateRefreshToken(rawToken);
+    setAuthCookie(res, newAccessToken, newRefreshToken);
+    sendJson(res, 200, { token: newAccessToken });
+  } catch (e) {
+    const status = e.statusCode || 401;
+    sendJson(res, status, { error: e.message || 'Invalid or expired refresh token' });
   }
 }
 
@@ -662,10 +693,23 @@ async function handleRegistrationStatus(req, res, body, url) {
   });
 }
 
-function handleLogout(req, res, _body) {
+async function handleLogout(req, res, _body) {
+  const isProd = process.env.NODE_ENV === 'production';
+  try {
+    const cookies = parseCookies(req);
+    if (cookies.refreshToken) {
+      const decoded = jwt.decode(decodeURIComponent(cookies.refreshToken));
+      if (decoded?.userId) {
+        await revokeRefreshToken(decoded.userId);
+      }
+    }
+  } catch {
+    /* best-effort revocation */
+  }
   res.setHeader('Set-Cookie', [
-    `token=; HttpOnly; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-    `session=; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `token=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `refreshToken=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `session=; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
   ]);
   sendJson(res, 200, { ok: true });
 }
@@ -682,22 +726,20 @@ async function handleEnterpriseInquiry(req, res, body) {
     sendJson(res, 404, { error: 'Registration session not found.' });
     return;
   }
-  await db
-    .collection('pending_registrations')
-    .updateOne(
-      { pendingId },
-      {
-        $set: {
-          plan: 'enterprise',
-          status: 'inquiry_submitted',
-          company,
-          teamSize: teamSize || null,
-          requirements,
-          contact: contact || null,
-          inquiredAt: new Date().toISOString(),
-        },
-      }
-    );
+  await db.collection('pending_registrations').updateOne(
+    { pendingId },
+    {
+      $set: {
+        plan: 'enterprise',
+        status: 'inquiry_submitted',
+        company,
+        teamSize: teamSize || null,
+        requirements,
+        contact: contact || null,
+        inquiredAt: new Date().toISOString(),
+      },
+    }
+  );
   await db.collection('enterprise_inquiries').insertOne({
     email: pending.email,
     name: pending.name,
@@ -805,6 +847,7 @@ async function handleDeleteAccount(req, res, url, body, user) {
   }
   const email = userDoc.email;
   await db.collection('users').deleteOne({ _id: new ObjectId(user.id) });
+  await revokeRefreshToken(user.id);
   await db.collection('user_data').deleteMany({ userId: user.id });
   await db.collection('user_api_keys').deleteMany({ userId: user.id });
   await db
@@ -820,8 +863,9 @@ async function handleDeleteAccount(req, res, url, body, user) {
     deletedAt: new Date().toISOString(),
   });
   res.setHeader('Set-Cookie', [
-    `token=; HttpOnly; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
-    `session=; SameSite=Strict; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `token=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `refreshToken=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
+    `session=; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
   ]);
   sendJson(res, 200, { ok: true });
 }
@@ -853,6 +897,7 @@ async function handleSupport(req, res, body) {
 const ROUTE_CONFIG = [
   // Removed: old /api/auth/register (bypasses new registration flow). Use start-registration + select-plan + complete-registration instead.
   { path: '/api/auth/validate-key', method: 'POST', handler: handleValidateKey, auth: false },
+  { path: '/api/auth/refresh', method: 'POST', handler: handleRefreshToken, auth: false },
   { path: '/api/auth/support', method: 'POST', handler: handleSupport, auth: false },
   { path: '/api/auth/login', method: 'POST', handler: handleLogin, auth: false },
   { path: '/api/auth/forgot-password', method: 'POST', handler: handleForgotPassword, auth: false },

@@ -15,44 +15,47 @@ export type AuthResponse = {
   user: User;
 };
 
-const SESSION_TOKEN_KEY = 'nextest_token';
-
-export function getStoredToken(): string | null {
-  try {
-    return sessionStorage.getItem(SESSION_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setStoredToken(token: string): void {
-  try {
-    sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-  } catch {
-    /* ignored */
-  }
-}
-
-export function clearStoredToken(): void {
-  try {
-    sessionStorage.removeItem(SESSION_TOKEN_KEY);
-  } catch {
-    /* ignored */
-  }
-}
-
 export const api = axios.create({
   baseURL: '',
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = getStoredToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+let isRefreshing = false;
+let pendingRefresh: Promise<void> | null = null;
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const originalRequest = error.config;
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/api/auth/refresh') &&
+      !originalRequest.url?.includes('/api/auth/login')
+    ) {
+      originalRequest._retry = true;
+      if (!isRefreshing) {
+        isRefreshing = true;
+        pendingRefresh = api
+          .post('/api/auth/refresh')
+          .then(() => {
+            /* cookie refreshed by server, retry with new cookie */
+          })
+          .catch(() => {
+            clearSession();
+            window.location.href = '/auth';
+          })
+          .finally(() => {
+            isRefreshing = false;
+            pendingRefresh = null;
+          });
+      }
+      await pendingRefresh;
+      return api(originalRequest);
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export type KnowledgeFile = {
   id: string;
@@ -204,7 +207,6 @@ export function hasSession(): boolean {
 
 export function clearSession(): void {
   document.cookie = 'session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
-  document.cookie = 'token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
 }
 
 export async function getProfile() {

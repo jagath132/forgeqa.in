@@ -147,6 +147,10 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  useEffect(() => {
+    document.title = 'Create Account — ForgeQA';
+  }, []);
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const [step, setStep] = useState<Step>('info');
   const [name, setName] = useState('');

@@ -22,6 +22,7 @@ export function LandingPage({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    document.title = 'ForgeQA — AI-Powered Test Automation Platform';
     if (searchParams.get('support') === 'true') {
       setTimeout(
         () =>

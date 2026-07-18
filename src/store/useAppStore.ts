@@ -2,11 +2,10 @@ import { create } from 'zustand';
 import {
   api,
   clearSession,
-  clearStoredToken,
   getHistory,
   getProfile,
   getQaResult,
-  getStoredToken,
+  hasSession,
   saveHistory,
   saveQaResult,
   type AiProvider,
@@ -125,7 +124,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   setNavDrawerOpen: (navDrawerOpen) => set({ navDrawerOpen }),
   logout: () => {
     clearSession();
-    clearStoredToken();
+    api.post('/api/auth/logout').catch(() => {});
     set({ user: null });
   },
   openConfirm: (title, message, onConfirm, confirmLabel) => {
@@ -136,9 +135,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
   },
 
   initialize: async () => {
-    if (!getStoredToken()) {
-      clearSession();
-      api.post('/api/auth/logout').catch(() => {});
+    if (!hasSession()) {
       set({ authChecking: false });
       return;
     }
@@ -167,7 +164,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       }
     } catch {
       clearSession();
-      clearStoredToken();
     }
     set({ authChecking: false });
   },

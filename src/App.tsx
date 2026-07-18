@@ -33,6 +33,19 @@ function AppLayout() {
       });
     });
   }, [pathname]);
+  useEffect(() => {
+    const titles: Record<string, string> = {
+      '/dashboard': 'Dashboard — ForgeQA',
+      '/generator': 'Generator — ForgeQA',
+      '/test-scripts': 'Test Scripts — ForgeQA',
+      '/knowledge': 'Knowledge Base — ForgeQA',
+      '/settings': 'Settings — ForgeQA',
+      '/analytics': 'Analytics — ForgeQA',
+      '/suites': 'Suites — ForgeQA',
+      '/regression': 'Regression — ForgeQA',
+    };
+    document.title = titles[pathname] || 'ForgeQA — AI-Powered Test Automation Platform';
+  }, [pathname]);
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
       <NavBar />

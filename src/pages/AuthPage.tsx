@@ -1,10 +1,13 @@
-import { useState, useEffect, FormEvent, useRef } from 'react';
+import { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { api, setStoredToken, type AuthResponse } from '../lib/api';
+import { api, type AuthResponse } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
 type AuthMode = 'login' | 'forgot';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 const CONSOLE_LINES = [
   '✓ login flow ........................ passed',
@@ -65,6 +68,11 @@ export function AuthPage() {
   const navigate = useNavigate();
   const setUser = useAppStore((s) => s.setUser);
   const setSavedProviderKeys = useAppStore((s) => s.setSavedProviderKeys);
+
+  useEffect(() => {
+    document.title = 'Sign In — ForgeQA';
+  }, []);
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,9 +85,48 @@ export function AuthPage() {
   const [rememberDevice, setRememberDevice] = useState(false);
   const twoFARef = useRef<HTMLInputElement | null>(null);
   const [btnSuccess, setBtnSuccess] = useState(false);
+  const [lockoutMinutes, setLockoutMinutes] = useState(0);
+  const [lockoutCountdown, setLockoutCountdown] = useState(0);
+  const lockoutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const submittingRef = useRef(false);
+
+  const clearLockoutTimer = useCallback(() => {
+    if (lockoutTimerRef.current) {
+      clearInterval(lockoutTimerRef.current);
+      lockoutTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return clearLockoutTimer;
+  }, [clearLockoutTimer]);
+
+  useEffect(() => {
+    if (lockoutCountdown <= 0) {
+      clearLockoutTimer();
+      return;
+    }
+    lockoutTimerRef.current = setInterval(() => {
+      setLockoutCountdown((prev) => {
+        if (prev <= 1) {
+          clearLockoutTimer();
+          setLockoutMinutes(0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return clearLockoutTimer;
+  }, [lockoutCountdown, clearLockoutTimer]);
+
+  const isLocked = lockoutMinutes > 0 || lockoutCountdown > 0;
+  const isValidEmail = EMAIL_REGEX.test(email);
+  const isValidPassword = PASSWORD_REGEX.test(password);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!isValidEmail || submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setSuccessMessage('');
     setIsLoading(true);
@@ -91,6 +138,7 @@ export function AuthPage() {
         if (require2FA && twoFactorCode) {
           payload.twoFactorCode = twoFactorCode;
           payload.rememberDevice = rememberDevice;
+          delete payload.deviceToken;
         }
         const res = await api.post<
           AuthResponse & { require2FA?: boolean; email?: string; deviceToken?: string }
@@ -100,13 +148,13 @@ export function AuthPage() {
           setTwoFactorCode('');
           setTimeout(() => twoFARef.current?.focus(), 100);
           setIsLoading(false);
+          submittingRef.current = false;
           return;
         }
         if (res.data.deviceToken) {
           localStorage.setItem('forgeqa_device_token', res.data.deviceToken);
         }
         setBtnSuccess(true);
-        setStoredToken(res.data.token);
         const isNewUser = !res.data.user.has_seen_welcome;
         setTimeout(() => {
           setUser(res.data.user);
@@ -126,12 +174,18 @@ export function AuthPage() {
       }
     } catch (err) {
       if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.error || err.message || 'An error occurred.');
+        const data = err.response?.data as any;
+        if (data?.lockout && data?.remainingMinutes) {
+          setLockoutMinutes(data.remainingMinutes);
+          setLockoutCountdown(data.remainingMinutes * 60);
+        }
+        setError(data?.error || err.message || 'An error occurred.');
       } else {
         setError('An unexpected error occurred.');
       }
     } finally {
       setIsLoading(false);
+      submittingRef.current = false;
     }
   }
 
@@ -141,7 +195,16 @@ export function AuthPage() {
     setSuccessMessage('');
     setRequire2FA(false);
     setTwoFactorCode('');
+    clearLockoutTimer();
+    setLockoutMinutes(0);
+    setLockoutCountdown(0);
   };
+
+  function formatCountdown(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
 
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--paper)' }}>
@@ -303,11 +366,14 @@ export function AuthPage() {
           {/* Error */}
           {error && (
             <div
+              role="alert"
               className="mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm"
               style={{
-                background: 'rgba(240,68,56,0.06)',
+                background: isLocked ? 'rgba(240,68,56,0.08)' : 'rgba(240,68,56,0.06)',
                 color: 'var(--danger)',
-                border: '1px solid rgba(240,68,56,0.12)',
+                border: isLocked
+                  ? '1px solid rgba(240,68,56,0.2)'
+                  : '1px solid rgba(240,68,56,0.12)',
               }}
             >
               <svg
@@ -323,7 +389,14 @@ export function AuthPage() {
                   d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span>{error}</span>
+              <div>
+                <span>{error}</span>
+                {isLocked && lockoutCountdown > 0 && (
+                  <span className="block mt-1 text-xs font-semibold">
+                    Try again in {formatCountdown(lockoutCountdown)}
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
@@ -379,32 +452,50 @@ export function AuthPage() {
                 >
                   Email
                 </label>
-                <input
-                  id="auth_email"
-                  name="auth_email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  autoComplete="off"
-                  className="w-full text-sm outline-none transition-all px-4 py-3"
-                  style={{
-                    color: 'var(--ink)',
-                    background: 'var(--bg-secondary)',
-                    border: '1.5px solid var(--mist)',
-                    borderRadius: 'var(--radius-lg)',
-                    fontFamily: 'var(--font-sans)',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--accent)';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(49,88,255,0.08)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--mist)';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    id="auth_email"
+                    name="auth_email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="off"
+                    className="w-full text-sm outline-none transition-all px-4 py-3"
+                    style={{
+                      color: 'var(--ink)',
+                      background: 'var(--bg-secondary)',
+                      border:
+                        email && !isValidEmail
+                          ? '1.5px solid var(--danger)'
+                          : '1.5px solid var(--mist)',
+                      borderRadius: 'var(--radius-lg)',
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor =
+                        email && !isValidEmail ? 'var(--danger)' : 'var(--accent)';
+                      e.target.style.boxShadow =
+                        email && !isValidEmail
+                          ? '0 0 0 3px rgba(240,68,56,0.08)'
+                          : '0 0 0 3px rgba(49,88,255,0.08)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor =
+                        email && !isValidEmail ? 'var(--danger)' : 'var(--mist)';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                  {email && !isValidEmail && (
+                    <span
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      Invalid format
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Password */}
@@ -431,22 +522,31 @@ export function AuthPage() {
                       style={{
                         color: 'var(--ink)',
                         background: 'var(--bg-secondary)',
-                        border: '1.5px solid var(--mist)',
+                        border:
+                          password && !isValidPassword
+                            ? '1.5px solid var(--danger)'
+                            : '1.5px solid var(--mist)',
                         borderRadius: 'var(--radius-lg)',
                         fontFamily: 'var(--font-sans)',
                       }}
                       onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--accent)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(49,88,255,0.08)';
+                        e.target.style.borderColor =
+                          password && !isValidPassword ? 'var(--danger)' : 'var(--accent)';
+                        e.target.style.boxShadow =
+                          password && !isValidPassword
+                            ? '0 0 0 3px rgba(240,68,56,0.08)'
+                            : '0 0 0 3px rgba(49,88,255,0.08)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = 'var(--mist)';
+                        e.target.style.borderColor =
+                          password && !isValidPassword ? 'var(--danger)' : 'var(--mist)';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                       className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
                       style={{
                         color: 'var(--graphite)',
@@ -490,6 +590,11 @@ export function AuthPage() {
                         </svg>
                       )}
                     </button>
+                    {password && !isValidPassword && (
+                      <span className="text-xs mt-1 block" style={{ color: 'var(--danger)' }}>
+                        Min 8 chars, upper, lower, number & special char required
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -624,7 +729,13 @@ export function AuthPage() {
                 <button
                   type="submit"
                   disabled={
-                    isLoading || !email || !password || (require2FA && twoFactorCode.length < 6)
+                    isLoading ||
+                    !email ||
+                    !isValidEmail ||
+                    !password ||
+                    !isValidPassword ||
+                    isLocked ||
+                    (require2FA && twoFactorCode.length < 6)
                   }
                   className="w-full py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                   style={{
