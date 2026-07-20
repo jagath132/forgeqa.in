@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useAdminStore } from "../store/useAdminStore";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, Check, AlertCircle, Loader2 } from "lucide-react";
+import "../index.css";
+
 
 function Spinner() {
   return <Loader2 size={18} className="lk-login-spinner" />;
