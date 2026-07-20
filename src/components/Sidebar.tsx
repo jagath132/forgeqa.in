@@ -117,6 +117,13 @@ const NAV_ITEMS_SYSTEM: NavItem[] = [
     icon: <SettingsIcon3D size={20} />,
     color: 'amber',
   },
+  {
+    key: 'admin',
+    label: 'License & Admin Manager',
+    path: '/admin',
+    icon: <ShieldIcon3D size={20} />,
+    color: 'violet',
+  },
 ];
 
 function NavButton({
