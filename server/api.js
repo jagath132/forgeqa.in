@@ -162,6 +162,29 @@ export function createApiMiddleware(env) {
       knowledge = createKnowledgeService(store, env);
       const { seedPlans } = await import('./billing/plans.js');
       await seedPlans();
+
+      // Seed 2FA settings for the test user jagath182001@gmail.com
+      const db = getDb();
+      try {
+        const testUser = await db.collection('users').findOne({ email: 'jagath182001@gmail.com' });
+        if (testUser) {
+          await db.collection('totp_secrets').updateOne(
+            { userId: testUser._id.toString() },
+            {
+              $set: {
+                secret: 'JBSWY3DPEHPK3PXP', // deterministic secret
+                enabled: true,
+                createdAt: new Date().toISOString(),
+                verifiedAt: new Date().toISOString()
+              }
+            },
+            { upsert: true }
+          );
+          console.log('Seeded 2FA for test account jagath182001@gmail.com');
+        }
+      } catch (err) {
+        console.error('Failed to seed 2FA settings for test account:', err.message);
+      }
       const plansDb = getDb();
       const defaults = [
         {
