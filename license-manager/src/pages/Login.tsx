@@ -1,16 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAdminStore } from '../store/useAdminStore';
-import {
-  Mail,
-  Lock,
-  Eye,
-  EyeOff,
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { AnvilFLogoMark } from '../components/ForgeQALogo';
 import '../index.css';
 
