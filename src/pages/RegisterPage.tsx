@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { api } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
 
 type Step = 'info' | 'plan' | 'payment' | 'pending_verification' | 'verify_key';
 
@@ -146,6 +147,7 @@ function UnderlineInput({
 export function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const setUser = useAppStore((s: any) => s.setUser);
 
   useEffect(() => {
     document.title = 'Create Account — ForgeQA';
@@ -319,11 +321,17 @@ export function RegisterPage() {
     setError('');
     setIsLoading(true);
     try {
-      const res = await api.post<{ status: string }>('/api/auth/select-plan', {
-        pendingId,
-        plan: planId,
-      });
-      if (res.data.status === 'pending_verification') {
+      const res = await api.post<{ status: string; user?: any; token?: string }>(
+        '/api/auth/select-plan',
+        {
+          pendingId,
+          plan: planId,
+        }
+      );
+      if (res.data.status === 'completed' && res.data.user) {
+        setUser(res.data.user);
+        navigate('/dashboard?welcome=true');
+      } else if (res.data.status === 'pending_verification') {
         setStep('pending_verification');
       } else {
         setStep('payment');

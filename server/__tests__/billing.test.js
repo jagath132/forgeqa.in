@@ -14,7 +14,7 @@ describe('PLANS', () => {
   });
 
   it('pro plan has reasonable limits', () => {
-    expect(PLANS.pro.monthlyPrice).toBe(29);
+    expect(PLANS.pro.monthlyPrice).toBe(1499);
     expect(PLANS.pro.maxTestCases).toBe(5000);
   });
 

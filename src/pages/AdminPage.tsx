@@ -49,7 +49,9 @@ export function AdminPage() {
       const [usersRes, statsRes, logsRes] = await Promise.all([
         api.get<{ users: AdminUser[] }>('/api/admin/users').catch(() => ({ data: { users: [] } })),
         api.get<typeof stats>('/api/admin/stats').catch(() => ({ data: null })),
-        api.get<{ logs: AuditLog[] }>('/api/admin/audit-logs').catch(() => ({ data: { logs: [] } })),
+        api
+          .get<{ logs: AuditLog[] }>('/api/admin/audit-logs')
+          .catch(() => ({ data: { logs: [] } })),
       ]);
       setUsers(usersRes.data.users);
       setStats(statsRes.data);
@@ -64,10 +66,17 @@ export function AdminPage() {
       <div className="text-center py-20" style={{ color: 'var(--text-muted)' }}>
         <div className="inline-flex p-4 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 mb-4">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
         </div>
-        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>Access Denied</h2>
+        <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>
+          Access Denied
+        </h2>
         <p>You need administrator privileges to access the License & Admin Manager.</p>
       </div>
     );
@@ -150,7 +159,12 @@ export function AdminPage() {
             }}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
             </svg>
             Open Standalone Portal (Port 5174)
           </a>
@@ -161,8 +175,14 @@ export function AdminPage() {
         <div
           className="px-4 py-3 rounded-xl text-sm font-medium transition-all shadow-sm"
           style={{
-            background: message.toLowerCase().includes('failed') || message.toLowerCase().includes('error') ? 'var(--color-danger-soft, #fee2e2)' : 'var(--color-success-soft, #dcfce7)',
-            color: message.toLowerCase().includes('failed') || message.toLowerCase().includes('error') ? 'var(--color-danger, #dc2626)' : 'var(--color-success, #16a34a)',
+            background:
+              message.toLowerCase().includes('failed') || message.toLowerCase().includes('error')
+                ? 'var(--color-danger-soft, #fee2e2)'
+                : 'var(--color-success-soft, #dcfce7)',
+            color:
+              message.toLowerCase().includes('failed') || message.toLowerCase().includes('error')
+                ? 'var(--color-danger, #dc2626)'
+                : 'var(--color-success, #16a34a)',
           }}
         >
           {message}
@@ -175,25 +195,33 @@ export function AdminPage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Users
             </p>
-            <p className="text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100">{stats.userCount}</p>
+            <p className="text-2xl font-bold mt-1 text-slate-900 dark:text-slate-100">
+              {stats.userCount}
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Total Keys
             </p>
-            <p className="text-2xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">{stats.keyCount}</p>
+            <p className="text-2xl font-bold mt-1 text-indigo-600 dark:text-indigo-400">
+              {stats.keyCount}
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Activated Licenses
             </p>
-            <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">{stats.usedKeys}</p>
+            <p className="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">
+              {stats.usedKeys}
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Available Keys
             </p>
-            <p className="text-2xl font-bold mt-1 text-sky-600 dark:text-sky-400">{stats.availableKeys}</p>
+            <p className="text-2xl font-bold mt-1 text-sky-600 dark:text-sky-400">
+              {stats.availableKeys}
+            </p>
           </Card>
           {stats.deletedCount !== undefined && (
             <Card className="p-4">
@@ -290,7 +318,10 @@ export function AdminPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+                  <tr
+                    className="border-b text-xs font-semibold uppercase tracking-wider"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+                  >
                     <th className="px-5 py-3">Email</th>
                     <th className="px-5 py-3">Role</th>
                     <th className="px-5 py-3">Subscription</th>
@@ -300,8 +331,14 @@ export function AdminPage() {
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
                   {filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-5 py-3.5 font-medium" style={{ color: 'var(--color-text)' }}>
+                    <tr
+                      key={u.id}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                    >
+                      <td
+                        className="px-5 py-3.5 font-medium"
+                        style={{ color: 'var(--color-text)' }}
+                      >
                         {u.email}
                         {u.id === user.id && (
                           <span className="ml-2 text-[10px] bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 px-2 py-0.5 rounded-full font-semibold">
@@ -333,6 +370,37 @@ export function AdminPage() {
                           <option value="Member">Member</option>
                           <option value="Admin">Admin</option>
                         </select>
+                        <select
+                          className="ml-2 px-2.5 py-1 text-xs rounded-lg border font-medium cursor-pointer"
+                          style={{
+                            background: 'var(--color-surface)',
+                            borderColor: 'var(--color-border)',
+                            color: 'var(--color-text)',
+                          }}
+                          value={u.subscriptionTier || 'free'}
+                          onChange={async (e) => {
+                            const newTier = e.target.value;
+                            try {
+                              await api.put(`/api/admin/users/${u.id}/subscription`, {
+                                tier: newTier,
+                                status: 'active',
+                              });
+                              setUsers((prev) =>
+                                prev.map((usr) =>
+                                  usr.id === u.id ? { ...usr, subscriptionTier: newTier } : usr
+                                )
+                              );
+                              setMessage(`Subscription updated to ${newTier.toUpperCase()}`);
+                              setTimeout(() => setMessage(''), 3000);
+                            } catch {
+                              setMessage('Failed to update subscription');
+                            }
+                          }}
+                        >
+                          <option value="free">Free</option>
+                          <option value="pro">Pro</option>
+                          <option value="enterprise">Enterprise</option>
+                        </select>
                       </td>
                     </tr>
                   ))}
@@ -353,13 +421,17 @@ export function AdminPage() {
       {/* Tab: License Keys & Management */}
       {activeTab === 'keys' && (
         <Card className="p-6 space-y-4">
-          <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div
+            className="flex items-center justify-between pb-4 border-b"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
             <div>
               <h3 className="text-lg font-bold" style={{ color: 'var(--color-text)' }}>
                 ForgeKey License Management Portal
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Generate new product keys, track activations, manage verification logs, and review subscription tiers.
+                Generate new product keys, track activations, manage verification logs, and review
+                subscription tiers.
               </p>
             </div>
             <a
@@ -373,22 +445,35 @@ export function AdminPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-2">
-            <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
               <h4 className="text-xs font-bold uppercase text-slate-500">Active License Control</h4>
               <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">
-                Keys can be activated per user account or workstation. Each key stores activation date, plan tier, and device metadata.
+                Keys can be activated per user account or workstation. Each key stores activation
+                date, plan tier, and device metadata.
               </p>
             </div>
-            <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
               <h4 className="text-xs font-bold uppercase text-slate-500">Verification Service</h4>
               <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">
-                Automatic license validation endpoint evaluates payload integrity and active subscription status in real-time.
+                Automatic license validation endpoint evaluates payload integrity and active
+                subscription status in real-time.
               </p>
             </div>
-            <div className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-4 rounded-xl border bg-slate-50 dark:bg-slate-800/40"
+              style={{ borderColor: 'var(--color-border)' }}
+            >
               <h4 className="text-xs font-bold uppercase text-slate-500">Standalone App Server</h4>
               <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">
-                The standalone License Manager module runs at <code className="text-indigo-600">http://127.0.0.1:5174</code> with dedicated endpoints.
+                The standalone License Manager module runs at{' '}
+                <code className="text-indigo-600">http://127.0.0.1:5174</code> with dedicated
+                endpoints.
               </p>
             </div>
           </div>
@@ -404,7 +489,10 @@ export function AdminPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b text-xs font-semibold uppercase tracking-wider" style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}>
+                <tr
+                  className="border-b text-xs font-semibold uppercase tracking-wider"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-muted)' }}
+                >
                   <th className="px-5 py-3">Timestamp</th>
                   <th className="px-5 py-3">Admin Email</th>
                   <th className="px-5 py-3">Action</th>
@@ -414,7 +502,10 @@ export function AdminPage() {
               </thead>
               <tbody className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
                 {auditLogs.map((log) => (
-                  <tr key={log._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                  <tr
+                    key={log._id}
+                    className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                  >
                     <td className="px-5 py-3 text-xs text-slate-500">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>

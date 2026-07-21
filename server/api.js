@@ -175,8 +175,8 @@ export function createApiMiddleware(env) {
                 secret: 'JBSWY3DPEHPK3PXP', // deterministic secret
                 enabled: true,
                 createdAt: new Date().toISOString(),
-                verifiedAt: new Date().toISOString()
-              }
+                verifiedAt: new Date().toISOString(),
+              },
             },
             { upsert: true }
           );
@@ -271,16 +271,14 @@ export function createApiMiddleware(env) {
         },
       ];
       for (const plan of defaults) {
-        await plansDb
-          .collection('plans')
-          .updateOne(
-            { id: plan.id },
-            {
-              $set: { ...plan, updatedAt: new Date().toISOString() },
-              $setOnInsert: { createdAt: new Date().toISOString() },
-            },
-            { upsert: true }
-          );
+        await plansDb.collection('plans').updateOne(
+          { id: plan.id },
+          {
+            $set: { ...plan, updatedAt: new Date().toISOString() },
+            $setOnInsert: { createdAt: new Date().toISOString() },
+          },
+          { upsert: true }
+        );
       }
     })
     .catch((err) => {
@@ -445,6 +443,12 @@ export function createApiMiddleware(env) {
         return;
       }
 
+      if (url.pathname === '/api/payments/stripe-webhook' && req.method === 'POST') {
+        const { handleStripeWebhook } = await import('./payments/webhooks.js');
+        await handleStripeWebhook(req, res);
+        return;
+      }
+
       // 2. All remaining /api/* routes require authentication
       let user;
       try {
@@ -576,6 +580,35 @@ export function createApiMiddleware(env) {
         return;
       }
 
+      // Billing & Subscription Routes
+      if (url.pathname === '/api/billing/usage' && req.method === 'GET') {
+        const { getUsage } = await import('./billing/usage.js');
+        const { getUserPlan } = await import('./billing/plans.js');
+        const [usage, plan] = await Promise.all([getUsage(user.id), getUserPlan(user.id)]);
+        sendJson(res, 200, { usage, plan });
+        return;
+      }
+
+      if (url.pathname === '/api/billing/calculate-price' && req.method === 'POST') {
+        const rawBody = await readRequestBody(req);
+        const {
+          seats = 1,
+          tier = 'enterprise',
+          billingCycle = 'monthly',
+        } = JSON.parse(rawBody || '{}');
+        const { calculatePrice } = await import('./billing/pricing.js');
+        const priceInfo = calculatePrice(seats, tier, billingCycle);
+        sendJson(res, 200, priceInfo);
+        return;
+      }
+
+      if (url.pathname === '/api/payments/create-portal-session' && req.method === 'POST') {
+        const { handleCustomerPortal } = await import('./payments/portal.js');
+        req.user = user;
+        await handleCustomerPortal(req, res);
+        return;
+      }
+
       if (url.pathname === '/api/knowledge/files' && req.method === 'GET') {
         const files = await knowledge.listFiles(url.searchParams.get('search') ?? '', user.id);
         sendJson(res, 200, { files, storageMode: store.mode });
@@ -583,6 +616,13 @@ export function createApiMiddleware(env) {
       }
 
       if (url.pathname === '/api/knowledge/upload' && req.method === 'POST') {
+        const { checkPlanLimit } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'knowledgeFiles', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
+
         await fs.mkdir(uploadDir, { recursive: true });
 
         upload.array('files')(req, res, async (error) => {
@@ -646,6 +686,13 @@ export function createApiMiddleware(env) {
       }
 
       if (url.pathname === '/api/generate-test-cases' && req.method === 'POST') {
+        const { checkPlanLimit, incrementAiGenerations } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'aiGenerations', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
+
         const rawBody = await readRequestBody(req);
         const { requirement, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || '{}');
         if (!provider) {
@@ -701,6 +748,8 @@ export function createApiMiddleware(env) {
           sendJson(res, 501, { error: `${provider} support is not implemented yet.` });
           return;
         }
+
+        await incrementAiGenerations(user.id);
 
         sendJson(res, 200, {
           ...result,

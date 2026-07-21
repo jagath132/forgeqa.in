@@ -1,51 +1,53 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, ArrowRight } from 'lucide-react';
 
 const TIERS = [
   {
-    name: 'Starter',
-    price: '$29',
+    name: 'Free',
+    price: '₹0',
     period: '/month',
-    desc: 'For individual QA engineers and small teams.',
+    desc: 'For individual QA engineers and solo testers.',
     features: [
-      '500 test generations/mo',
-      '3 AI providers',
-      'CSV & PDF export',
-      'Email support',
-      'Single workspace',
+      '20 AI generations/day',
+      'Up to 500 test cases',
+      '3 Knowledge base uploads',
+      'Single workspace seat',
+      'CSV export',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Get Started Free',
     highlighted: false,
   },
   {
-    name: 'Team',
-    price: '$99',
-    period: '/month',
-    desc: 'For growing QA teams with shared test suites.',
+    name: 'Pro',
+    price: '₹1,499',
+    period: '/seat/month',
+    desc: 'For growing QA teams requiring automation scripts.',
     features: [
-      '5,000 test generations/mo',
-      'All AI providers',
-      'Multi-format export',
-      'Team workspaces',
+      '200 AI generations/day',
+      'Up to 5,000 test cases',
+      '20 Knowledge base uploads',
+      'Up to 10 team seats',
+      'Playwright / Cypress / Selenium scripts',
+      'Regression test suites & CI/CD webhooks',
       'Priority email support',
-      'Parallel execution',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start Pro Trial',
     highlighted: true,
   },
   {
     name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    desc: 'For organizations with custom compliance needs.',
+    price: '₹699–₹1,499',
+    period: '/seat/month',
+    desc: 'For organizations needing high volume seats & custom SSO.',
     features: [
-      'Unlimited generations',
-      'On-premise deployment',
-      'SSO/SAML',
-      'Dedicated support engineer',
-      'Custom integrations',
-      'SLA guarantee',
+      '2,000 AI generations/day',
+      'Up to 50,000 test cases',
+      'Unlimited Knowledge base uploads',
+      'Up to 999 team seats',
+      'Volume discounts (up to 53% off)',
+      'SSO / SAML authentication',
+      'Custom integrations & SLA',
     ],
     cta: 'Contact Sales',
     highlighted: false,
@@ -57,12 +59,12 @@ interface PricingSectionProps {
   onGetStarted: () => void;
 }
 
-function PricingCard({
-  tier,
-  index,
-  isAuthed,
-  onGetStarted,
-}: PricingSectionProps & { tier: (typeof TIERS)[0]; index: number }) {
+interface PricingCardProps extends PricingSectionProps {
+  tier: (typeof TIERS)[0];
+  index: number;
+}
+
+function PricingCard({ tier, index, isAuthed, onGetStarted }: PricingCardProps) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -166,14 +168,14 @@ function PricingCard({
           }}
           type="button"
           className="mt-8 w-full py-3 text-sm font-semibold rounded-lg cursor-pointer inline-flex items-center justify-center gap-2 transition-all duration-200"
-          onMouseEnter={(e) => {
+          onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
             if (tier.highlighted) {
               e.currentTarget.style.boxShadow = '0 8px 30px rgba(37, 99, 235, 0.3)';
             } else {
               e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.4)';
             }
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
             if (tier.highlighted) {
               e.currentTarget.style.boxShadow = 'none';
             } else {

@@ -437,7 +437,7 @@ async function handleUpgradeSubscription(req, res, url, body, user) {
 }
 
 async function handleCreateUpgradeCheckout(req, res, url, body, user) {
-  const { tier } = body;
+  const { tier, seats = 1, billingCycle = 'monthly' } = body;
   if (!tier || !['pro', 'enterprise'].includes(tier)) {
     sendJson(res, 400, { error: 'Valid paid plan tier is required.' });
     return;
@@ -446,9 +446,12 @@ async function handleCreateUpgradeCheckout(req, res, url, body, user) {
     const { createCheckoutSession } = await import('../payments/stripe.js');
     const pendingId = `upgrade_${user.id}_${Date.now()}`;
     const result = await createCheckoutSession({
+      userId: user.id,
       pendingId,
       email: user.email,
       plan: tier,
+      seats: Math.max(1, parseInt(seats || 1, 10)),
+      billingCycle,
       name: user.name || '',
     });
     sendJson(res, 200, result);
@@ -602,13 +605,38 @@ async function handleSelectPlan(req, res, body) {
 
   const isFree = planDoc.price === 0;
   if (isFree) {
+    let userDoc = await authStore.findUserByEmail(pending.email);
+    if (!userDoc) {
+      userDoc = await authStore.createUserFromHash({
+        email: pending.email,
+        passwordHash: pending.passwordHash,
+        salt: pending.salt,
+        name: pending.name,
+        subscriptionTier: 'free',
+      });
+    }
+
     await db
       .collection('pending_registrations')
-      .updateOne(
-        { pendingId },
-        { $set: { paymentStatus: 'completed', status: 'pending_verification' } }
-      );
-    sendJson(res, 200, { status: 'pending_verification', pendingId, email: pending.email, plan });
+      .updateOne({ pendingId }, { $set: { paymentStatus: 'completed', status: 'completed' } });
+
+    const token = generateToken(userDoc);
+    const refreshToken = await generateRefreshToken(userDoc);
+    setAuthCookie(res, token, refreshToken);
+
+    sendJson(res, 200, {
+      status: 'completed',
+      token,
+      user: {
+        id: userDoc.id || userDoc._id.toString(),
+        email: userDoc.email,
+        name: userDoc.name || null,
+        role: userDoc.role || 'Member',
+        subscriptionTier: 'free',
+        createdAt: userDoc.createdAt,
+        has_seen_welcome: false,
+      },
+    });
     return;
   }
 

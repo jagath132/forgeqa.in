@@ -449,62 +449,64 @@ export function AuthPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
               {/* Email */}
-              <div>
-                <label
-                  htmlFor="auth_email"
-                  className="block text-xs font-semibold mb-2"
-                  style={{ color: 'var(--graphite)' }}
-                >
-                  Email
-                </label>
-                <div className="relative">
-                  <input
-                    id="auth_email"
-                    name="auth_email"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    autoComplete="off"
-                    className="w-full text-sm outline-none transition-all px-4 py-3"
-                    style={{
-                      color: 'var(--ink)',
-                      background: 'var(--bg-secondary)',
-                      border:
-                        email && !isValidEmail
-                          ? '1.5px solid var(--danger)'
-                          : '1.5px solid var(--mist)',
-                      borderRadius: 'var(--radius-lg)',
-                      fontFamily: 'var(--font-sans)',
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor =
-                        email && !isValidEmail ? 'var(--danger)' : 'var(--accent)';
-                      e.target.style.boxShadow =
-                        email && !isValidEmail
-                          ? '0 0 0 3px rgba(240,68,56,0.08)'
-                          : '0 0 0 3px rgba(49,88,255,0.08)';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor =
-                        email && !isValidEmail ? 'var(--danger)' : 'var(--mist)';
-                      e.target.style.boxShadow = 'none';
-                    }}
-                  />
-                  {email && !isValidEmail && (
-                    <span
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
-                      style={{ color: 'var(--danger)' }}
-                    >
-                      Invalid format
-                    </span>
-                  )}
+              {!require2FA && (
+                <div>
+                  <label
+                    htmlFor="auth_email"
+                    className="block text-xs font-semibold mb-2"
+                    style={{ color: 'var(--graphite)' }}
+                  >
+                    Email
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="auth_email"
+                      name="auth_email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@company.com"
+                      autoComplete="off"
+                      className="w-full text-sm outline-none transition-all px-4 py-3"
+                      style={{
+                        color: 'var(--ink)',
+                        background: 'var(--bg-secondary)',
+                        border:
+                          email && !isValidEmail
+                            ? '1.5px solid var(--danger)'
+                            : '1.5px solid var(--mist)',
+                        borderRadius: 'var(--radius-lg)',
+                        fontFamily: 'var(--font-sans)',
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor =
+                          email && !isValidEmail ? 'var(--danger)' : 'var(--accent)';
+                        e.target.style.boxShadow =
+                          email && !isValidEmail
+                            ? '0 0 0 3px rgba(240,68,56,0.08)'
+                            : '0 0 0 3px rgba(49,88,255,0.08)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor =
+                          email && !isValidEmail ? 'var(--danger)' : 'var(--mist)';
+                        e.target.style.boxShadow = 'none';
+                      }}
+                    />
+                    {email && !isValidEmail && (
+                      <span
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
+                        style={{ color: 'var(--danger)' }}
+                      >
+                        Invalid format
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Password */}
-              {mode === 'login' && (
+              {mode === 'login' && !require2FA && (
                 <div>
                   <label
                     htmlFor="auth_password"
@@ -625,15 +627,15 @@ export function AuthPage() {
 
               {/* 2FA */}
               {mode === 'login' && require2FA && (
-                <div className="animate-fade-in">
+                <div className="animate-fade-in space-y-4">
                   <div
-                    className="p-4 rounded-xl mb-4 text-center"
+                    className="p-4 rounded-xl text-center"
                     style={{
                       background: 'rgba(18,183,106,0.04)',
                       border: '1px solid rgba(18,183,106,0.12)',
                     }}
                   >
-                    <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="flex items-center justify-center gap-2 mb-1.5">
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -652,7 +654,8 @@ export function AuthPage() {
                       </span>
                     </div>
                     <p className="text-xs" style={{ color: 'var(--graphite)' }}>
-                      Enter the 6-digit code from your authenticator app.
+                      Signing in as <strong className="font-semibold">{email}</strong>. Enter the
+                      6-digit verification code.
                     </p>
                   </div>
                   <div className="relative">
@@ -704,7 +707,7 @@ export function AuthPage() {
                       Remember this device for 30 days
                     </label>
                   </div>
-                  <p className="text-[11px] mt-1 ml-6" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[11px] ml-6" style={{ color: 'var(--text-muted)' }}>
                     Skip 2FA on this browser for the next 30 days. Only check this on devices you
                     trust.
                   </p>
@@ -716,7 +719,7 @@ export function AuthPage() {
                       setRememberDevice(false);
                       setError('');
                     }}
-                    className="mt-2 w-full text-xs py-1.5 font-semibold transition-opacity hover:opacity-70"
+                    className="w-full text-xs py-1.5 font-semibold transition-opacity hover:opacity-70"
                     style={{
                       color: 'var(--graphite)',
                       background: 'transparent',
@@ -724,7 +727,7 @@ export function AuthPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    ← Back to password
+                    ← Back to Sign In
                   </button>
                 </div>
               )}

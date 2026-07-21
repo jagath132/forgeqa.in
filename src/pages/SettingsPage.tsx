@@ -1,10 +1,13 @@
-import { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { UsageMeter } from '../components/UsageMeter';
+import { SeatSelector } from '../components/SeatSelector';
+import { PlanComparison } from '../components/PlanComparison';
 import {
   getProfile,
   saveProfile,
@@ -80,11 +83,11 @@ function getInitials(name: string, fallback = 'U') {
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const user = useAppStore((s) => s.user);
-  const profileName = useAppStore((s) => s.profileName);
-  const setProfileName = useAppStore((s) => s.setProfileName);
-  const openConfirm = useAppStore((s) => s.openConfirm);
-  const logout = useAppStore((s) => s.logout);
+  const user = useAppStore((s: any) => s.user);
+  const profileName = useAppStore((s: any) => s.profileName);
+  const setProfileName = useAppStore((s: any) => s.setProfileName);
+  const openConfirm = useAppStore((s: any) => s.openConfirm);
+  const logout = useAppStore((s: any) => s.logout);
 
   const [activeSection, setActiveSection] = useState<Section>('profile');
 
@@ -115,33 +118,35 @@ export function SettingsPage() {
   const [supportForm, setSupportForm] = useState({ name: '', email: '', subject: '', message: '' });
 
   /* ── Integrations state (from AISettings) ── */
-  const storeProvider = useAppStore((s) => s.provider);
-  const activeProvider = useAppStore((s) => s.activeProvider);
-  const setProvider = useAppStore((s) => s.setProvider);
-  const setActiveProvider = useAppStore((s) => s.setActiveProvider);
-  const savedProviderKeys = useAppStore((s) => s.savedProviderKeys);
-  const setSavedProviderKeys = useAppStore((s) => s.setSavedProviderKeys);
+  const storeProvider = useAppStore((s: any) => s.provider);
+  const activeProvider = useAppStore((s: any) => s.activeProvider);
+  const setProvider = useAppStore((s: any) => s.setProvider);
+  const setActiveProvider = useAppStore((s: any) => s.setActiveProvider);
+  const savedProviderKeys = useAppStore((s: any) => s.savedProviderKeys);
+  const setSavedProviderKeys = useAppStore((s: any) => s.setSavedProviderKeys);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const [savingProvider, setSavingProvider] = useState(false);
 
-  /* ── Billing state ── */
-  const [billingPlan, setBillingPlan] = useState<{
-    tier: string;
-    name: string;
-    monthlyPrice: number;
-    yearlyPrice: number;
-    maxUsers: number;
-    maxTestCases: number;
-    aiGenerationsPerDay: number;
-    subscriptionStatus: string;
-    subscriptionEndsAt: string | null;
-    features: string[];
-  } | null>(null);
+  /* ── Billing & Usage state ── */
+  const [billingPlan, setBillingPlan] = useState<any>(null);
+  const [usageMetrics, setUsageMetrics] = useState<{
+    aiGenerationsToday: number;
+    totalTestCases: number;
+    totalFiles: number;
+    teamMembers: number;
+  }>({
+    aiGenerationsToday: 0,
+    totalTestCases: 0,
+    totalFiles: 0,
+    teamMembers: 1,
+  });
+  const [enterpriseSeats, setEnterpriseSeats] = useState(15);
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   /* ── Upgrade / Enquiry modals ── */
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -168,23 +173,40 @@ export function SettingsPage() {
     return () => clearTimeout(timer);
   }, [enquirySent]);
 
-  useEffect(() => {
-    (async () => {
-      if (activeSection !== 'billing') return;
-      setBillingLoading(true);
-      try {
-        const [billingRes, plansRes] = await Promise.all([
-          api.get('/api/user/billing'),
-          api.get('/api/plans'),
-        ]);
-        if (billingRes.data?.plan) setBillingPlan(billingRes.data.plan);
-        if (plansRes.data?.plans) setAvailablePlans(plansRes.data.plans);
-      } catch {
-        /* ignore */
-      }
-      setBillingLoading(false);
-    })();
+  const loadBillingData = useCallback(async () => {
+    if (activeSection !== 'billing') return;
+    setBillingLoading(true);
+    try {
+      const [usageRes, plansRes] = await Promise.all([
+        api.get('/api/billing/usage'),
+        api.get('/api/plans'),
+      ]);
+      if (usageRes.data?.plan) setBillingPlan(usageRes.data.plan);
+      if (usageRes.data?.usage) setUsageMetrics(usageRes.data.usage);
+      if (plansRes.data?.plans) setAvailablePlans(plansRes.data.plans);
+    } catch {
+      /* ignore */
+    }
+    setBillingLoading(false);
   }, [activeSection]);
+
+  useEffect(() => {
+    loadBillingData();
+  }, [loadBillingData]);
+
+  async function handleLaunchCustomerPortal() {
+    setPortalLoading(true);
+    try {
+      const res = await api.post('/api/payments/create-portal-session');
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to open billing portal');
+    } finally {
+      setPortalLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -273,7 +295,9 @@ export function SettingsPage() {
   async function handleRemoveDevice(deviceId: string) {
     try {
       await removeTrustedDevice(deviceId);
-      setTrustedDevices((prev) => prev.filter((d) => d.id !== deviceId));
+      setTrustedDevices((prev: TrustedDevice[]) =>
+        prev.filter((d: TrustedDevice) => d.id !== deviceId)
+      );
     } catch {
       /* ignore */
     }
@@ -429,7 +453,7 @@ export function SettingsPage() {
       setProvider(selectedProvider);
       setSettingsMessage(`Provider set to ${selectedProviderObj?.label || selectedProvider}.`);
       setTimeout(() => setSettingsMessage(''), 3000);
-    } catch (err) {
+    } catch (err: any) {
       const msg = axios.isAxiosError(err)
         ? (err.response?.data?.error ?? err.message)
         : 'Failed to save provider.';
@@ -467,7 +491,7 @@ export function SettingsPage() {
       setSettingsMessage('API key saved successfully.');
       setSettingsError('');
       setTimeout(() => setSettingsMessage(''), 3000);
-    } catch (error) {
+    } catch (error: any) {
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ?? error.message)
         : 'Unable to save API key.';
@@ -487,7 +511,7 @@ export function SettingsPage() {
       setSettingsMessage('Saved API key has been removed.');
       setSettingsError('');
       setTimeout(() => setSettingsMessage(''), 3000);
-    } catch (error) {
+    } catch (error: any) {
       const msg = axios.isAxiosError(error)
         ? (error.response?.data?.error ?? error.message)
         : 'Unable to clear saved API key.';
@@ -702,9 +726,13 @@ export function SettingsPage() {
                     <input
                       className="input-modern flex-1 px-4 py-2.5 text-sm"
                       value={localName}
-                      onChange={(e) => setLocalName(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setLocalName(e.target.value)
+                      }
                       placeholder="Enter display name"
-                      onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                        e.key === 'Enter' && handleSaveName()
+                      }
                     />
                     <button
                       onClick={handleSaveName}
@@ -842,7 +870,10 @@ export function SettingsPage() {
                       No product key associated with this account.
                     </p>
                   )}
-                  <div className="flex items-center gap-2 mt-3 pt-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <div
+                    className="flex items-center gap-2 mt-3 pt-3 border-t"
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
                     <button
                       type="button"
                       onClick={() => navigate('/admin')}
@@ -1056,7 +1087,7 @@ export function SettingsPage() {
                         inputMode="numeric"
                         maxLength={6}
                         value={twoFAToken}
-                        onChange={(e) =>
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           setTwoFAToken(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))
                         }
                         placeholder="000000"
@@ -1177,7 +1208,7 @@ export function SettingsPage() {
                         inputMode="numeric"
                         maxLength={6}
                         value={twoFAToken}
-                        onChange={(e) =>
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           setTwoFAToken(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))
                         }
                         placeholder="000000"
@@ -1419,7 +1450,7 @@ export function SettingsPage() {
                               type="text"
                               required
                               value={supportForm.name}
-                              onChange={(e) =>
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                                 setSupportForm((p) => ({ ...p, name: e.target.value }))
                               }
                               placeholder="John Doe"
@@ -1444,7 +1475,7 @@ export function SettingsPage() {
                               type="email"
                               required
                               value={supportForm.email}
-                              onChange={(e) =>
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                                 setSupportForm((p) => ({ ...p, email: e.target.value }))
                               }
                               placeholder="you@company.com"
@@ -1470,7 +1501,7 @@ export function SettingsPage() {
                             type="text"
                             required
                             value={supportForm.subject}
-                            onChange={(e) =>
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                               setSupportForm((p) => ({ ...p, subject: e.target.value }))
                             }
                             placeholder="How can we help?"
@@ -1495,7 +1526,7 @@ export function SettingsPage() {
                             required
                             rows={4}
                             value={supportForm.message}
-                            onChange={(e) =>
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                               setSupportForm((p) => ({ ...p, message: e.target.value }))
                             }
                             placeholder="Describe your issue in detail..."
@@ -1660,21 +1691,48 @@ export function SettingsPage() {
 
       case 'billing':
         return (
-          <div>
-            <div className="flex items-center justify-between mb-6">
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Billing
+                  Billing & Subscription
                 </h2>
                 <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Manage your subscription and billing information.
+                  Manage workspace seats, monitor real-time usage, and upgrade plan features.
                 </p>
               </div>
-              {billingPlan?.subscriptionEndsAt && (
-                <Badge variant="warning">
-                  Renews {new Date(billingPlan.subscriptionEndsAt).toLocaleDateString()}
-                </Badge>
-              )}
+              <div className="flex items-center gap-3">
+                {billingPlan?.subscriptionEndsAt && (
+                  <Badge variant="warning">
+                    Renews {new Date(billingPlan.subscriptionEndsAt).toLocaleDateString()}
+                  </Badge>
+                )}
+                <button
+                  type="button"
+                  onClick={handleLaunchCustomerPortal}
+                  disabled={portalLoading}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs border border-slate-700 transition flex items-center gap-2 cursor-pointer shadow"
+                >
+                  {portalLoading ? (
+                    <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  ) : (
+                    <svg
+                      className="w-4 h-4 text-blue-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                      />
+                    </svg>
+                  )}
+                  <span>Manage Billing in Stripe Portal</span>
+                </button>
+              </div>
             </div>
 
             {billingLoading ? (
@@ -1686,473 +1744,76 @@ export function SettingsPage() {
               </div>
             ) : (
               <>
-                {/* Current Plan — Premium Summary Card */}
-                <Card className="p-6 mb-6">
-                  <div className="flex items-start justify-between mb-5">
+                {/* Active Subscription Summary Banner */}
+                <Card className="p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 mb-5 border-b border-slate-800">
                     <div className="flex items-center gap-4">
-                      <div
-                        className="flex h-14 w-14 items-center justify-center rounded-2xl"
-                        style={{
-                          background:
-                            billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
-                              ? 'var(--gradient-primary)'
-                              : 'linear-gradient(135deg, var(--color-text-muted), var(--color-border))',
-                        }}
-                      >
-                        <svg
-                          className="h-7 w-7 text-white"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
-                          />
-                        </svg>
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                        {(billingPlan?.name || 'F')[0]}
                       </div>
                       <div>
-                        <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                          {billingPlan?.name || 'Free'} Plan
-                        </p>
-                        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
-                            ? `$${billingPlan.monthlyPrice}/month`
-                            : 'Free — no payment required'}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={billingPlan?.subscriptionStatus === 'active' ? 'success' : 'neutral'}
-                    >
-                      {billingPlan?.subscriptionStatus === 'active'
-                        ? 'Active'
-                        : billingPlan?.subscriptionStatus || 'Active'}
-                    </Badge>
-                  </div>
-
-                  <div
-                    className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl"
-                    style={{
-                      background: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-subtle)',
-                    }}
-                  >
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Team Members
-                      </p>
-                      <p
-                        className="text-lg font-bold mt-1"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {billingPlan?.maxUsers ?? 1}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Test Cases
-                      </p>
-                      <p
-                        className="text-lg font-bold mt-1"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {billingPlan?.maxTestCases
-                          ? `${billingPlan.maxTestCases.toLocaleString()}`
-                          : 'Unlimited'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        AI Generations / Day
-                      </p>
-                      <p
-                        className="text-lg font-bold mt-1"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {billingPlan?.aiGenerationsPerDay ?? 20}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Status
-                      </p>
-                      <p
-                        className="text-lg font-bold mt-1 capitalize"
-                        style={{
-                          color:
-                            billingPlan?.subscriptionStatus === 'active'
-                              ? 'var(--accent)'
-                              : 'var(--danger)',
-                        }}
-                      >
-                        {billingPlan?.subscriptionStatus || 'Active'}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Available Plans — Upgrade Grid */}
-                <Card className="p-6 mb-6">
-                  <h3 className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Available Plans
-                  </h3>
-                  <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
-                    Choose the plan that fits your team's needs.
-                  </p>
-
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {availablePlans.length > 0 ? (
-                      availablePlans.map((plan) => {
-                        const isCurrentPlan = billingPlan?.tier === plan.id;
-                        const isFree = plan.id === 'free';
-                        const isEnterprise = plan.id === 'enterprise';
-                        return (
-                          <div
-                            key={plan.id}
-                            className="relative rounded-xl p-5 flex flex-col transition-all duration-200 hover:shadow-md"
-                            style={{
-                              background: 'var(--bg-card)',
-                              border: '1px solid var(--border-subtle)',
-                            }}
-                          >
-                            {plan.popular && !isCurrentPlan && (
-                              <span
-                                className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase px-3 py-0.5 rounded-full text-white"
-                                style={{ background: 'var(--gradient-primary)' }}
-                              >
-                                Most Popular
-                              </span>
-                            )}
-                            <div className="mb-4">
-                              <p
-                                className="text-base font-bold"
-                                style={{ color: 'var(--text-primary)' }}
-                              >
-                                {plan.name}
-                              </p>
-                              <div className="mt-2">
-                                {isFree ? (
-                                  <span
-                                    className="text-2xl font-bold"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    Free
-                                  </span>
-                                ) : isEnterprise ? (
-                                  <span
-                                    className="text-2xl font-bold"
-                                    style={{ color: 'var(--text-primary)' }}
-                                  >
-                                    Custom
-                                  </span>
-                                ) : (
-                                  <>
-                                    <span
-                                      className="text-2xl font-bold"
-                                      style={{ color: 'var(--text-primary)' }}
-                                    >
-                                      ₹{Math.round((plan.price || 0) / 100).toLocaleString('en-IN')}
-                                    </span>
-                                    <span
-                                      className="text-xs ml-1"
-                                      style={{ color: 'var(--text-muted)' }}
-                                    >
-                                      /mo
-                                    </span>
-                                  </>
-                                )}
-                              </div>
-                              <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-                                {plan.description}
-                              </p>
-                            </div>
-                            <div className="flex-1 space-y-2 mb-5">
-                              {plan.features?.map((f: string, i: number) => (
-                                <div key={i} className="flex items-center gap-2 text-xs">
-                                  <svg
-                                    className="h-3.5 w-3.5 shrink-0"
-                                    style={{ color: 'var(--accent)' }}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={2}
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M4.5 12.75l6 6 9-13.5"
-                                    />
-                                  </svg>
-                                  <span style={{ color: 'var(--text-primary)' }}>{f}</span>
-                                </div>
-                              ))}
-                            </div>
-                            {isCurrentPlan ? (
-                              <button
-                                disabled
-                                className="w-full py-2.5 rounded-lg text-sm font-semibold cursor-default"
-                                style={{
-                                  background: 'var(--bg-secondary)',
-                                  color: 'var(--text-muted)',
-                                  border: '1px solid var(--border-subtle)',
-                                }}
-                              >
-                                Current Plan
-                              </button>
-                            ) : plan.id === 'enterprise' ? (
-                              <button
-                                className="w-full py-2.5 rounded-lg text-sm font-semibold cursor-pointer transition-all duration-200"
-                                style={{
-                                  background: 'transparent',
-                                  color: 'var(--accent)',
-                                  border: '1px solid var(--accent)',
-                                }}
-                                onClick={() => {
-                                  setUpgradePlan(plan);
-                                  setEnquirySent(false);
-                                  setEnquiryForm({
-                                    company: '',
-                                    teamSize: '',
-                                    contact: '',
-                                    requirements: '',
-                                  });
-                                  setShowEnterpriseModal(true);
-                                }}
-                              >
-                                Contact Sales
-                              </button>
-                            ) : (
-                              <button
-                                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white cursor-pointer transition-all duration-200"
-                                style={{ background: 'var(--gradient-primary)' }}
-                                onClick={() => {
-                                  setUpgradePlan(plan);
-                                  setUpgradeBilling('monthly');
-                                  setUpgradeProcessing(false);
-                                  setUpgradeSuccess(false);
-                                  setShowUpgradeModal(true);
-                                }}
-                              >
-                                Upgrade to {plan.name}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div
-                        className="col-span-3 text-center py-8 text-sm"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        No plans available to display.
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
-                {/* Billing History & Payment Method — only for paid plans */}
-                {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0 && (
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <Card className="p-5">
-                      <div
-                        className="flex items-center gap-3 pb-4 mb-4 border-b"
-                        style={{ borderColor: 'var(--border-subtle)' }}
-                      >
-                        <div
-                          className="flex h-9 w-9 items-center justify-center rounded-xl"
-                          style={{ background: 'var(--accent-amber-soft)' }}
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            style={{ color: 'var(--accent-amber)' }}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
-                            />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3
-                            className="text-sm font-bold"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            Billing History
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-white">
+                            {billingPlan?.name || 'Free'} Plan
                           </h3>
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            View your past invoices.
-                          </p>
-                        </div>
-                      </div>
-                      <div
-                        className="flex items-center justify-between rounded-lg p-4"
-                        style={{
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-subtle)',
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-8 w-8 items-center justify-center rounded-lg"
-                            style={{ background: 'var(--bg-card)' }}
-                          >
-                            <svg
-                              className="h-4 w-4"
-                              style={{ color: 'var(--text-muted)' }}
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                          </div>
-                          <div>
-                            <p
-                              className="text-sm font-semibold"
-                              style={{ color: 'var(--text-primary)' }}
-                            >
-                              {billingPlan.name} — ${billingPlan.monthlyPrice}/mo
-                            </p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                              Next invoice:{' '}
-                              {billingPlan.subscriptionEndsAt
-                                ? new Date(billingPlan.subscriptionEndsAt).toLocaleDateString()
-                                : 'N/A'}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          className="btn-secondary px-3 py-1.5 text-xs font-semibold cursor-pointer"
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const r = await api.get('/api/user/billing');
-                              openConfirm(
-                                'Invoices',
-                                r.data.plan
-                                  ? `Plan: ${r.data.plan.tier}\nStatus: ${r.data.plan.subscriptionStatus}`
-                                  : 'No invoices available yet.',
-                                () => {},
-                                'Close'
-                              );
-                            } catch {
-                              openConfirm(
-                                'Invoices',
-                                'No invoices available yet.',
-                                () => {},
-                                'Close'
-                              );
+                          <Badge
+                            variant={
+                              billingPlan?.subscriptionStatus === 'active' ? 'success' : 'neutral'
                             }
-                          }}
-                        >
-                          View Invoices
-                        </button>
-                      </div>
-                    </Card>
-
-                    <Card className="p-5">
-                      <div
-                        className="flex items-center gap-3 pb-4 mb-4 border-b"
-                        style={{ borderColor: 'var(--border-subtle)' }}
-                      >
-                        <div
-                          className="flex h-9 w-9 items-center justify-center rounded-xl"
-                          style={{ background: 'var(--accent-soft)' }}
-                        >
-                          <svg
-                            className="h-4 w-4"
-                            style={{ color: 'var(--accent)' }}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
-                            />
-                          </svg>
+                            {billingPlan?.subscriptionStatus || 'Active'}
+                          </Badge>
                         </div>
-                        <div>
-                          <h3
-                            className="text-sm font-bold"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            Payment Method
-                          </h3>
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            Manage your payment details.
-                          </p>
-                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
+                            ? `₹${billingPlan.monthlyPrice.toLocaleString()}/seat/month (${billingPlan.currency || 'INR'})`
+                            : 'Free Plan — Basic limits applied'}
+                        </p>
                       </div>
-                      <div
-                        className="flex items-center justify-between rounded-lg p-4"
-                        style={{
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-subtle)',
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="flex h-9 w-9 items-center justify-center rounded-lg"
-                            style={{ background: 'var(--bg-card)' }}
-                          >
-                            <svg
-                              className="h-5 w-5"
-                              style={{ color: 'var(--text-muted)' }}
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <rect x="1" y="4" width="22" height="16" rx="2" />
-                              <path d="M1 10h22" />
-                            </svg>
-                          </div>
-                          <div>
-                            <p
-                              className="text-sm font-semibold"
-                              style={{ color: 'var(--text-primary)' }}
-                            >
-                              Visa ending in 4242
-                            </p>
-                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                              Expires 12/2027
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          className="btn-secondary px-3 py-1.5 text-xs font-semibold cursor-pointer"
-                          type="button"
-                          onClick={() =>
-                            openConfirm(
-                              'Payment Method',
-                              'Payment method management will be available soon. Contact jagathwork372@gmail.com for assistance.',
-                              () => {},
-                              'Close'
-                            )
-                          }
-                        >
-                          Update
-                        </button>
-                      </div>
-                    </Card>
+                    </div>
                   </div>
-                )}
+
+                  {/* Real-time Usage Meters Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <UsageMeter
+                      label="Daily AI Generations"
+                      current={usageMetrics.aiGenerationsToday}
+                      limit={billingPlan?.aiGenerationsPerDay ?? 20}
+                      unit="gens"
+                      description="Resets at 00:00 UTC"
+                    />
+                    <UsageMeter
+                      label="Test Case Storage"
+                      current={usageMetrics.totalTestCases}
+                      limit={billingPlan?.maxTestCases ?? 500}
+                      unit="cases"
+                      description="Active stored test cases"
+                    />
+                    <UsageMeter
+                      label="Knowledge Base Files"
+                      current={usageMetrics.totalFiles}
+                      limit={billingPlan?.maxFiles ?? 3}
+                      unit="files"
+                      description="Uploaded documents"
+                    />
+                    <UsageMeter
+                      label="Workspace Members"
+                      current={usageMetrics.teamMembers}
+                      limit={billingPlan?.maxUsers ?? 1}
+                      unit="seats"
+                      description="Active user seats"
+                    />
+                  </div>
+                </Card>
+
+                {/* Seat Selector Component */}
+                <SeatSelector seats={enterpriseSeats} onChangeSeats={setEnterpriseSeats} />
+
+                {/* Side-by-Side Plan Comparison Table */}
+                <div className="mt-8">
+                  <h3 className="text-lg font-bold text-white mb-3">Plan Feature & Limit Matrix</h3>
+                  <PlanComparison currentTier={billingPlan?.tier || 'free'} />
+                </div>
               </>
             )}
           </div>
