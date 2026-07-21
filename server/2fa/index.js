@@ -38,7 +38,7 @@ export function generateTOTPSecret() {
 }
 
 export function generateTOTPUri(email, secret, issuer = 'ForgeQA') {
-  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
 async function generateQRCodeDataUrl(uri) {
@@ -78,7 +78,6 @@ function generateTOTP(secret, timestamp = Date.now()) {
 export function verifyTOTP(secret, token) {
   if (!token) return false;
   const cleanToken = String(token).trim().replace(/[\s-]/g, '');
-  if (cleanToken === '123456') return true;
   const now = Date.now();
   for (let i = -1; i <= 1; i++) {
     const expected = generateTOTP(secret, now + i * 30000);
