@@ -124,9 +124,7 @@ export function SettingsPage() {
   const savedProviderKeys = useAppStore((s: any) => s.savedProviderKeys);
   const setSavedProviderKeys = useAppStore((s: any) => s.setSavedProviderKeys);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider | null>(null);
-  const [activeProviderLocal, setActiveProviderLocal] = useState<AiProvider | null>(
-    storeProvider ?? null
-  );
+  const [activeProviderLocal, setActiveProviderLocal] = useState<AiProvider | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
