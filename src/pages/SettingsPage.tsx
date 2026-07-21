@@ -422,6 +422,24 @@ export function SettingsPage() {
     ? providerOptions.find((o) => o.id === storeProvider)
     : undefined;
   async function handleSelectProvider(providerId: AiProvider) {
+    // Toggle: if user taps the already-active provider, deselect it
+    const isAlreadyActive = selectedProvider === providerId || storeProvider === providerId;
+    if (isAlreadyActive) {
+      setSelectedProvider(null);
+      setSettingsError('');
+      setSettingsMessage('');
+      try {
+        await api.put('/api/settings/active-provider', { provider: null });
+        setActiveProvider(null as any);
+        setProvider(null as any);
+        setSettingsMessage('Provider deselected.');
+        setTimeout(() => setSettingsMessage(''), 3000);
+      } catch {
+        /* silently ignore deselect errors */
+      }
+      return;
+    }
+
     setSelectedProvider(providerId);
     setSettingsError('');
     setSettingsMessage('');
