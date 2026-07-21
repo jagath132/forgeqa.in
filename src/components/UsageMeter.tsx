@@ -22,31 +22,23 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
   const isDanger = !isUnlimited && percentage >= 100;
 
   const getProgressColor = () => {
-    if (isDanger) return 'var(--danger, #ef4444)';
-    if (isWarning) return 'var(--warning, #f59e0b)';
-    return 'var(--accent, #3b82f6)';
+    if (isDanger) return '#ef4444';
+    if (isWarning) return '#f59e0b';
+    return '#3b82f6';
   };
 
   return (
-    <div
-      className="p-4 rounded-xl border flex flex-col justify-between"
-      style={{
-        background: 'var(--bg-secondary, rgba(255, 255, 255, 0.03))',
-        borderColor: 'var(--border-subtle, rgba(255, 255, 255, 0.1))',
-      }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {label}
-        </span>
-        <span className="text-xs font-mono font-medium" style={{ color: 'var(--text-muted)' }}>
+    <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between min-h-[120px]">
+      <div className="flex justify-between items-start mb-2 gap-2">
+        <span className="text-xs font-bold text-slate-800 leading-tight">{label}</span>
+        <span className="text-[10px] font-mono font-medium text-slate-400 whitespace-nowrap">
           {current.toLocaleString()} {unit} /{' '}
           {isUnlimited ? 'Unlimited' : `${limit.toLocaleString()} ${unit}`}
         </span>
       </div>
 
       {!isUnlimited && (
-        <div className="w-full bg-slate-700/30 rounded-full h-2 overflow-hidden my-2">
+        <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden my-3">
           <div
             className="h-full transition-all duration-300 rounded-full"
             style={{
@@ -57,14 +49,14 @@ export const UsageMeter: React.FC<UsageMeterProps> = ({
         </div>
       )}
 
-      <div className="flex items-center justify-between text-xs mt-1">
-        <span style={{ color: 'var(--text-muted)' }}>{description || 'Current usage period'}</span>
+      <div className="flex items-center justify-between text-[10px] mt-1">
+        <span className="text-slate-400">{description || 'Current usage period'}</span>
         {isDanger ? (
-          <span className="text-red-400 font-medium">Limit Reached</span>
+          <span className="text-red-500 font-bold">Limit Reached</span>
         ) : isWarning ? (
-          <span className="text-amber-400 font-medium">{100 - percentage}% remaining</span>
+          <span className="text-amber-500 font-bold">{100 - percentage}% remaining</span>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>
+          <span className="text-slate-400">
             {isUnlimited ? 'No restriction' : `${percentage}% used`}
           </span>
         )}

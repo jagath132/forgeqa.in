@@ -62,81 +62,69 @@ export function PlanComparison({ currentTier = 'free', onSelectPlan }: PlanCompa
     },
   ];
 
+  const renderCellContent = (content: string) => {
+    if (content.includes('✅')) {
+      const text = content.replace('✅ ', '').replace('✅', '');
+      return (
+        <span className="flex items-center justify-center gap-2 text-slate-200">
+          <span className="bg-emerald-500 text-white rounded-full p-0.5 inline-flex shadow">
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={3}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </span>
+          {text && <span>{text}</span>}
+        </span>
+      );
+    }
+    if (content.includes('❌')) {
+      return <span className="flex items-center justify-center text-slate-500 font-black">✕</span>;
+    }
+    return <span>{content}</span>;
+  };
+
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+    <div className="overflow-x-auto rounded-xl bg-[#1e293b] shadow-md border border-slate-700">
       <table className="w-full text-left border-collapse text-xs sm:text-sm">
         <thead>
-          <tr className="border-b border-slate-800">
-            <th className="p-3 text-slate-400 font-semibold w-1/4">Features & Limits</th>
-            <th className="p-3 text-center w-1/4">
-              <div className="font-bold text-base text-white">Free</div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">₹0 / mo</div>
-              {onSelectPlan && (
-                <button
-                  type="button"
-                  disabled={currentTier === 'free'}
-                  onClick={() => onSelectPlan('free')}
-                  className={`mt-2 px-3 py-1 rounded-lg text-xs font-semibold w-full transition ${
-                    currentTier === 'free'
-                      ? 'bg-slate-800 text-slate-400 cursor-default'
-                      : 'bg-slate-800 hover:bg-slate-700 text-white'
-                  }`}
-                >
-                  {currentTier === 'free' ? 'Current Plan' : 'Downgrade'}
-                </button>
-              )}
+          <tr className="border-b border-slate-700/50">
+            <th className="p-4 text-slate-400 font-semibold w-1/4 align-top">Features & Limits</th>
+            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-[#1e293b] align-top">
+              <div className="font-bold text-lg text-white">Free</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-1">₹0 / mo</div>
             </th>
-            <th className="p-3 text-center w-1/4 bg-blue-950/30 border-x border-blue-900/50">
-              <div className="font-bold text-base text-blue-400">Pro</div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">₹1,499 / seat / mo</div>
-              {onSelectPlan && (
-                <button
-                  type="button"
-                  onClick={() => onSelectPlan('pro')}
-                  className={`mt-2 px-3 py-1 rounded-lg text-xs font-semibold w-full transition ${
-                    currentTier === 'pro'
-                      ? 'bg-blue-600 text-white cursor-default'
-                      : 'bg-blue-600 hover:bg-blue-500 text-white shadow'
-                  }`}
-                >
-                  {currentTier === 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
-                </button>
-              )}
+            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-slate-800/80 align-top">
+              <div className="font-bold text-lg text-blue-400">Pro</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-1">₹1,499 / seat / mo</div>
             </th>
-            <th className="p-3 text-center w-1/4">
-              <div className="font-bold text-base text-emerald-400">Enterprise</div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">₹699–₹1,499 / seat</div>
-              {onSelectPlan && (
-                <button
-                  type="button"
-                  onClick={() => onSelectPlan('enterprise')}
-                  className={`mt-2 px-3 py-1 rounded-lg text-xs font-semibold w-full transition ${
-                    currentTier === 'enterprise'
-                      ? 'bg-emerald-600 text-white cursor-default'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow'
-                  }`}
-                >
-                  {currentTier === 'enterprise' ? 'Current Plan' : 'Upgrade to Enterprise'}
-                </button>
-              )}
+            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-[#1e293b] align-top">
+              <div className="font-bold text-lg text-amber-400">Enterprise</div>
+              <div className="text-[10px] text-slate-400 font-mono mt-1">₹699–₹1,499 / seat</div>
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="text-xs">
           {rows.map((row, index) => (
             <tr
               key={row.name}
-              className={`border-b border-slate-900 ${
-                index % 2 === 0 ? 'bg-slate-900/20' : 'bg-transparent'
+              className={`border-b border-slate-700/50 ${
+                index % 2 === 0 ? 'bg-slate-800/30' : 'bg-transparent'
               }`}
             >
-              <td className="p-3 font-medium text-slate-300">{row.name}</td>
-              <td className="p-3 text-center text-slate-400 font-mono text-xs">{row.free}</td>
-              <td className="p-3 text-center text-blue-300 font-mono text-xs bg-blue-950/20 border-x border-blue-900/40 font-medium">
-                {row.pro}
+              <td className="p-4 font-medium text-slate-300">{row.name}</td>
+              <td className="p-4 text-center text-slate-400 font-mono border-l border-slate-700/50">
+                {renderCellContent(row.free)}
               </td>
-              <td className="p-3 text-center text-emerald-300 font-mono text-xs font-medium">
-                {row.enterprise}
+              <td className="p-4 text-center text-blue-300 font-mono border-l border-slate-700/50 bg-slate-800/30 font-medium">
+                {renderCellContent(row.pro)}
+              </td>
+              <td className="p-4 text-center text-amber-300 font-mono border-l border-slate-700/50 font-medium">
+                {renderCellContent(row.enterprise)}
               </td>
             </tr>
           ))}
