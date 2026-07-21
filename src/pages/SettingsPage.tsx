@@ -427,22 +427,15 @@ export function SettingsPage() {
   async function handleSelectProvider(providerId: AiProvider) {
     // Toggle: if user taps the already-active provider, deselect it
     if (activeProviderLocal === providerId) {
-      // Immediately update local state so UI responds
+      // Deselect immediately — purely client-side, no API call
+      // (avoids catch block reverting the state back)
       setActiveProviderLocal(null);
       setSelectedProvider(null);
+      setActiveProvider(null as any);
+      setProvider(null as any);
       setSettingsError('');
-      setSettingsMessage('');
-      try {
-        await api.put('/api/settings/active-provider', { provider: null });
-        setActiveProvider(null as any);
-        setProvider(null as any);
-        setSettingsMessage('Provider deselected.');
-        setTimeout(() => setSettingsMessage(''), 3000);
-      } catch {
-        // Revert local state if API fails
-        setActiveProviderLocal(providerId);
-        setSelectedProvider(providerId);
-      }
+      setSettingsMessage('Provider deselected.');
+      setTimeout(() => setSettingsMessage(''), 3000);
       return;
     }
 
