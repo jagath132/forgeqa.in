@@ -124,6 +124,9 @@ export function SettingsPage() {
   const savedProviderKeys = useAppStore((s: any) => s.savedProviderKeys);
   const setSavedProviderKeys = useAppStore((s: any) => s.setSavedProviderKeys);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider | null>(null);
+  const [activeProviderLocal, setActiveProviderLocal] = useState<AiProvider | null>(
+    storeProvider ?? null
+  );
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
@@ -423,8 +426,9 @@ export function SettingsPage() {
     : undefined;
   async function handleSelectProvider(providerId: AiProvider) {
     // Toggle: if user taps the already-active provider, deselect it
-    const isAlreadyActive = selectedProvider === providerId || storeProvider === providerId;
-    if (isAlreadyActive) {
+    if (activeProviderLocal === providerId) {
+      // Immediately update local state so UI responds
+      setActiveProviderLocal(null);
       setSelectedProvider(null);
       setSettingsError('');
       setSettingsMessage('');
@@ -435,11 +439,15 @@ export function SettingsPage() {
         setSettingsMessage('Provider deselected.');
         setTimeout(() => setSettingsMessage(''), 3000);
       } catch {
-        /* silently ignore deselect errors */
+        // Revert local state if API fails
+        setActiveProviderLocal(providerId);
+        setSelectedProvider(providerId);
       }
       return;
     }
 
+    // Immediately update local state so UI responds
+    setActiveProviderLocal(providerId);
     setSelectedProvider(providerId);
     setSettingsError('');
     setSettingsMessage('');
@@ -451,6 +459,9 @@ export function SettingsPage() {
       setSettingsMessage(`Provider set to ${label}.`);
       setTimeout(() => setSettingsMessage(''), 3000);
     } catch (err: any) {
+      // Revert local state if API fails
+      setActiveProviderLocal(activeProviderLocal);
+      setSelectedProvider(null);
       const msg = axios.isAxiosError(err)
         ? (err.response?.data?.error ?? err.message)
         : 'Failed to select provider.';
@@ -2362,8 +2373,9 @@ export function SettingsPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {providerOptions.map((option) => {
-                  const isActive = (selectedProvider || storeProvider) === option.id;
-                  const isSelected = selectedProvider === option.id;
+                  const isActive = activeProviderLocal === option.id;
+                  const isSelected =
+                    selectedProvider === option.id && activeProviderLocal !== option.id;
                   const cardStyle = isActive
                     ? {
                         background: 'var(--accent-soft)',
