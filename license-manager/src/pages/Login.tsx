@@ -1,8 +1,18 @@
-import { useState, type FormEvent } from "react";
-import { useAdminStore } from "../store/useAdminStore";
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, Check, AlertCircle, Loader2 } from "lucide-react";
-import "../index.css";
-
+import { useState, type FormEvent } from 'react';
+import { useAdminStore } from '../store/useAdminStore';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
+import { AnvilFLogoMark } from '../components/ForgeQALogo';
+import '../index.css';
 
 function Spinner() {
   return <Loader2 size={18} className="lk-login-spinner" />;
@@ -10,25 +20,25 @@ function Spinner() {
 
 export function LoginPage({ onBack }: { onBack?: () => void }) {
   const { login, error: storeError } = useAdminStore();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [localError, setLocalError] = useState("");
+  const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const error = localError || storeError;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setLocalError("");
+    setLocalError('');
 
     const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
-      setLocalError("Please enter your email address.");
+      setLocalError('Please enter your email address.');
       return;
     }
     if (!password) {
-      setLocalError("Please enter your password.");
+      setLocalError('Please enter your password.');
       return;
     }
 
@@ -57,11 +67,15 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
       <div className="lk-login-card">
         <div className="lk-login-card-inner">
           <div className="lk-login-header">
-            <div className="lk-login-logo">
-              <Check size={20} strokeWidth={2.5} />
+            <div className="flex justify-center mb-3">
+              <AnvilFLogoMark size={48} />
             </div>
-            <h1 className="lk-login-title">ForgeKey</h1>
-            <p className="lk-login-desc">Sign in to manage product keys and customers.</p>
+            <h1 className="lk-login-title">
+              ForgeQA <span style={{ color: '#06B6D4' }}>License Manager</span>
+            </h1>
+            <p className="lk-login-desc">
+              Sign in to manage product keys, plans, and customer accounts.
+            </p>
           </div>
 
           {error && (
@@ -73,9 +87,13 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
 
           <form onSubmit={handleSubmit} className="lk-login-form">
             <div className="lk-login-field">
-              <label className="lk-login-label" htmlFor="login-email">Email</label>
+              <label className="lk-login-label" htmlFor="login-email">
+                Email
+              </label>
               <div className="lk-login-input-wrap">
-                <span className="lk-login-input-icon"><Mail size={18} strokeWidth={1.8} /></span>
+                <span className="lk-login-input-icon">
+                  <Mail size={18} strokeWidth={1.8} />
+                </span>
                 <input
                   id="login-email"
                   className="lk-login-input"
@@ -91,13 +109,17 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
             </div>
 
             <div className="lk-login-field">
-              <label className="lk-login-label" htmlFor="login-password">Password</label>
+              <label className="lk-login-label" htmlFor="login-password">
+                Password
+              </label>
               <div className="lk-login-input-wrap">
-                <span className="lk-login-input-icon"><Lock size={18} strokeWidth={1.8} /></span>
+                <span className="lk-login-input-icon">
+                  <Lock size={18} strokeWidth={1.8} />
+                </span>
                 <input
                   id="login-password"
                   className="lk-login-input"
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -108,9 +130,13 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
                   type="button"
                   className="lk-login-toggle-vis"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? <EyeOff size={18} strokeWidth={1.8} /> : <Eye size={18} strokeWidth={1.8} />}
+                  {showPassword ? (
+                    <EyeOff size={18} strokeWidth={1.8} />
+                  ) : (
+                    <Eye size={18} strokeWidth={1.8} />
+                  )}
                 </button>
               </div>
             </div>

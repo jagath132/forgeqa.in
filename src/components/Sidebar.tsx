@@ -1,5 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore, getProviderLabel } from '../store/useAppStore';
+import { AnvilFLogoMark } from './ui/ForgeQALogo';
 import { UserProfile } from './UserProfile';
 import {
   DashboardIcon3D,
@@ -346,41 +347,12 @@ export function Sidebar() {
             style={{ padding: '20px 16px 16px' }}
           >
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigateToPage('/dashboard')}
               type="button"
-              className="cursor-pointer flex items-center gap-3"
-              style={{ background: 'none', border: 'none', padding: 0 }}
+              className="flex items-center gap-2 cursor-pointer border-none bg-transparent p-0"
+              aria-label="Go to Dashboard"
             >
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  background: 'linear-gradient(135deg, #2563EB, #38BDF8)',
-                  borderRadius: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path
-                    d="M12 2l8 3v7c0 4-3.5 7.5-8 9-4.5-1.5-8-5-8-9V5l8-3z"
-                    fill="rgba(255,255,255,0.2)"
-                  />
-                  <path d="M9 12l2 2 4-4" />
-                </svg>
-              </div>
+              <AnvilFLogoMark size={38} />
               <div style={{ marginLeft: '0.5rem' }}>
                 <h1
                   style={{

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { api, type AuthResponse } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
+import { ForgeQALogo, AnvilFLogoMark } from '../components/ui/ForgeQALogo';
 
 type AuthMode = 'login' | 'forgot';
 
@@ -222,30 +223,12 @@ export function AuthPage() {
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-10 pt-10 relative z-10">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
-            style={{ background: 'var(--signal-green)' }}
-          >
-            <svg
-              className="h-5 w-5 text-[var(--ink)]"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6 12l4 4 8-8"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <AnvilFLogoMark size={32} />
           <span
-            className="text-sm font-bold"
+            className="text-base font-bold tracking-tight"
             style={{ color: 'var(--paper)', fontFamily: 'var(--font-display)' }}
           >
-            ForgeQA
+            Forge<span style={{ color: '#06B6D4' }}>QA</span>
           </span>
         </div>
 
@@ -316,26 +299,7 @@ export function AuthPage() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex md:hidden items-center gap-2.5 mb-8">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
-              style={{ background: 'var(--signal-green)' }}
-            >
-              <svg className="h-5 w-5 text-[var(--ink)]" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M6 12l4 4 8-8"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <span
-              className="text-sm font-bold"
-              style={{ color: 'var(--ink)', fontFamily: 'var(--font-display)' }}
-            >
-              ForgeQA
-            </span>
+            <ForgeQALogo size="md" />
           </div>
 
           {/* Toggle */}

@@ -1,29 +1,24 @@
+import React from 'react';
+import { ForgeQALogo, AnvilFLogoMark } from './ForgeQALogo';
+
 interface LogoProps {
   variant?: 'mark' | 'wordmark';
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  dark?: boolean;
 }
 
-export function Logo({ variant = 'wordmark', className = '' }: LogoProps) {
+export function Logo({
+  variant = 'wordmark',
+  className = '',
+  size = 'md',
+  dark = false,
+}: LogoProps) {
   if (variant === 'mark') {
     return (
-      <img
-        src="/logo/logo-mark-gradient.svg"
-        alt="ForgeQA"
-        className={className}
-        width={32}
-        height={32}
-      />
+      <AnvilFLogoMark size={size === 'sm' ? 28 : size === 'md' ? 36 : 44} className={className} />
     );
   }
 
-  return (
-    <img
-      src="/logo/wordmark-light-bg.svg"
-      alt="ForgeQA"
-      className={className}
-      width={132}
-      height={34}
-      style={{ display: 'block' }}
-    />
-  );
+  return <ForgeQALogo size={size} dark={dark} className={className} />;
 }

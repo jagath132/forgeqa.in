@@ -11,6 +11,7 @@ import { PaymentsPage } from './pages/Payments';
 import { VerificationsPage } from './pages/Verifications';
 import { PlansPage } from './pages/Plans';
 import { DeletedUsersPage } from './pages/DeletedUsers';
+import { AnvilFLogoMark } from './components/ForgeQALogo';
 import {
   LayoutDashboard,
   Blocks,
@@ -159,11 +160,11 @@ export function App() {
     <div className={`app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <KeyRound size={18} strokeWidth={2.5} />
+          <div className="sidebar-brand-icon flex items-center justify-center p-0 bg-transparent border-0">
+            <AnvilFLogoMark size={28} />
           </div>
           <div className="sidebar-brand-text">
-            <h1>ForgeKey</h1>
+            <h1>ForgeQA</h1>
             <p>License Manager</p>
           </div>
           <button
