@@ -223,7 +223,7 @@ export function App() {
         <div className="topbar">
           <div className="topbar-left">
             <div className="topbar-breadcrumb">
-              <span>ForgeKey</span>
+              <span>ForgeQA</span>
               <span>/</span>
               <span>{pageLabel}</span>
             </div>

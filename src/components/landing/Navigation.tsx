@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, X, ArrowRight, ChevronRight } from 'lucide-react';
+import { AnvilFLogoMark } from '../ui/ForgeQALogo';
 
 const NAV_LINKS = [
   { href: 'features', label: 'Features' },
@@ -71,22 +72,7 @@ export default function Navigation({ isAuthed, onGetStarted, onSignIn }: Navigat
             style={{ outline: 'none' }}
             aria-label="ForgeQA Home"
           >
-            <div
-              className="flex items-center justify-center rounded-xl"
-              style={{
-                width: 34,
-                height: 34,
-                background: 'var(--gradient-primary)',
-                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
-              }}
-            >
-              <span
-                className="text-white font-bold text-sm"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                F
-              </span>
-            </div>
+            <AnvilFLogoMark size={34} />
             <span
               style={{
                 color: 'var(--landing-text)',

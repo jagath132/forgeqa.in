@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { AnvilFLogoMark } from '../components/ui/ForgeQALogo';
 
 const KEY_FORMAT = /^[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/;
 
@@ -167,30 +168,12 @@ export function CompleteRegistrationPage() {
         style={{ background: 'var(--ink)' }}
       >
         <div className="flex items-center gap-2.5 px-10 pt-10">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0"
-            style={{ background: 'var(--signal-green)' }}
-          >
-            <svg
-              className="h-5 w-5 text-[var(--ink)]"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M6 12l4 4 8-8"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+          <AnvilFLogoMark size={32} />
           <span
-            className="text-sm font-bold"
-            style={{ color: 'var(--paper)', fontFamily: 'var(--font-sans)' }}
+            className="text-base font-bold tracking-tight"
+            style={{ color: 'var(--paper)', fontFamily: 'var(--font-display)' }}
           >
-            ForgeQA
+            Forge<span style={{ color: '#06B6D4' }}>QA</span>
           </span>
         </div>
 

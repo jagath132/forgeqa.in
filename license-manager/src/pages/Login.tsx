@@ -147,7 +147,7 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
           </form>
 
           <div className="lk-login-footer">
-            <span>ForgeKey License Manager</span>
+            <span>ForgeQA License Manager</span>
             <span className="lk-login-version">v0.1.0</span>
           </div>
         </div>
