@@ -117,13 +117,6 @@ const NAV_ITEMS_SYSTEM: NavItem[] = [
     icon: <SettingsIcon3D size={20} />,
     color: 'amber',
   },
-  {
-    key: 'admin',
-    label: 'License & Admin Manager',
-    path: '/admin',
-    icon: <ShieldIcon3D size={20} />,
-    color: 'violet',
-  },
 ];
 
 function NavButton({
@@ -470,10 +463,7 @@ export function Sidebar() {
             {/* Configuration section */}
             <SectionHeader label="Configuration" />
             <div className="space-y-0.5">
-              {(user?.role === 'Admin' || user?.role === 'Owner'
-                ? NAV_ITEMS_SYSTEM
-                : NAV_ITEMS_SYSTEM.filter((item) => item.key !== 'admin')
-              ).map((item) => (
+              {NAV_ITEMS_SYSTEM.map((item) => (
                 <NavButton
                   key={item.key}
                   item={item}

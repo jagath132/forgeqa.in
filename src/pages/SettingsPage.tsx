@@ -870,24 +870,6 @@ export function SettingsPage() {
                       No product key associated with this account.
                     </p>
                   )}
-                  {(user?.role === 'Admin' || user?.role === 'Owner') && (
-                    <div
-                      className="flex items-center gap-2 mt-3 pt-3 border-t"
-                      style={{ borderColor: 'var(--color-border)' }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => navigate('/admin')}
-                        className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer"
-                        style={{
-                          background: 'var(--color-accent)',
-                          color: '#ffffff',
-                        }}
-                      >
-                        Open License Manager
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             </Card>

@@ -44,8 +44,6 @@ function AppLayout() {
       '/analytics': 'Analytics — ForgeQA',
       '/suites': 'Suites — ForgeQA',
       '/regression': 'Regression — ForgeQA',
-      '/admin': 'License & Admin Manager — ForgeQA',
-      '/license-manager': 'License & Admin Manager — ForgeQA',
     };
     document.title = titles[pathname] || 'ForgeQA — AI-Powered Test Automation Platform';
   }, [pathname]);
@@ -61,8 +59,8 @@ function AppLayout() {
               <Route path="/test-scripts" element={<TestScripts />} />
               <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/license-manager" element={<AdminPage />} />
+              <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/license-manager" element={<Navigate to="/dashboard" replace />} />
               <Route path="/ai-settings" element={<Navigate to="/settings" replace />} />
               <Route path="/profile" element={<Navigate to="/settings" replace />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
