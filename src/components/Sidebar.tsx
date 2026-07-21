@@ -470,7 +470,10 @@ export function Sidebar() {
             {/* Configuration section */}
             <SectionHeader label="Configuration" />
             <div className="space-y-0.5">
-              {NAV_ITEMS_SYSTEM.map((item) => (
+              {(user?.role === 'Admin' || user?.role === 'Owner'
+                ? NAV_ITEMS_SYSTEM
+                : NAV_ITEMS_SYSTEM.filter((item) => item.key !== 'admin')
+              ).map((item) => (
                 <NavButton
                   key={item.key}
                   item={item}

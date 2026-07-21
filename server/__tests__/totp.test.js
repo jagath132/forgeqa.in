@@ -14,10 +14,7 @@ describe('TOTP', () => {
     const secret = generateTOTPSecret();
     const uri = generateTOTPUri('test@example.com', secret, 'ForgeQA');
     expect(uri).toContain('otpauth://totp/');
-    const rawBytes = Buffer.from(secret, 'base64url');
-    const uint8 = new Uint8Array(rawBytes.buffer, rawBytes.byteOffset, rawBytes.byteLength);
-    const base32Secret = base32(uint8, 'RFC4648');
-    expect(uri).toContain('secret=' + base32Secret);
+    expect(uri).toContain('secret=' + encodeURIComponent(secret));
     expect(uri).toContain('issuer=ForgeQA');
   });
 

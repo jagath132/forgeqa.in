@@ -3,16 +3,42 @@ import QRCode from 'qrcode';
 import base32 from 'base32-encode';
 import { getDb } from '../db.js';
 
+function base32ToBuffer(b32Str) {
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const clean = String(b32Str || '')
+    .toUpperCase()
+    .replace(/[^A-Z2-7]/g, '');
+  let bits = 0;
+  let value = 0;
+  const output = [];
+  for (let i = 0; i < clean.length; i++) {
+    value = (value << 5) | ALPHABET.indexOf(clean[i]);
+    bits += 5;
+    if (bits >= 8) {
+      output.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(output);
+}
+
+function getSecretBytes(secret) {
+  if (!secret) return Buffer.alloc(0);
+  const trimmed = String(secret).trim();
+  if (/^[A-Z2-7=]+$/i.test(trimmed)) {
+    return base32ToBuffer(trimmed);
+  }
+  return Buffer.from(trimmed, 'base64url');
+}
+
 export function generateTOTPSecret() {
-  const secret = crypto.randomBytes(20).toString('base64url');
-  return secret;
+  const raw = crypto.randomBytes(20);
+  const uint8 = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  return base32(uint8, 'RFC4648');
 }
 
 export function generateTOTPUri(email, secret, issuer = 'ForgeQA') {
-  const rawBytes = Buffer.from(secret, 'base64url');
-  const uint8 = new Uint8Array(rawBytes.buffer, rawBytes.byteOffset, rawBytes.byteLength);
-  const base32Secret = base32(uint8, 'RFC4648');
-  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${base32Secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+  return `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(email)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
 async function generateQRCodeDataUrl(uri) {
@@ -24,7 +50,8 @@ async function generateQRCodeDataUrl(uri) {
 }
 
 function hmacSha1(key, message) {
-  const hmac = crypto.createHmac('sha1', Buffer.from(key, 'base64url'));
+  const keyBytes = getSecretBytes(key);
+  const hmac = crypto.createHmac('sha1', keyBytes);
   hmac.update(message);
   return hmac.digest();
 }
