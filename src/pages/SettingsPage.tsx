@@ -6,7 +6,6 @@ import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { UsageMeter } from '../components/UsageMeter';
-import { SeatSelector } from '../components/SeatSelector';
 import { PlanComparison } from '../components/PlanComparison';
 import {
   getProfile,
@@ -143,10 +142,8 @@ export function SettingsPage() {
     totalFiles: 0,
     teamMembers: 1,
   });
-  const [enterpriseSeats, setEnterpriseSeats] = useState(15);
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [billingLoading, setBillingLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   /* ── Upgrade / Enquiry modals ── */
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -174,7 +171,6 @@ export function SettingsPage() {
   }, [enquirySent]);
 
   const loadBillingData = useCallback(async () => {
-    if (activeSection !== 'billing') return;
     setBillingLoading(true);
     try {
       const [usageRes, plansRes] = await Promise.all([
@@ -193,20 +189,6 @@ export function SettingsPage() {
   useEffect(() => {
     loadBillingData();
   }, [loadBillingData]);
-
-  async function handleLaunchCustomerPortal() {
-    setPortalLoading(true);
-    try {
-      const res = await api.post('/api/payments/create-portal-session');
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      }
-    } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to open billing portal');
-    } finally {
-      setPortalLoading(false);
-    }
-  }
 
   useEffect(() => {
     if (!user) return;
@@ -1675,89 +1657,133 @@ export function SettingsPage() {
 
       case 'billing':
         return (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-8 animate-fade-in">
+            {/* Header section with title, description, and quick action button */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-slate-800/60">
               <div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Billing & Subscription
-                </h2>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Manage workspace seats, monitor real-time usage, and upgrade plan features.
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {billingPlan?.subscriptionEndsAt && (
-                  <Badge variant="warning">
-                    Renews {new Date(billingPlan.subscriptionEndsAt).toLocaleDateString()}
-                  </Badge>
-                )}
-                <button
-                  type="button"
-                  onClick={handleLaunchCustomerPortal}
-                  disabled={portalLoading}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs border border-slate-700 transition flex items-center gap-2 cursor-pointer shadow"
-                >
-                  {portalLoading ? (
-                    <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  ) : (
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 text-cyan-400">
                     <svg
-                      className="w-4 h-4 text-blue-400"
+                      className="w-5 h-5"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
+                      strokeWidth={2}
                     >
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                        d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                       />
                     </svg>
-                  )}
-                  <span>Manage Billing in Stripe Portal</span>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-white">
+                      Billing & Subscription
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Monitor real-time consumption, view plan limits, and manage tier upgrades.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/auth/complete-registration')}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-medium text-xs transition flex items-center gap-2 cursor-pointer shadow-lg shadow-cyan-500/10"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                    />
+                  </svg>
+                  <span>Redeem Product Key</span>
                 </button>
               </div>
             </div>
 
             {billingLoading ? (
-              <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
                 <div
-                  className="h-6 w-6 rounded-full border-2 border-t-transparent animate-spin"
-                  style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+                  className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin"
+                  style={{ borderColor: 'var(--accent, #06B6D4)', borderTopColor: 'transparent' }}
                 />
+                <span className="text-xs text-slate-400">Loading subscription details...</span>
               </div>
             ) : (
               <>
-                {/* Active Subscription Summary Banner */}
-                <Card className="p-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 mb-5 border-b border-slate-800">
+                {/* ── Active Subscription Summary Banner ── */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 p-6 shadow-xl">
+                  {/* Decorative glowing gradient backdrop */}
+                  <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-cyan-500/20 shrink-0">
                         {(billingPlan?.name || 'F')[0]}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xl font-bold text-white">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-2xl font-black text-white tracking-tight">
                             {billingPlan?.name || 'Free'} Plan
                           </h3>
-                          <Badge
-                            variant={
-                              billingPlan?.subscriptionStatus === 'active' ? 'success' : 'neutral'
-                            }
-                          >
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
                             {billingPlan?.subscriptionStatus || 'Active'}
-                          </Badge>
+                          </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">
-                          {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
-                            ? `₹${billingPlan.monthlyPrice.toLocaleString()}/seat/month (${billingPlan.currency || 'INR'})`
-                            : 'Free Plan — Basic limits applied'}
+                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                          <span>
+                            {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
+                              ? `₹${billingPlan.monthlyPrice.toLocaleString()} / seat / month (${billingPlan.currency || 'INR'})`
+                              : 'Free Plan — Basic workspace quotas'}
+                          </span>
+                          {billingPlan?.subscriptionEndsAt && (
+                            <>
+                              <span className="text-slate-600">•</span>
+                              <span className="text-amber-400/90 font-medium">
+                                Renews{' '}
+                                {new Date(billingPlan.subscriptionEndsAt).toLocaleDateString()}
+                              </span>
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Real-time Usage Meters Grid */}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('plans-comparison-section');
+                          el?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs border border-slate-700 transition cursor-pointer flex-1 md:flex-none text-center shadow"
+                      >
+                        Change Plan Tier
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Real-time Usage Meters Grid ── */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
+                      Resource Utilization
+                    </h3>
+                    <span className="text-xs text-slate-500 font-mono">Live Sync</span>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <UsageMeter
                       label="Daily AI Generations"
@@ -1788,14 +1814,477 @@ export function SettingsPage() {
                       description="Active user seats"
                     />
                   </div>
-                </Card>
+                </div>
 
-                {/* Seat Selector Component */}
-                <SeatSelector seats={enterpriseSeats} onChangeSeats={setEnterpriseSeats} />
+                {/* ── Interactive Subscription Tiers ── */}
+                <div id="plans-comparison-section" className="space-y-4 pt-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">
+                        Available Subscription Plans
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Choose the tier that fits your engineering team's scale.
+                      </p>
+                    </div>
 
-                {/* Side-by-Side Plan Comparison Table */}
-                <div className="mt-8">
-                  <h3 className="text-lg font-bold text-white mb-3">Plan Feature & Limit Matrix</h3>
+                    {/* Billing Cycle Toggle Switch */}
+                    <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => setUpgradeBilling('monthly')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                          upgradeBilling === 'monthly'
+                            ? 'bg-cyan-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Monthly Billing
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUpgradeBilling('yearly')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          upgradeBilling === 'yearly'
+                            ? 'bg-cyan-500 text-slate-950 shadow'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <span>Annual Billing</span>
+                        <span className="text-[10px] bg-emerald-500 text-slate-950 font-bold px-1.5 py-0.2 rounded-full">
+                          20% OFF
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tier Cards Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Free Tier */}
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between hover:border-slate-700 transition">
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Starter
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300">
+                            Free Forever
+                          </span>
+                        </div>
+                        <h4 className="text-xl font-bold text-white">Free Plan</h4>
+                        <p className="text-xs text-slate-400 mt-1 min-h-[36px]">
+                          Essential AI test suite generation for solo developers.
+                        </p>
+
+                        <div className="my-6">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black text-white font-mono">₹0</span>
+                            <span className="text-xs text-slate-400">/ month</span>
+                          </div>
+                        </div>
+
+                        <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800/80 pt-5">
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-emerald-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>20 AI Generations per day</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-emerald-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>Up to 500 Test Cases storage</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-emerald-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>3 Knowledge Base documents</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-emerald-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>1 Workspace seat</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={billingPlan?.tier === 'free' || !billingPlan?.tier}
+                        className={`mt-6 w-full py-2.5 rounded-xl font-bold text-xs transition cursor-pointer ${
+                          billingPlan?.tier === 'free' || !billingPlan?.tier
+                            ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-default'
+                            : 'bg-slate-800 hover:bg-slate-700 text-white'
+                        }`}
+                      >
+                        {billingPlan?.tier === 'free' || !billingPlan?.tier
+                          ? 'Current Plan'
+                          : 'Select Free'}
+                      </button>
+                    </div>
+
+                    {/* Pro Tier — Featured */}
+                    <div className="relative rounded-2xl border-2 border-cyan-500/60 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-950 p-6 flex flex-col justify-between shadow-2xl shadow-cyan-500/10">
+                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-md">
+                        MOST POPULAR
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-4 mt-1">
+                          <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                            Professional
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                            Recommended
+                          </span>
+                        </div>
+                        <h4 className="text-xl font-bold text-white">Pro Plan</h4>
+                        <p className="text-xs text-slate-400 mt-1 min-h-[36px]">
+                          Full automation engine, Playwright/Cypress export & priority AI execution.
+                        </p>
+
+                        <div className="my-6">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black text-white font-mono">
+                              ₹{upgradeBilling === 'yearly' ? '14,990' : '1,499'}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              / {upgradeBilling === 'yearly' ? 'year' : 'month'}
+                            </span>
+                          </div>
+                          {upgradeBilling === 'yearly' && (
+                            <span className="text-[11px] text-emerald-400 font-medium block mt-1">
+                              Equivalent to ₹1,249/mo (Save ₹2,998/yr)
+                            </span>
+                          )}
+                        </div>
+
+                        <ul className="space-y-2.5 text-xs text-slate-200 border-t border-slate-800/80 pt-5">
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-cyan-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span className="font-semibold text-white">
+                              200 AI Generations per day
+                            </span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-cyan-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>Up to 5,000 Test Cases storage</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-cyan-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>20 Knowledge Base uploads</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-cyan-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span className="text-cyan-300 font-semibold">
+                              Playwright, Cypress & Selenium scripts
+                            </span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-cyan-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>Regression Suites & CI/CD Integrations</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate('/auth/complete-registration')}
+                        className="mt-6 w-full py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 transition cursor-pointer shadow-lg shadow-cyan-500/20"
+                      >
+                        {billingPlan?.tier === 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
+                      </button>
+                    </div>
+
+                    {/* Enterprise Tier */}
+                    <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between hover:border-slate-700 transition">
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                            Enterprise
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                            Custom Scale
+                          </span>
+                        </div>
+                        <h4 className="text-xl font-bold text-white">Enterprise Plan</h4>
+                        <p className="text-xs text-slate-400 mt-1 min-h-[36px]">
+                          Dedicated SLA, custom AI models, SAML SSO & unlimited team quotas.
+                        </p>
+
+                        <div className="my-6">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black text-white font-mono">Custom</span>
+                          </div>
+                          <span className="text-[11px] text-slate-400 block mt-1">
+                            Tailored to enterprise security policies
+                          </span>
+                        </div>
+
+                        <ul className="space-y-2.5 text-xs text-slate-300 border-t border-slate-800/80 pt-5">
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-amber-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span className="font-semibold text-white">
+                              2,000+ AI Generations per day
+                            </span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-amber-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>50,000+ Test Cases storage</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-amber-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>Unlimited Knowledge Base uploads</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-amber-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>SSO & SAML Authentication</span>
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg
+                              className="w-4 h-4 text-amber-400 shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            <span>Dedicated Account Manager & 99.9% SLA</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate('/auth/complete-registration')}
+                        className="mt-6 w-full py-2.5 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-white transition cursor-pointer"
+                      >
+                        Contact Sales
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Invoice & Billing History Table ── */}
+                <div className="space-y-3 pt-6 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-white">Billing History & Receipts</h3>
+                    <span className="text-xs text-slate-400">Past transactions</span>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-semibold uppercase tracking-wider">
+                            <th className="p-3.5">Invoice ID</th>
+                            <th className="p-3.5">Date</th>
+                            <th className="p-3.5">Description</th>
+                            <th className="p-3.5">Amount</th>
+                            <th className="p-3.5">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                          {billingPlan?.tier === 'pro' || billingPlan?.tier === 'enterprise' ? (
+                            <tr>
+                              <td className="p-3.5 font-mono font-medium text-white">
+                                INV-2026-001
+                              </td>
+                              <td className="p-3.5">{new Date().toLocaleDateString()}</td>
+                              <td className="p-3.5 font-medium">
+                                {billingPlan?.name || 'Pro'} Plan Subscription
+                              </td>
+                              <td className="p-3.5 font-mono font-bold text-white">
+                                ₹{(billingPlan?.monthlyPrice || 1499).toLocaleString()}
+                              </td>
+                              <td className="p-3.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Paid
+                                </span>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr>
+                              <td className="p-3.5 font-mono font-medium text-slate-400">
+                                INV-FREE-ACCOUNT
+                              </td>
+                              <td className="p-3.5">{new Date().toLocaleDateString()}</td>
+                              <td className="p-3.5 font-medium text-slate-400">
+                                Free Tier License
+                              </td>
+                              <td className="p-3.5 font-mono font-bold text-slate-400">₹0</td>
+                              <td className="p-3.5">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-400">
+                                  Active
+                                </span>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Side-by-Side Plan Comparison Table ── */}
+                <div className="pt-6 border-t border-slate-800">
+                  <h3 className="text-base font-bold text-white mb-3">Detailed Feature Matrix</h3>
                   <PlanComparison currentTier={billingPlan?.tier || 'free'} />
                 </div>
               </>
