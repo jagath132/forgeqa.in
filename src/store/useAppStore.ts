@@ -55,6 +55,7 @@ interface AppState {
   setSearchOpen: (open: boolean) => void;
   setNavDrawerOpen: (open: boolean) => void;
   logout: () => void;
+  loginUser: (user: User, providerKeys?: ProviderKeyMap) => void;
   openConfirm: (
     title: string,
     message: string,
@@ -127,6 +128,33 @@ export const useAppStore = create<AppState>()((set, get) => ({
     api.post('/api/auth/logout').catch(() => {});
     set({ user: null });
   },
+
+  // Set user immediately after login — navigates to dashboard without any extra API calls
+  loginUser: (user, providerKeys) => {
+    const activeProv = user.activeProvider || null;
+    set({ user, activeProvider: activeProv, provider: activeProv });
+    if (providerKeys) set({ savedProviderKeys: providerKeys });
+    // Load secondary data in background — does NOT block navigation
+    Promise.all([
+      getHistory(),
+      getQaResult(),
+      api
+        .get<{ keys: ProviderKeyMap }>('/api/settings/api-keys')
+        .catch(() => ({ data: { keys: {} } })),
+      getProfile().catch(() => ({ displayName: '' })),
+    ])
+      .then(([loadedHistory, loadedQaResult, settingsRes, loadedProfile]) => {
+        set({ history: loadedHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
+        if (loadedProfile?.displayName) set({ profileName: loadedProfile.displayName });
+        if (loadedQaResult) {
+          set({ qaResult: loadedQaResult });
+        } else if (loadedHistory.length > 0) {
+          set({ qaResult: loadedHistory[0].result });
+        }
+      })
+      .catch(() => {});
+  },
+
   openConfirm: (title, message, onConfirm, confirmLabel) => {
     set({ confirmDialog: { open: true, title, message, onConfirm, confirmLabel } });
   },
@@ -140,32 +168,40 @@ export const useAppStore = create<AppState>()((set, get) => ({
       return;
     }
     try {
+      // Only fetch user identity — show the UI immediately
       const res = await api.get<{ user: User }>('/api/auth/me');
       const activeProv = res.data.user.activeProvider || null;
-      set({ user: res.data.user, activeProvider: activeProv, provider: activeProv });
+      set({
+        user: res.data.user,
+        activeProvider: activeProv,
+        provider: activeProv,
+        authChecking: false,
+      });
 
       /* Seed sample data on first load for testing */
       seedSampleData();
 
-      const [loadedHistory, loadedQaResult, settingsRes, loadedProfile] = await Promise.all([
+      // Load secondary data in the background — does NOT block authChecking
+      Promise.all([
         getHistory(),
         getQaResult(),
         api.get<{ keys: ProviderKeyMap }>('/api/settings/api-keys'),
         getProfile().catch(() => ({ displayName: '' })),
-      ]);
-      set({ history: loadedHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
-      if (loadedProfile?.displayName) {
-        set({ profileName: loadedProfile.displayName });
-      }
-      if (loadedQaResult) {
-        set({ qaResult: loadedQaResult });
-      } else if (loadedHistory.length > 0) {
-        set({ qaResult: loadedHistory[0].result });
-      }
+      ])
+        .then(([loadedHistory, loadedQaResult, settingsRes, loadedProfile]) => {
+          set({ history: loadedHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
+          if (loadedProfile?.displayName) set({ profileName: loadedProfile.displayName });
+          if (loadedQaResult) {
+            set({ qaResult: loadedQaResult });
+          } else if (loadedHistory.length > 0) {
+            set({ qaResult: loadedHistory[0].result });
+          }
+        })
+        .catch(() => {});
     } catch {
       clearSession();
+      set({ authChecking: false });
     }
-    set({ authChecking: false });
   },
 }));
 

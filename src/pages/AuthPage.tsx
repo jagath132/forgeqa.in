@@ -66,8 +66,7 @@ function ConsoleFeed() {
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const setUser = useAppStore((s) => s.setUser);
-  const setSavedProviderKeys = useAppStore((s) => s.setSavedProviderKeys);
+  const loginUser = useAppStore((s) => s.loginUser);
 
   useEffect(() => {
     document.title = 'Sign In — ForgeQA';
@@ -160,19 +159,12 @@ export function AuthPage() {
           localStorage.setItem('forgeqa_device_token', res.data.deviceToken);
         }
         setBtnSuccess(true);
-        const isNewUser = !res.data.user.has_seen_welcome;
-        setTimeout(() => {
-          try {
-            api
-              .get<{ keys: Record<string, boolean> }>('/api/settings/api-keys')
-              .then((kr) => setSavedProviderKeys(kr.data.keys ?? {}))
-              .catch(() => {});
-          } catch {
-            /* ignore */
-          }
+        // Navigate immediately — secondary data loads in the background
+        requestAnimationFrame(() => {
+          const isNewUser = !res.data.user.has_seen_welcome;
+          loginUser(res.data.user);
           navigate(isNewUser ? '/dashboard?welcome=true' : '/dashboard');
-          setUser(res.data.user);
-        }, 400);
+        });
       } else {
         const res = await api.post<{ message: string }>('/api/auth/forgot-password', { email });
         setSuccessMessage(res.data.message);
