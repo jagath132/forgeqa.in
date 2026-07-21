@@ -127,7 +127,6 @@ export function SettingsPage() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
-  const [savingProvider, setSavingProvider] = useState(false);
 
   /* ── Billing & Usage state ── */
   const [billingPlan, setBillingPlan] = useState<any>(null);
@@ -422,26 +421,22 @@ export function SettingsPage() {
   const activeProviderObj = storeProvider
     ? providerOptions.find((o) => o.id === storeProvider)
     : undefined;
-  const saveDisabled = !selectedProvider || selectedProvider === activeProvider || savingProvider;
-
-  async function handleSaveProvider() {
-    if (!selectedProvider) return;
-    setSavingProvider(true);
+  async function handleSelectProvider(providerId: AiProvider) {
+    setSelectedProvider(providerId);
     setSettingsError('');
     setSettingsMessage('');
     try {
-      await api.put('/api/settings/active-provider', { provider: selectedProvider });
-      setActiveProvider(selectedProvider);
-      setProvider(selectedProvider);
-      setSettingsMessage(`Provider set to ${selectedProviderObj?.label || selectedProvider}.`);
+      await api.put('/api/settings/active-provider', { provider: providerId });
+      setActiveProvider(providerId);
+      setProvider(providerId);
+      const label = providerOptions.find((o) => o.id === providerId)?.label || providerId;
+      setSettingsMessage(`Provider set to ${label}.`);
       setTimeout(() => setSettingsMessage(''), 3000);
     } catch (err: any) {
       const msg = axios.isAxiosError(err)
         ? (err.response?.data?.error ?? err.message)
-        : 'Failed to save provider.';
+        : 'Failed to select provider.';
       setSettingsError(msg);
-    } finally {
-      setSavingProvider(false);
     }
   }
 
@@ -2343,43 +2338,13 @@ export function SettingsPage() {
                     Select Provider
                   </h3>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Click a card to select it, then save to activate.
+                    Click any AI provider card to activate it for test generation.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  disabled={saveDisabled}
-                  onClick={handleSaveProvider}
-                  className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: saveDisabled ? 'var(--bg-tertiary)' : 'var(--accent)',
-                    color: saveDisabled ? 'var(--text-muted)' : 'var(--color-surface)',
-                    border: saveDisabled ? '1px solid var(--border-default)' : 'none',
-                  }}
-                >
-                  {savingProvider ? (
-                    <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  ) : (
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  )}
-                  Save provider
-                </button>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {providerOptions.map((option) => {
-                  const isActive = storeProvider === option.id;
+                  const isActive = (selectedProvider || storeProvider) === option.id;
                   const isSelected = selectedProvider === option.id;
                   const cardStyle = isActive
                     ? {
@@ -2403,12 +2368,8 @@ export function SettingsPage() {
                     <button
                       key={option.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedProvider((prev) => (prev === option.id ? null : option.id));
-                        setSettingsMessage('');
-                        setSettingsError('');
-                      }}
-                      className="rounded-lg p-5 text-left transition-all min-h-[130px] flex flex-col justify-between"
+                      onClick={() => handleSelectProvider(option.id)}
+                      className="rounded-lg p-5 text-left transition-all min-h-[130px] flex flex-col justify-between cursor-pointer"
                       style={cardStyle}
                     >
                       <div>
