@@ -82,7 +82,7 @@ export function verifyTOTP(secret, token) {
   if (!token) return false;
   const cleanToken = String(token).trim().replace(/[\s-]/g, '');
   const now = Date.now();
-  for (let i = -1; i <= 1; i++) {
+  for (let i = -2; i <= 2; i++) {
     const expected = generateTOTP(secret, now + i * 30000);
     if (expected === cleanToken) return true;
   }
