@@ -12,11 +12,14 @@ function base32ToBuffer(b32Str) {
   let value = 0;
   const output = [];
   for (let i = 0; i < clean.length; i++) {
-    value = (value << 5) | ALPHABET.indexOf(clean[i]);
+    const val = ALPHABET.indexOf(clean[i]);
+    if (val === -1) continue;
+    value = (value << 5) | val;
     bits += 5;
     if (bits >= 8) {
       output.push((value >>> (bits - 8)) & 0xff);
       bits -= 8;
+      value = value & ((1 << bits) - 1);
     }
   }
   return Buffer.from(output);
@@ -66,7 +69,7 @@ function truncate(hmacResult) {
   return code % 1000000;
 }
 
-function generateTOTP(secret, timestamp = Date.now()) {
+export function generateTOTP(secret, timestamp = Date.now()) {
   const timeStep = 30000;
   const counter = Math.floor(timestamp / timeStep);
   const counterBuf = Buffer.alloc(8);

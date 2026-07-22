@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateTOTPSecret, verifyTOTP, generateTOTPUri } from '../2fa/index.js';
-import base32 from 'base32-encode';
+import { generateTOTPSecret, generateTOTP, verifyTOTP, generateTOTPUri } from '../2fa/index.js';
 
 describe('TOTP', () => {
   it('generates a secret', () => {
@@ -16,6 +15,12 @@ describe('TOTP', () => {
     expect(uri).toContain('otpauth://totp/');
     expect(uri).toContain('secret=' + encodeURIComponent(secret));
     expect(uri).toContain('issuer=ForgeQA');
+  });
+
+  it('verifyTOTP accepts valid token generated for secret', () => {
+    const secret = generateTOTPSecret();
+    const token = generateTOTP(secret);
+    expect(verifyTOTP(secret, token)).toBe(true);
   });
 
   it('verifyTOTP rejects bad token', () => {
