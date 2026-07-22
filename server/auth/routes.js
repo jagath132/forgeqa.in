@@ -22,7 +22,6 @@ import {
   recordFailedAttempt,
   clearLockout,
 } from '../rate-limit/index.js';
-import { verify2FA, is2FAEnabled } from '../2fa/index.js';
 import { getUserPlan } from '../billing/plans.js';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -147,47 +146,6 @@ async function handleLogin(req, res, body) {
   clearLockout(lockoutKey);
 
   const userId = userRecord._id.toString();
-  const tfaCode = body.twoFactorCode;
-  const tfaEnabled = await is2FAEnabled(userId);
-
-  if (tfaEnabled) {
-    const { verifyTrustedDevice } = await import('../2fa/index.js');
-    const isTrusted = deviceToken && (await verifyTrustedDevice(userId, deviceToken));
-
-    if (tfaCode) {
-      const tfaOk = await verify2FA(userId, tfaCode);
-      if (!tfaOk) {
-        recordFailedAttempt(lockoutKey);
-        sendJson(res, 401, { error: 'Invalid two-factor authentication code.' });
-        return;
-      }
-      if (rememberDevice && !isTrusted) {
-        const userAgent = req.headers['user-agent'] || 'Unknown Browser';
-        const deviceName = extractDeviceName(userAgent);
-        const { addTrustedDevice } = await import('../2fa/index.js');
-        const device = await addTrustedDevice(userId, deviceName);
-        const token = generateToken(userRecord);
-        const refreshToken = await generateRefreshToken(userRecord);
-        setAuthCookie(res, token, refreshToken);
-        sendJson(res, 200, {
-          token,
-          deviceToken: device.token,
-          user: {
-            id: userId,
-            email: userRecord.email,
-            name: userRecord.name || null,
-            role: userRecord.role || 'Member',
-            createdAt: userRecord.createdAt,
-            has_seen_welcome: userRecord.has_seen_welcome || false,
-          },
-        });
-        return;
-      }
-    } else if (!isTrusted) {
-      sendJson(res, 200, { require2FA: true, email: userRecord.email });
-      return;
-    }
-  }
 
   const token = generateToken(userRecord);
   const refreshToken = await generateRefreshToken(userRecord);
@@ -315,7 +273,6 @@ async function handleChangePassword(req, res, url, body, user) {
 
 async function handleMe(req, res, url, body, user) {
   const plan = await getUserPlan(user.id);
-  const twoFactor = await is2FAEnabled(user.id);
   const db = getDb();
   const userDoc = await db
     .collection('users')
@@ -340,7 +297,7 @@ async function handleMe(req, res, url, body, user) {
       createdAt: user.createdAt,
       subscriptionTier: plan.tier,
       subscriptionStatus: plan.subscriptionStatus,
-      twoFactorEnabled: twoFactor,
+      twoFactorEnabled: false,
       activeProvider: userDoc?.activeProvider || null,
       has_seen_welcome: fullUser?.has_seen_welcome || false,
     },
@@ -353,67 +310,6 @@ async function handleWelcomeSeen(req, res, url, body, user) {
   await db
     .collection('users')
     .updateOne({ _id: new ObjectId(user.id) }, { $set: { has_seen_welcome: true } });
-  sendJson(res, 200, { ok: true });
-}
-
-async function handleSetup2FA(req, res, url, body, user) {
-  const { setup2FA } = await import('../2fa/index.js');
-  const result = await setup2FA(user.id, user.email);
-  sendJson(res, 200, result);
-}
-
-async function handleEnable2FA(req, res, url, body, user) {
-  const { enable2FA } = await import('../2fa/index.js');
-  const { token } = body;
-  if (!token) {
-    sendJson(res, 400, { error: 'Verification code is required.' });
-    return;
-  }
-  try {
-    await enable2FA(user.id, token);
-    sendJson(res, 200, { ok: true });
-  } catch (err) {
-    sendJson(res, 400, { error: err.message });
-  }
-}
-
-async function handleDisable2FA(req, res, url, body, user) {
-  const { disable2FA } = await import('../2fa/index.js');
-  const { token } = body;
-  if (!token) {
-    sendJson(res, 400, { error: 'Verification code is required.' });
-    return;
-  }
-  const { verify2FA } = await import('../2fa/index.js');
-  const ok = await verify2FA(user.id, token);
-  if (!ok) {
-    sendJson(res, 400, { error: 'Invalid verification code.' });
-    return;
-  }
-  await disable2FA(user.id);
-  sendJson(res, 200, { ok: true });
-}
-
-async function handleGetTrustedDevices(req, res, url, body, user) {
-  const { getTrustedDevices } = await import('../2fa/index.js');
-  const devices = await getTrustedDevices(user.id);
-  sendJson(res, 200, { devices });
-}
-
-async function handleRemoveTrustedDevice(req, res, url, body, user) {
-  const { removeTrustedDevice } = await import('../2fa/index.js');
-  const { deviceId } = body;
-  if (!deviceId) {
-    sendJson(res, 400, { error: 'Device ID is required.' });
-    return;
-  }
-  await removeTrustedDevice(user.id, deviceId);
-  sendJson(res, 200, { ok: true });
-}
-
-async function handleRemoveAllTrustedDevices(req, res, url, body, user) {
-  const { removeAllTrustedDevices } = await import('../2fa/index.js');
-  await removeAllTrustedDevices(user.id);
   sendJson(res, 200, { ok: true });
 }
 
@@ -937,27 +833,7 @@ const ROUTE_CONFIG = [
   { path: '/api/settings/api-keys', method: 'GET', handler: handleGetApiKeys, auth: true },
   { path: '/api/settings/api-key', method: 'POST', handler: handleSaveApiKey, auth: true },
   { path: '/api/settings/api-key', method: 'DELETE', handler: handleDeleteApiKey, auth: true },
-  { path: '/api/auth/2fa/setup', method: 'POST', handler: handleSetup2FA, auth: true },
-  { path: '/api/auth/2fa/enable', method: 'POST', handler: handleEnable2FA, auth: true },
-  { path: '/api/auth/2fa/disable', method: 'POST', handler: handleDisable2FA, auth: true },
-  {
-    path: '/api/auth/trusted-devices',
-    method: 'GET',
-    handler: handleGetTrustedDevices,
-    auth: true,
-  },
-  {
-    path: '/api/auth/trusted-devices',
-    method: 'DELETE',
-    handler: handleRemoveTrustedDevice,
-    auth: true,
-  },
-  {
-    path: '/api/auth/trusted-devices/all',
-    method: 'DELETE',
-    handler: handleRemoveAllTrustedDevices,
-    auth: true,
-  },
+
   {
     path: '/api/settings/active-provider',
     method: 'PUT',

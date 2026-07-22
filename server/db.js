@@ -63,10 +63,8 @@ async function ensureIndexes(db) {
   await db.collection('subscription_plans').createIndex({ tier: 1 }, { unique: true });
   await db.collection('plans').createIndex({ id: 1 }, { unique: true });
   await db.collection('plans').createIndex({ price: 1 });
-  await db.collection('totp_secrets').createIndex({ userId: 1 }, { unique: true });
   await db.collection('enterprise_inquiries').createIndex({ email: 1 });
   await db.collection('enterprise_inquiries').createIndex({ createdAt: -1 });
-  await db.collection('trusted_devices').createIndex({ userId: 1, token: 1 });
   try {
     await db.collection('pending_registrations').createIndex({ email: 1 }, { unique: true });
     await db

@@ -80,10 +80,7 @@ export function AuthPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [require2FA, setRequire2FA] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [rememberDevice, setRememberDevice] = useState(false);
-  const twoFARef = useRef<HTMLInputElement | null>(null);
+
   const [btnSuccess, setBtnSuccess] = useState(false);
   const [lockoutMinutes, setLockoutMinutes] = useState(0);
   const [lockoutCountdown, setLockoutCountdown] = useState(0);
@@ -140,22 +137,10 @@ export function AuthPage() {
         const payload: Record<string, any> = { email, password };
         const storedDeviceToken = localStorage.getItem('forgeqa_device_token');
         if (storedDeviceToken) payload.deviceToken = storedDeviceToken;
-        if (require2FA && twoFactorCode) {
-          payload.twoFactorCode = twoFactorCode;
-          payload.rememberDevice = rememberDevice;
-          delete payload.deviceToken;
-        }
-        const res = await api.post<
-          AuthResponse & { require2FA?: boolean; email?: string; deviceToken?: string }
-        >('/api/auth/login', payload);
-        if (res.data.require2FA) {
-          setRequire2FA(true);
-          setTwoFactorCode('');
-          setTimeout(() => twoFARef.current?.focus(), 100);
-          setIsLoading(false);
-          submittingRef.current = false;
-          return;
-        }
+        const res = await api.post<AuthResponse & { deviceToken?: string }>(
+          '/api/auth/login',
+          payload
+        );
         if (res.data.deviceToken) {
           localStorage.setItem('forgeqa_device_token', res.data.deviceToken);
         }
@@ -191,8 +176,6 @@ export function AuthPage() {
     setMode(m);
     setError('');
     setSuccessMessage('');
-    setRequire2FA(false);
-    setTwoFactorCode('');
     clearLockoutTimer();
     setLockoutMinutes(0);
     setLockoutCountdown(0);
@@ -405,64 +388,62 @@ export function AuthPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
               {/* Email */}
-              {!require2FA && (
-                <div>
-                  <label
-                    htmlFor="auth_email"
-                    className="block text-xs font-semibold mb-2"
-                    style={{ color: 'var(--graphite)' }}
-                  >
-                    Email
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="auth_email"
-                      name="auth_email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@company.com"
-                      autoComplete="off"
-                      className="w-full text-sm outline-none transition-all px-4 py-3"
-                      style={{
-                        color: 'var(--ink)',
-                        background: 'var(--bg-secondary)',
-                        border:
-                          email && !isValidEmail
-                            ? '1.5px solid var(--danger)'
-                            : '1.5px solid var(--mist)',
-                        borderRadius: 'var(--radius-lg)',
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor =
-                          email && !isValidEmail ? 'var(--danger)' : 'var(--accent)';
-                        e.target.style.boxShadow =
-                          email && !isValidEmail
-                            ? '0 0 0 3px rgba(240,68,56,0.08)'
-                            : '0 0 0 3px rgba(49,88,255,0.08)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor =
-                          email && !isValidEmail ? 'var(--danger)' : 'var(--mist)';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                    {email && !isValidEmail && (
-                      <span
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
-                        style={{ color: 'var(--danger)' }}
-                      >
-                        Invalid format
-                      </span>
-                    )}
-                  </div>
+              <div>
+                <label
+                  htmlFor="auth_email"
+                  className="block text-xs font-semibold mb-2"
+                  style={{ color: 'var(--graphite)' }}
+                >
+                  Email
+                </label>
+                <div className="relative">
+                  <input
+                    id="auth_email"
+                    name="auth_email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="off"
+                    className="w-full text-sm outline-none transition-all px-4 py-3"
+                    style={{
+                      color: 'var(--ink)',
+                      background: 'var(--bg-secondary)',
+                      border:
+                        email && !isValidEmail
+                          ? '1.5px solid var(--danger)'
+                          : '1.5px solid var(--mist)',
+                      borderRadius: 'var(--radius-lg)',
+                      fontFamily: 'var(--font-sans)',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor =
+                        email && !isValidEmail ? 'var(--danger)' : 'var(--accent)';
+                      e.target.style.boxShadow =
+                        email && !isValidEmail
+                          ? '0 0 0 3px rgba(240,68,56,0.08)'
+                          : '0 0 0 3px rgba(49,88,255,0.08)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor =
+                        email && !isValidEmail ? 'var(--danger)' : 'var(--mist)';
+                      e.target.style.boxShadow = 'none';
+                    }}
+                  />
+                  {email && !isValidEmail && (
+                    <span
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
+                      style={{ color: 'var(--danger)' }}
+                    >
+                      Invalid format
+                    </span>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Password */}
-              {mode === 'login' && !require2FA && (
+              {mode === 'login' && (
                 <div>
                   <label
                     htmlFor="auth_password"
@@ -563,7 +544,7 @@ export function AuthPage() {
               )}
 
               {/* Forgot password link */}
-              {mode === 'login' && !require2FA && (
+              {mode === 'login' && (
                 <div className="flex justify-end -mt-2">
                   <button
                     type="button"
@@ -581,113 +562,6 @@ export function AuthPage() {
                 </div>
               )}
 
-              {/* 2FA */}
-              {mode === 'login' && require2FA && (
-                <div className="animate-fade-in space-y-4">
-                  <div
-                    className="p-4 rounded-xl text-center"
-                    style={{
-                      background: 'rgba(18,183,106,0.04)',
-                      border: '1px solid rgba(18,183,106,0.12)',
-                    }}
-                  >
-                    <div className="flex items-center justify-center gap-2 mb-1.5">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="var(--signal-green)"
-                        strokeWidth={1.5}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                      <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                        Two-Factor Authentication
-                      </span>
-                    </div>
-                    <p className="text-xs" style={{ color: 'var(--graphite)' }}>
-                      Signing in as <strong className="font-semibold">{email}</strong>. Enter the
-                      6-digit verification code.
-                    </p>
-                  </div>
-                  <div className="relative">
-                    <input
-                      ref={twoFARef}
-                      id="twoFactorCode"
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
-                      placeholder="000000"
-                      value={twoFactorCode}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
-                        setTwoFactorCode(v);
-                      }}
-                      className="w-full py-3 text-center text-2xl tracking-[0.5em] font-mono rounded-xl outline-none transition-all"
-                      style={{
-                        color: 'var(--ink)',
-                        background: 'var(--bg-secondary)',
-                        border: `1.5px solid ${twoFactorCode.length === 6 ? 'var(--signal-green)' : 'var(--mist)'}`,
-                        letterSpacing: '0.5em',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = 'var(--accent)';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(49,88,255,0.08)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor =
-                          twoFactorCode.length === 6 ? 'var(--signal-green)' : 'var(--mist)';
-                        e.target.style.boxShadow = 'none';
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <input
-                      type="checkbox"
-                      id="rememberDevice"
-                      checked={rememberDevice}
-                      onChange={(e) => setRememberDevice(e.target.checked)}
-                      className="h-4 w-4 rounded cursor-pointer"
-                      style={{ accentColor: 'var(--accent)' }}
-                    />
-                    <label
-                      htmlFor="rememberDevice"
-                      className="text-xs cursor-pointer"
-                      style={{ color: 'var(--graphite)' }}
-                    >
-                      Remember this device for 30 days
-                    </label>
-                  </div>
-                  <p className="text-[11px] ml-6" style={{ color: 'var(--text-muted)' }}>
-                    Skip 2FA on this browser for the next 30 days. Only check this on devices you
-                    trust.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRequire2FA(false);
-                      setTwoFactorCode('');
-                      setRememberDevice(false);
-                      setError('');
-                    }}
-                    className="w-full text-xs py-1.5 font-semibold transition-opacity hover:opacity-70"
-                    style={{
-                      color: 'var(--graphite)',
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ← Back to Sign In
-                  </button>
-                </div>
-              )}
-
               {/* Submit button */}
               {mode === 'login' && (
                 <button
@@ -698,8 +572,7 @@ export function AuthPage() {
                     !isValidEmail ||
                     !password ||
                     !isValidPassword ||
-                    isLocked ||
-                    (require2FA && twoFactorCode.length < 6)
+                    isLocked
                   }
                   className="w-full py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
                   style={{
@@ -727,8 +600,6 @@ export function AuthPage() {
                       </svg>
                       Signed in
                     </>
-                  ) : require2FA ? (
-                    'Verify Code'
                   ) : (
                     'Sign In'
                   )}

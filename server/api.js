@@ -163,24 +163,6 @@ export function createApiMiddleware(env) {
       const { seedPlans } = await import('./billing/plans.js');
       await seedPlans();
 
-      // Un-lock test user jagath182001@gmail.com if they were stuck with hardcoded seeded 2FA secret
-      const db = getDb();
-      try {
-        const testUser = await db.collection('users').findOne({ email: 'jagath182001@gmail.com' });
-        if (testUser) {
-          const totpRecord = await db
-            .collection('totp_secrets')
-            .findOne({ userId: testUser._id.toString() });
-          if (totpRecord && totpRecord.secret === 'JBSWY3DPEHPK3PXP') {
-            await db
-              .collection('totp_secrets')
-              .updateOne({ userId: testUser._id.toString() }, { $set: { enabled: false } });
-            console.log('Disabled forced test-secret 2FA for account jagath182001@gmail.com');
-          }
-        }
-      } catch (err) {
-        console.error('Failed to update 2FA settings for test account:', err.message);
-      }
       const plansDb = getDb();
       const defaults = [
         {

@@ -222,42 +222,6 @@ export async function changePassword(currentPassword: string, newPassword: strin
   await api.put('/api/auth/password', { currentPassword, newPassword });
 }
 
-export async function setup2FA() {
-  const res = await api.post<{ secret: string; uri: string; qrCode: string }>(
-    '/api/auth/2fa/setup'
-  );
-  return res.data;
-}
-
-export async function enable2FA(token: string) {
-  await api.post('/api/auth/2fa/enable', { token });
-}
-
-export async function disable2FA(token: string) {
-  await api.post('/api/auth/2fa/disable', { token });
-}
-
-export interface TrustedDevice {
-  id: string;
-  deviceName: string;
-  createdAt: string;
-  expiresAt: string;
-  isExpired: boolean;
-}
-
-export async function getTrustedDevices() {
-  const res = await api.get<{ devices: TrustedDevice[] }>('/api/auth/trusted-devices');
-  return res.data.devices;
-}
-
-export async function removeTrustedDevice(deviceId: string) {
-  await api.delete('/api/auth/trusted-devices', { data: { deviceId } });
-}
-
-export async function removeAllTrustedDevices() {
-  await api.delete('/api/auth/trusted-devices/all');
-}
-
 export async function getProductKey() {
   const res = await api.get<{ productKey: { key: string; activatedAt: string } | null }>(
     '/api/user/product-key'
