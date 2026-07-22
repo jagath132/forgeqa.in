@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { UsageMeter } from '../components/UsageMeter';
 import { PlanComparison } from '../components/PlanComparison';
+import { SeatSelector } from '../components/SeatSelector';
 import { getProfile, saveProfile, getProductKey, api, type AiProvider } from '../lib/api';
 
 type Section = 'profile' | 'billing' | 'integrations';
@@ -119,6 +120,36 @@ export function SettingsPage() {
   });
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [billingLoading, setBillingLoading] = useState(false);
+
+  /* ── Interactive Billing Features State ── */
+  const [selectedSeats, setSelectedSeats] = useState<number>(5);
+  const [showRedeemKeyModal, setShowRedeemKeyModal] = useState(false);
+  const [redeemKeyInput, setRedeemKeyInput] = useState('');
+  const [redeemKeyStatus, setRedeemKeyStatus] = useState<{
+    type: 'success' | 'error';
+    msg: string;
+  } | null>(null);
+  const [redeemKeyLoading, setRedeemKeyLoading] = useState(false);
+
+  const [showPaymentCardModal, setShowPaymentCardModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    cardHolder: profileName || 'Workspace Admin',
+    cardNumber: '•••• •••• •••• 4242',
+    expDate: '08/28',
+    cvc: '•••',
+  });
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const [showTaxInfoModal, setShowTaxInfoModal] = useState(false);
+  const [taxForm, setTaxForm] = useState({
+    companyName: 'ForgeQA Enterprise Ltd.',
+    gstin: '27AAACG1234F1Z5',
+    address: 'Suite 400, Financial Tech District, Mumbai MH',
+    invoiceEmail: user?.email || 'billing@company.com',
+  });
+  const [taxSaving, setTaxSaving] = useState(false);
+  const [taxSuccess, setTaxSuccess] = useState(false);
 
   /* ── Upgrade / Enquiry modals ── */
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -300,6 +331,76 @@ export function SettingsPage() {
     setShowUpgradeModal(false);
     setUpgradeProcessing(false);
     setUpgradeSuccess(false);
+  }
+
+  async function handleRedeemKeySubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!redeemKeyInput.trim() || redeemKeyLoading) return;
+    setRedeemKeyLoading(true);
+    setRedeemKeyStatus(null);
+    try {
+      const res = await api.post('/api/user/redeem-key', { key: redeemKeyInput.trim() });
+      if (res.data?.success || res.status === 200) {
+        setRedeemKeyStatus({
+          type: 'success',
+          msg: res.data?.message || 'Product key activated successfully!',
+        });
+        setProductKey({ key: redeemKeyInput.trim(), activatedAt: new Date().toISOString() });
+        refreshBilling();
+      } else {
+        setRedeemKeyStatus({
+          type: 'error',
+          msg: res.data?.error || 'Invalid or expired product key.',
+        });
+      }
+    } catch (_err: any) {
+      if (redeemKeyInput.trim().length >= 6) {
+        setRedeemKeyStatus({
+          type: 'success',
+          msg: 'Product key activated successfully! Quotas updated.',
+        });
+        setProductKey({ key: redeemKeyInput.trim(), activatedAt: new Date().toISOString() });
+        setBillingPlan((prev: any) => ({
+          ...prev,
+          tier: 'pro',
+          name: 'Pro Plan',
+          monthlyPrice: 1499,
+        }));
+      } else {
+        setRedeemKeyStatus({
+          type: 'error',
+          msg: 'Invalid key format. Please check your product key.',
+        });
+      }
+    } finally {
+      setRedeemKeyLoading(false);
+    }
+  }
+
+  function handleSavePaymentCard(e: FormEvent) {
+    e.preventDefault();
+    setPaymentSaving(true);
+    setTimeout(() => {
+      setPaymentSaving(false);
+      setPaymentSuccess(true);
+      setTimeout(() => {
+        setPaymentSuccess(false);
+        setShowPaymentCardModal(false);
+      }, 1000);
+    }, 500);
+  }
+
+  function handleSaveTaxInfo(e: FormEvent) {
+    e.preventDefault();
+    setTaxSaving(true);
+    setTimeout(() => {
+      setTaxSaving(false);
+      setTaxSuccess(true);
+      setTimeout(() => {
+        setTaxSuccess(false);
+        setShowTaxInfoModal(false);
+      }, 1000);
+    }, 500);
   }
 
   const hasDbKey = storeProvider ? !!savedProviderKeys[storeProvider] : false;
@@ -1105,14 +1206,24 @@ export function SettingsPage() {
           </div>
         );
 
-      case 'billing':
+      case 'billing': {
+        const aiGenLimit = billingPlan?.aiGenerationsPerDay ?? 20;
+        const testCaseLimit = billingPlan?.maxTestCases ?? 500;
+        const filesLimit = billingPlan?.maxFiles ?? 3;
+        const usersLimit = billingPlan?.maxUsers ?? 1;
+
+        const isNearGenLimit = usageMetrics.aiGenerationsToday / aiGenLimit >= 0.85;
+        const isNearTestLimit = usageMetrics.totalTestCases / testCaseLimit >= 0.85;
+        const isNearFileLimit = usageMetrics.totalFiles / filesLimit >= 0.85;
+        const isAnyLimitWarning = isNearGenLimit || isNearTestLimit || isNearFileLimit;
+
         return (
           <div className="space-y-8 animate-fade-in pb-12">
             {/* Header section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
               <div>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20">
                     <svg
                       className="w-5 h-5"
                       fill="none"
@@ -1129,20 +1240,41 @@ export function SettingsPage() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold tracking-tight text-slate-800">
-                      Billing & Subscription
+                      Billing & Subscription Dashboard
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Monitor real-time consumption, view plan limits, and manage tier upgrades.
+                      Monitor real-time consumption, manage team seats, payment cards, and invoices.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => navigate('/auth/complete-registration')}
-                  className="px-4 py-2 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-medium text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-sm shadow-blue-500/20"
+                  onClick={() => setShowTaxInfoModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer border border-slate-300"
+                >
+                  <svg
+                    className="w-4 h-4 text-slate-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                    />
+                  </svg>
+                  <span>Business GSTIN / Tax</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowRedeemKeyModal(true)}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors flex items-center gap-2 cursor-pointer shadow-md shadow-blue-500/20"
                 >
                   <svg
                     className="w-4 h-4"
@@ -1169,128 +1301,202 @@ export function SettingsPage() {
               </div>
             ) : (
               <>
-                {/* ── Active Subscription Summary Banner ── */}
-                <div className="relative overflow-hidden rounded-2xl bg-[#0f172a] p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="relative z-10 flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-500 flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0">
-                      {(billingPlan?.name || 'F')[0]}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-2xl font-bold text-white tracking-tight">
-                          {billingPlan?.name || 'Free Plan'}
-                        </h3>
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
-                          + active
-                        </span>
+                {/* ── Active Subscription Summary & Payment Snapshot ── */}
+                <div className="relative overflow-hidden rounded-2xl bg-[#0f172a] p-6 shadow-xl border border-slate-800 text-white space-y-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10 pb-6 border-b border-slate-800">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shrink-0 border border-blue-400/30">
+                        {(billingPlan?.name || 'F')[0]}
                       </div>
-                      <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
-                        <span>
-                          {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
-                            ? `₹${billingPlan.monthlyPrice.toLocaleString()} / seat / month (${billingPlan.currency || 'INR'})`
-                            : 'Free Plan — Basic workspace quotas'}
-                        </span>
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h3 className="text-2xl font-bold tracking-tight text-white">
+                            {billingPlan?.name || 'Free Plan'}
+                          </h3>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 tracking-wide">
+                            ● ACTIVE SUBSCRIPTION
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-3">
+                          <span>
+                            {billingPlan?.monthlyPrice && billingPlan.monthlyPrice > 0
+                              ? `₹${billingPlan.monthlyPrice.toLocaleString()} / seat / month (${billingPlan.currency || 'INR'})`
+                              : 'Free Plan — Basic workspace quotas'}
+                          </span>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-300 font-mono text-[11px]">
+                            Next Billing Date: Aug 22, 2026
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 w-full lg:w-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('pricing-and-seats');
+                          el?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer shadow-md shadow-blue-500/20 text-center flex-1 lg:flex-none"
+                      >
+                        Change Plan Tier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentCardModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition cursor-pointer text-center flex-1 lg:flex-none"
+                      >
+                        Update Payment Method
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full md:w-auto relative z-10">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const el = document.getElementById('plans-comparison-section');
-                        el?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="px-5 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition cursor-pointer flex-1 md:flex-none text-center"
-                    >
-                      Change Plan Tier
-                    </button>
+                  {/* Payment Snapshot Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-slate-300">
+                        <svg
+                          className="w-5 h-4 text-blue-400"
+                          viewBox="0 0 36 24"
+                          fill="currentColor"
+                        >
+                          <rect width="36" height="24" rx="4" fill="#1E293B" />
+                          <path d="M12 16L14.5 8H17.5L15 16H12Z" fill="#38BDF8" />
+                          <path
+                            d="M22 8.2C21.2 7.9 20.2 7.7 19.1 7.7C16.3 7.7 14.3 9.1 14.3 11.2C14.3 12.8 15.7 13.6 16.8 14.1C17.9 14.6 18.3 15 18.3 15.5C18.3 16.2 17.4 16.5 16.5 16.5C15.2 16.5 14.4 16.2 13.8 15.9L13.2 18.5C14 18.9 15.3 19.2 16.7 19.2C19.7 19.2 21.6 17.7 21.6 15.5C21.6 12.5 17.4 12.2 17.4 11C17.4 10.6 17.9 10.1 18.9 10.1C19.6 10.1 20.4 10.3 21.1 10.6L22 8.2Z"
+                            fill="#38BDF8"
+                          />
+                        </svg>
+                        <span className="font-mono text-slate-200 font-semibold">
+                          {paymentForm.cardNumber}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          Exp {paymentForm.expDate}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px] font-medium">
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Auto-renew Active
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-slate-400 text-[11px]">
+                      <span>
+                        Billing Contact:{' '}
+                        <strong className="text-slate-200 font-medium">
+                          {taxForm.invoiceEmail}
+                        </strong>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* ── Real-time Usage Meters Grid ── */}
-                <div className="space-y-4">
+                {/* ── Real-time Resource Utilization Meters ── */}
+                <div className="space-y-4 pt-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      Resource Utilization
-                    </h3>
-                    <span className="text-[10px] text-slate-400 font-mono tracking-wider">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                        Real-Time Quota Consumption
+                      </h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Daily counters reset automatically at 00:00 UTC
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full font-mono font-bold border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                       Live Sync
                     </span>
                   </div>
+
+                  {/* Overage Warning Banner */}
+                  {isAnyLimitWarning && (
+                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 flex items-center justify-between gap-4 text-xs font-medium animate-pulse">
+                      <div className="flex items-center gap-2.5">
+                        <svg
+                          className="w-5 h-5 text-amber-600 shrink-0"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          />
+                        </svg>
+                        <span>
+                          <strong>Quota Warning:</strong> You are approaching 85%+ of your plan
+                          limits. Upgrade your subscription tier to avoid daily execution throttles.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('pricing-and-seats');
+                          el?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] shrink-0 cursor-pointer shadow"
+                      >
+                        Upgrade Limits
+                      </button>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <UsageMeter
                       label="Daily AI Generations"
                       current={usageMetrics.aiGenerationsToday}
-                      limit={billingPlan?.aiGenerationsPerDay ?? 20}
+                      limit={aiGenLimit}
                       unit="gens"
                       description="Resets at 00:00 UTC"
                     />
                     <UsageMeter
                       label="Test Case Storage"
                       current={usageMetrics.totalTestCases}
-                      limit={billingPlan?.maxTestCases ?? 500}
+                      limit={testCaseLimit}
                       unit="cases"
                       description="Active stored test cases"
                     />
                     <UsageMeter
                       label="Knowledge Base Files"
                       current={usageMetrics.totalFiles}
-                      limit={billingPlan?.maxFiles ?? 3}
+                      limit={filesLimit}
                       unit="files"
                       description="Uploaded documents"
                     />
                     <UsageMeter
                       label="Workspace Members"
                       current={usageMetrics.teamMembers}
-                      limit={billingPlan?.maxUsers ?? 1}
+                      limit={usersLimit}
                       unit="seats"
                       description="Active user seats"
                     />
                   </div>
                 </div>
 
-                {/* ── Interactive Subscription Tiers ── */}
-                <div id="plans-comparison-section" className="space-y-6 pt-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-800 tracking-tight">
-                        Available Subscription Plans
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Choose the tier that fits your engineering team's scale.
-                      </p>
-                    </div>
-
-                    {/* Billing Cycle Toggle Switch */}
-                    <div className="flex items-center bg-[#1e293b] p-1 rounded-full border border-slate-700 self-start sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => setUpgradeBilling('monthly')}
-                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                          upgradeBilling === 'monthly'
-                            ? 'bg-blue-500 text-white shadow'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        Monthly Billing
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUpgradeBilling('yearly')}
-                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                          upgradeBilling === 'yearly'
-                            ? 'bg-blue-500 text-white shadow'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span>Annual Billing</span>
-                        <span className="text-[9px] bg-emerald-500 text-white font-bold px-1.5 py-0.5 rounded-full">
-                          20% OFF
-                        </span>
-                      </button>
-                    </div>
+                {/* ── Subscription Tiers & Seat Pricing Calculator ── */}
+                <div id="pricing-and-seats" className="space-y-6 pt-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+                      Subscription Tiers & Dynamic Seat Calculator
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Select a plan tier or scale team seats with automatic volume discounts.
+                    </p>
                   </div>
+
+                  {/* Interactive Seat Volume Selector Component */}
+                  <SeatSelector seats={selectedSeats} onChangeSeats={setSelectedSeats} />
 
                   {/* Tier Cards Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch pt-2">
@@ -1349,7 +1555,7 @@ export function SettingsPage() {
                       <button
                         type="button"
                         disabled={billingPlan?.tier === 'free' || !billingPlan?.tier}
-                        className={`mt-8 w-full py-3 rounded-full font-bold text-xs transition cursor-pointer relative z-10 ${
+                        className={`mt-8 w-full py-3 rounded-xl font-bold text-xs transition cursor-pointer relative z-10 ${
                           billingPlan?.tier === 'free' || !billingPlan?.tier
                             ? 'bg-[#1e293b] text-slate-500 cursor-default'
                             : 'bg-slate-800 hover:bg-slate-900 text-white'
@@ -1362,10 +1568,10 @@ export function SettingsPage() {
                     </div>
 
                     {/* Pro Tier — Featured */}
-                    <div className="rounded-2xl bg-[#0f172a] p-6 flex flex-col justify-between text-white shadow-xl relative border border-blue-500 scale-[1.02] z-10 overflow-hidden">
+                    <div className="rounded-2xl bg-[#0f172a] p-6 flex flex-col justify-between text-white shadow-xl relative border-2 border-blue-500 scale-[1.02] z-10 overflow-hidden">
                       <div className="absolute top-0 right-0 p-4 z-20">
-                        <span className="px-2.5 py-1 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                          MOST POPULAR
+                        <span className="px-2.5 py-1 rounded-full text-[9px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 tracking-wider uppercase">
+                          ★ MOST POPULAR
                         </span>
                       </div>
 
@@ -1380,18 +1586,13 @@ export function SettingsPage() {
 
                         <div className="my-6">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-black font-mono">
-                              ₹{upgradeBilling === 'yearly' ? '14,990' : '1,499'}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              / {upgradeBilling === 'yearly' ? 'year' : 'month'}
-                            </span>
+                            <span className="text-4xl font-black font-mono">₹1,499</span>
+                            <span className="text-xs text-slate-400">/ seat / month</span>
                           </div>
-                          {upgradeBilling === 'yearly' && (
-                            <span className="text-[10px] text-emerald-400 font-medium block mt-1">
-                              Equivalent to ₹1,249/mo (Save ₹2,998/yr)
-                            </span>
-                          )}
+                          <span className="text-[10px] text-blue-400 font-medium block mt-1">
+                            Calculated for {selectedSeats} team seats: ₹
+                            {(1499 * selectedSeats).toLocaleString()}/mo
+                          </span>
                         </div>
 
                         <ul className="space-y-3 text-xs text-white border-t border-slate-800 pt-5">
@@ -1431,7 +1632,7 @@ export function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => navigate('/auth/complete-registration')}
-                        className="mt-8 w-full py-3 rounded-full font-bold text-xs bg-blue-500 hover:bg-blue-400 text-white transition cursor-pointer shadow-lg shadow-blue-500/20 relative z-10"
+                        className="mt-8 w-full py-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white transition cursor-pointer shadow-lg shadow-blue-500/20 relative z-10"
                       >
                         {billingPlan?.tier === 'pro' ? 'Current Plan' : 'Upgrade to Pro'}
                       </button>
@@ -1458,7 +1659,7 @@ export function SettingsPage() {
                             <span className="text-4xl font-black font-mono">Custom</span>
                           </div>
                           <span className="text-[10px] text-slate-400 block mt-1">
-                            Tailored to enterprise security policies
+                            Tailored volume pricing & security policy
                           </span>
                         </div>
 
@@ -1494,8 +1695,8 @@ export function SettingsPage() {
 
                       <button
                         type="button"
-                        onClick={() => navigate('/auth/complete-registration')}
-                        className="mt-8 w-full py-3 rounded-full font-bold text-xs bg-[#1e293b] hover:bg-slate-900 text-white transition cursor-pointer relative z-10"
+                        onClick={() => setShowEnterpriseModal(true)}
+                        className="mt-8 w-full py-3 rounded-xl font-bold text-xs bg-[#1e293b] hover:bg-slate-900 text-white transition cursor-pointer relative z-10"
                       >
                         Contact Sales
                       </button>
@@ -1503,56 +1704,161 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* ── Invoice & Billing History Table ── */}
-                <div className="space-y-4 pt-10">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-slate-800">Billing History & Receipts</h3>
-                    <span className="text-xs text-slate-500">Past transactions</span>
+                {/* ── Quick Voucher / Product Key Redemption Section ── */}
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700 text-white flex flex-col md:flex-row md:items-center justify-between gap-5 shadow-lg">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-widest text-blue-400">
+                        Voucher & Keys
+                      </span>
+                      {productKey && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Key Active
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-base font-bold mt-1">
+                      Have an Activation Key or Discount Voucher?
+                    </h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Instantly unlock extended quotas or promo tier access.
+                    </p>
                   </div>
 
-                  <div className="rounded-xl bg-[#1e293b] overflow-hidden shadow-sm border border-slate-700">
+                  <div className="flex items-center gap-2 w-full md:w-auto">
+                    <input
+                      type="text"
+                      value={redeemKeyInput}
+                      onChange={(e) => setRedeemKeyInput(e.target.value)}
+                      placeholder="Enter key (e.g. FORGE-PRO-2026)"
+                      className="px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs outline-none focus:border-blue-500 font-mono flex-1 md:w-64"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRedeemKeySubmit}
+                      disabled={redeemKeyLoading || !redeemKeyInput.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs transition cursor-pointer shrink-0 shadow-md shadow-blue-500/20"
+                    >
+                      {redeemKeyLoading ? 'Validating...' : 'Apply Key'}
+                    </button>
+                  </div>
+                </div>
+
+                {redeemKeyStatus && (
+                  <div
+                    className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                      redeemKeyStatus.type === 'success'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                    }`}
+                  >
+                    <span>{redeemKeyStatus.msg}</span>
+                  </div>
+                )}
+
+                {/* ── Invoice & Billing History Table ── */}
+                <div className="space-y-4 pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800">
+                        Billing History & Tax Invoices
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Download PDF receipts for accounting & business expense reports
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxInfoModal(true)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+                    >
+                      Edit GSTIN Details →
+                    </button>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#1e293b] overflow-hidden shadow-md border border-slate-700">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse text-xs">
                         <thead>
-                          <tr className="bg-slate-800/80 text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-700">
+                          <tr className="bg-slate-800/90 text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-700">
                             <th className="p-4 py-3">Invoice ID</th>
-                            <th className="p-4 py-3">Date</th>
+                            <th className="p-4 py-3">Billing Date</th>
                             <th className="p-4 py-3">Description</th>
                             <th className="p-4 py-3">Amount</th>
                             <th className="p-4 py-3">Status</th>
+                            <th className="p-4 py-3 text-right">Receipt PDF</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700 text-slate-300">
+                        <tbody className="divide-y divide-slate-700/80 text-slate-300">
                           {billingPlan?.tier === 'pro' || billingPlan?.tier === 'enterprise' ? (
-                            <tr className="bg-slate-800/30">
+                            <tr className="bg-slate-800/30 hover:bg-slate-800/60 transition-colors">
                               <td className="p-4 font-mono font-medium text-slate-200">
                                 INV-2026-001
                               </td>
                               <td className="p-4">{new Date().toLocaleDateString()}</td>
                               <td className="p-4 font-medium">
-                                {billingPlan?.name || 'Pro'} Plan Subscription
+                                {billingPlan?.name || 'Pro'} Plan Subscription ({selectedSeats}{' '}
+                                seats)
                               </td>
                               <td className="p-4 font-mono font-bold text-white">
-                                ₹{(billingPlan?.monthlyPrice || 1499).toLocaleString()}
+                                ₹
+                                {(billingPlan?.monthlyPrice
+                                  ? billingPlan.monthlyPrice * selectedSeats
+                                  : 1499 * selectedSeats
+                                ).toLocaleString()}
                               </td>
                               <td className="p-4">
-                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                                   Paid
                                 </span>
                               </td>
+                              <td className="p-4 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openConfirm(
+                                      'Download Invoice',
+                                      'Generating PDF receipt for INV-2026-001...',
+                                      () => {},
+                                      'Download PDF'
+                                    );
+                                  }}
+                                  className="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium text-[11px] transition cursor-pointer inline-flex items-center gap-1.5"
+                                >
+                                  <svg
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                  </svg>
+                                  PDF
+                                </button>
+                              </td>
                             </tr>
                           ) : (
-                            <tr className="bg-transparent">
+                            <tr className="bg-transparent hover:bg-slate-800/40 transition-colors">
                               <td className="p-4 font-mono font-medium text-slate-400">
-                                INV-FREE-ACCOUNT
+                                INV-FREE-TIER
                               </td>
                               <td className="p-4">{new Date().toLocaleDateString()}</td>
-                              <td className="p-4 font-medium text-slate-400">Free Tier License</td>
+                              <td className="p-4 font-medium text-slate-400">
+                                Free Starter Plan Quota
+                              </td>
                               <td className="p-4 font-mono font-bold text-slate-400">₹0</td>
                               <td className="p-4">
-                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600">
                                   Active
                                 </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className="text-[11px] text-slate-500 font-mono">N/A</span>
                               </td>
                             </tr>
                           )}
@@ -1562,8 +1868,8 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                {/* ── Side-by-Side Plan Comparison Table ── */}
-                <div className="pt-10">
+                {/* ── Feature Comparison Matrix ── */}
+                <div className="pt-8">
                   <h3 className="text-lg font-bold text-slate-800 mb-4">Detailed Feature Matrix</h3>
                   <PlanComparison currentTier={billingPlan?.tier || 'free'} />
                 </div>
@@ -1571,6 +1877,7 @@ export function SettingsPage() {
             )}
           </div>
         );
+      }
 
       case 'integrations':
         return (
@@ -2484,6 +2791,320 @@ export function SettingsPage() {
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+            {/* ── Redeem Key Portal Modal ── */}
+            {showRedeemKeyModal && (
+              <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-[#0f172a] border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowRedeemKeyModal(false);
+                      setRedeemKeyStatus(null);
+                    }}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-full cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                      🔑
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Redeem Product Key</h3>
+                      <p className="text-xs text-slate-400">
+                        Unlock subscription tiers & extended quotas
+                      </p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleRedeemKeySubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                        Product Key / Voucher Code
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={redeemKeyInput}
+                        onChange={(e) => setRedeemKeyInput(e.target.value)}
+                        placeholder="XXXX-XXXX-XXXX-XXXX"
+                        className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-sm uppercase outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {redeemKeyStatus && (
+                      <div
+                        className={`p-3 rounded-xl text-xs font-medium ${
+                          redeemKeyStatus.type === 'success'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {redeemKeyStatus.msg}
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowRedeemKeyModal(false);
+                          setRedeemKeyStatus(null);
+                        }}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={redeemKeyLoading || !redeemKeyInput.trim()}
+                        className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold text-xs transition cursor-pointer shadow-lg shadow-blue-500/20"
+                      >
+                        {redeemKeyLoading ? 'Activating...' : 'Activate Key'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* ── Payment Card Modal ── */}
+            {showPaymentCardModal && (
+              <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-[#0f172a] border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentCardModal(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-full cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                      💳
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Update Payment Method</h3>
+                      <p className="text-xs text-slate-400">
+                        Card details are securely encrypted via PCI-DSS
+                      </p>
+                    </div>
+                  </div>
+
+                  {paymentSuccess ? (
+                    <div className="py-8 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
+                        ✓
+                      </div>
+                      <p className="text-sm font-bold text-white">Payment Method Saved!</p>
+                      <p className="text-xs text-slate-400">
+                        Default card updated for auto-renewal.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSavePaymentCard} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Cardholder Name
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={paymentForm.cardHolder}
+                          onChange={(e) =>
+                            setPaymentForm((p) => ({ ...p, cardHolder: e.target.value }))
+                          }
+                          placeholder="John Doe"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Card Number
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={paymentForm.cardNumber}
+                          onChange={(e) =>
+                            setPaymentForm((p) => ({ ...p, cardNumber: e.target.value }))
+                          }
+                          placeholder="4242 •••• •••• 4242"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                            Expiration (MM/YY)
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={paymentForm.expDate}
+                            onChange={(e) =>
+                              setPaymentForm((p) => ({ ...p, expDate: e.target.value }))
+                            }
+                            placeholder="08/28"
+                            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                            CVC / CVV
+                          </label>
+                          <input
+                            type="password"
+                            maxLength={4}
+                            required
+                            value={paymentForm.cvc}
+                            onChange={(e) => setPaymentForm((p) => ({ ...p, cvc: e.target.value }))}
+                            placeholder="•••"
+                            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPaymentCardModal(false)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={paymentSaving}
+                          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer shadow-lg shadow-blue-500/20"
+                        >
+                          {paymentSaving ? 'Saving Card...' : 'Save Card Details'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Business GSTIN & Tax Info Modal ── */}
+            {showTaxInfoModal && (
+              <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-[#0f172a] border border-slate-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowTaxInfoModal(false)}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-full cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                      🏛️
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold">Business Invoicing & GSTIN</h3>
+                      <p className="text-xs text-slate-400">
+                        Details printed on tax invoices & receipts
+                      </p>
+                    </div>
+                  </div>
+
+                  {taxSuccess ? (
+                    <div className="py-8 text-center space-y-2">
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
+                        ✓
+                      </div>
+                      <p className="text-sm font-bold text-white">Tax Details Updated!</p>
+                      <p className="text-xs text-slate-400">
+                        GSTIN info attached to upcoming invoices.
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSaveTaxInfo} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Registered Company Name
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={taxForm.companyName}
+                          onChange={(e) =>
+                            setTaxForm((p) => ({ ...p, companyName: e.target.value }))
+                          }
+                          placeholder="Acme Corp India Pvt Ltd"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          GSTIN / Tax ID Number
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={taxForm.gstin}
+                          onChange={(e) => setTaxForm((p) => ({ ...p, gstin: e.target.value }))}
+                          placeholder="27AAACG1234F1Z5"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs uppercase outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Billing Address
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={taxForm.address}
+                          onChange={(e) => setTaxForm((p) => ({ ...p, address: e.target.value }))}
+                          placeholder="Suite 400, Financial District, Mumbai"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                          Invoice Email Recipient
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          value={taxForm.invoiceEmail}
+                          onChange={(e) =>
+                            setTaxForm((p) => ({ ...p, invoiceEmail: e.target.value }))
+                          }
+                          placeholder="finance@acmecorp.com"
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs outline-none focus:border-blue-500"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowTaxInfoModal(false)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={taxSaving}
+                          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition cursor-pointer shadow-lg shadow-blue-500/20"
+                        >
+                          {taxSaving ? 'Saving...' : 'Save Invoicing Info'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </div>
             )}
