@@ -131,22 +131,49 @@ export function SettingsPage() {
   } | null>(null);
   const [redeemKeyLoading, setRedeemKeyLoading] = useState(false);
 
+  const [savedCard, setSavedCard] = useState<{
+    cardHolder: string;
+    cardNumber: string;
+    expDate: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem('nextest_billing_card');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [showPaymentCardModal, setShowPaymentCardModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
-    cardHolder: profileName || 'Workspace Admin',
-    cardNumber: '•••• •••• •••• 4242',
-    expDate: '08/28',
-    cvc: '•••',
+    cardHolder: profileName || '',
+    cardNumber: '',
+    expDate: '',
+    cvc: '',
   });
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  const [savedTaxInfo, setSavedTaxInfo] = useState<{
+    companyName: string;
+    gstin: string;
+    address: string;
+    invoiceEmail: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem('nextest_billing_tax');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [showTaxInfoModal, setShowTaxInfoModal] = useState(false);
   const [taxForm, setTaxForm] = useState({
-    companyName: 'ForgeQA Enterprise Ltd.',
-    gstin: '27AAACG1234F1Z5',
-    address: 'Suite 400, Financial Tech District, Mumbai MH',
-    invoiceEmail: user?.email || 'billing@company.com',
+    companyName: '',
+    gstin: '',
+    address: '',
+    invoiceEmail: user?.email || '',
   });
   const [taxSaving, setTaxSaving] = useState(false);
   const [taxSuccess, setTaxSuccess] = useState(false);
@@ -380,6 +407,20 @@ export function SettingsPage() {
   function handleSavePaymentCard(e: FormEvent) {
     e.preventDefault();
     setPaymentSaving(true);
+    const cardData = {
+      cardHolder: paymentForm.cardHolder || profileName || 'Cardholder',
+      cardNumber:
+        paymentForm.cardNumber.length >= 4
+          ? `•••• •••• •••• ${paymentForm.cardNumber.slice(-4)}`
+          : '•••• 4242',
+      expDate: paymentForm.expDate || '12/28',
+    };
+    try {
+      localStorage.setItem('nextest_billing_card', JSON.stringify(cardData));
+    } catch {
+      /* ignore */
+    }
+    setSavedCard(cardData);
     setTimeout(() => {
       setPaymentSaving(false);
       setPaymentSuccess(true);
@@ -393,6 +434,18 @@ export function SettingsPage() {
   function handleSaveTaxInfo(e: FormEvent) {
     e.preventDefault();
     setTaxSaving(true);
+    const taxData = {
+      companyName: taxForm.companyName,
+      gstin: taxForm.gstin,
+      address: taxForm.address,
+      invoiceEmail: taxForm.invoiceEmail || user?.email || '',
+    };
+    try {
+      localStorage.setItem('nextest_billing_tax', JSON.stringify(taxData));
+    } catch {
+      /* ignore */
+    }
+    setSavedTaxInfo(taxData);
     setTimeout(() => {
       setTaxSaving(false);
       setTaxSuccess(true);
@@ -1325,7 +1378,11 @@ export function SettingsPage() {
                           </span>
                           <span className="text-slate-600">•</span>
                           <span className="text-slate-300 font-mono text-[11px]">
-                            Next Billing Date: Aug 22, 2026
+                            {billingPlan?.renewalDate
+                              ? `Next Billing Date: ${new Date(billingPlan.renewalDate).toLocaleDateString()}`
+                              : billingPlan?.tier === 'free' || !billingPlan?.tier
+                                ? 'Free Tier — No renewal needed'
+                                : 'Monthly Auto-Renewal'}
                           </span>
                         </p>
                       </div>
@@ -1347,7 +1404,7 @@ export function SettingsPage() {
                         onClick={() => setShowPaymentCardModal(true)}
                         className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 transition cursor-pointer text-center flex-1 lg:flex-none"
                       >
-                        Update Payment Method
+                        {savedCard ? 'Update Payment Card' : 'Add Payment Card'}
                       </button>
                     </div>
                   </div>
@@ -1355,46 +1412,70 @@ export function SettingsPage() {
                   {/* Payment Snapshot Bar */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 text-xs">
                     <div className="flex items-center gap-3">
-                      <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-slate-300">
-                        <svg
-                          className="w-5 h-4 text-blue-400"
-                          viewBox="0 0 36 24"
-                          fill="currentColor"
-                        >
-                          <rect width="36" height="24" rx="4" fill="#1E293B" />
-                          <path d="M12 16L14.5 8H17.5L15 16H12Z" fill="#38BDF8" />
-                          <path
-                            d="M22 8.2C21.2 7.9 20.2 7.7 19.1 7.7C16.3 7.7 14.3 9.1 14.3 11.2C14.3 12.8 15.7 13.6 16.8 14.1C17.9 14.6 18.3 15 18.3 15.5C18.3 16.2 17.4 16.5 16.5 16.5C15.2 16.5 14.4 16.2 13.8 15.9L13.2 18.5C14 18.9 15.3 19.2 16.7 19.2C19.7 19.2 21.6 17.7 21.6 15.5C21.6 12.5 17.4 12.2 17.4 11C17.4 10.6 17.9 10.1 18.9 10.1C19.6 10.1 20.4 10.3 21.1 10.6L22 8.2Z"
-                            fill="#38BDF8"
-                          />
-                        </svg>
-                        <span className="font-mono text-slate-200 font-semibold">
-                          {paymentForm.cardNumber}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          Exp {paymentForm.expDate}
-                        </span>
-                      </div>
-                      <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px] font-medium">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        Auto-renew Active
-                      </span>
+                      {savedCard ? (
+                        <>
+                          <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-slate-300">
+                            <svg
+                              className="w-5 h-4 text-blue-400"
+                              viewBox="0 0 36 24"
+                              fill="currentColor"
+                            >
+                              <rect width="36" height="24" rx="4" fill="#1E293B" />
+                              <path d="M12 16L14.5 8H17.5L15 16H12Z" fill="#38BDF8" />
+                              <path
+                                d="M22 8.2C21.2 7.9 20.2 7.7 19.1 7.7C16.3 7.7 14.3 9.1 14.3 11.2C14.3 12.8 15.7 13.6 16.8 14.1C17.9 14.6 18.3 15 18.3 15.5C18.3 16.2 17.4 16.5 16.5 16.5C15.2 16.5 14.4 16.2 13.8 15.9L13.2 18.5C14 18.9 15.3 19.2 16.7 19.2C19.7 19.2 21.6 17.7 21.6 15.5C21.6 12.5 17.4 12.2 17.4 11C17.4 10.6 17.9 10.1 18.9 10.1C19.6 10.1 20.4 10.3 21.1 10.6L22 8.2Z"
+                                fill="#38BDF8"
+                              />
+                            </svg>
+                            <span className="font-mono text-slate-200 font-semibold">
+                              {savedCard.cardNumber}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              Exp {savedCard.expDate}
+                            </span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px] font-medium">
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M5 13l4 4L19 7"
+                              />
+                            </svg>
+                            Card Linked
+                          </span>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <span className="text-slate-500 font-medium">No payment card linked</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowPaymentCardModal(true)}
+                            className="text-blue-400 hover:text-blue-300 underline font-medium text-[11px] cursor-pointer"
+                          >
+                            + Add Payment Card
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4 text-slate-400 text-[11px]">
                       <span>
                         Billing Contact:{' '}
                         <strong className="text-slate-200 font-medium">
-                          {taxForm.invoiceEmail}
+                          {savedTaxInfo?.invoiceEmail || user?.email || 'Not configured'}
                         </strong>
+                        {savedTaxInfo?.gstin && (
+                          <span className="ml-2 font-mono text-[10px] text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                            GSTIN: {savedTaxInfo.gstin}
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -1790,75 +1871,87 @@ export function SettingsPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700/80 text-slate-300">
-                          {billingPlan?.tier === 'pro' || billingPlan?.tier === 'enterprise' ? (
-                            <tr className="bg-slate-800/30 hover:bg-slate-800/60 transition-colors">
-                              <td className="p-4 font-mono font-medium text-slate-200">
-                                INV-2026-001
-                              </td>
-                              <td className="p-4">{new Date().toLocaleDateString()}</td>
-                              <td className="p-4 font-medium">
-                                {billingPlan?.name || 'Pro'} Plan Subscription ({selectedSeats}{' '}
-                                seats)
-                              </td>
-                              <td className="p-4 font-mono font-bold text-white">
-                                ₹
-                                {(billingPlan?.monthlyPrice
-                                  ? billingPlan.monthlyPrice * selectedSeats
-                                  : 1499 * selectedSeats
-                                ).toLocaleString()}
-                              </td>
-                              <td className="p-4">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                  Paid
-                                </span>
-                              </td>
-                              <td className="p-4 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    openConfirm(
-                                      'Download Invoice',
-                                      'Generating PDF receipt for INV-2026-001...',
-                                      () => {},
-                                      'Download PDF'
-                                    );
-                                  }}
-                                  className="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium text-[11px] transition cursor-pointer inline-flex items-center gap-1.5"
-                                >
+                          {billingPlan?.invoices && billingPlan.invoices.length > 0 ? (
+                            billingPlan.invoices.map((inv: any, idx: number) => (
+                              <tr
+                                key={inv.id || idx}
+                                className="bg-slate-800/30 hover:bg-slate-800/60 transition-colors"
+                              >
+                                <td className="p-4 font-mono font-medium text-slate-200">
+                                  {inv.id || `INV-${idx + 1}`}
+                                </td>
+                                <td className="p-4">
+                                  {inv.date || new Date().toLocaleDateString()}
+                                </td>
+                                <td className="p-4 font-medium">
+                                  {inv.description ||
+                                    `${billingPlan?.name || 'Pro'} Plan Subscription`}
+                                </td>
+                                <td className="p-4 font-mono font-bold text-white">
+                                  ₹{(inv.amount || 0).toLocaleString()}
+                                </td>
+                                <td className="p-4">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    {inv.status || 'Paid'}
+                                  </span>
+                                </td>
+                                <td className="p-4 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      openConfirm(
+                                        'Download Invoice',
+                                        `Generating PDF receipt for ${inv.id || 'invoice'}...`,
+                                        () => {},
+                                        'Download PDF'
+                                      );
+                                    }}
+                                    className="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium text-[11px] transition cursor-pointer inline-flex items-center gap-1.5"
+                                  >
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                      />
+                                    </svg>
+                                    PDF
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td
+                                colSpan={6}
+                                className="p-8 text-center text-slate-400 font-medium"
+                              >
+                                <div className="flex flex-col items-center justify-center gap-2">
                                   <svg
-                                    className="w-3.5 h-3.5"
+                                    className="w-8 h-8 text-slate-600"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
-                                    strokeWidth={2}
+                                    strokeWidth={1.5}
                                   >
                                     <path
                                       strokeLinecap="round"
                                       strokeLinejoin="round"
-                                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 01-2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                                     />
                                   </svg>
-                                  PDF
-                                </button>
-                              </td>
-                            </tr>
-                          ) : (
-                            <tr className="bg-transparent hover:bg-slate-800/40 transition-colors">
-                              <td className="p-4 font-mono font-medium text-slate-400">
-                                INV-FREE-TIER
-                              </td>
-                              <td className="p-4">{new Date().toLocaleDateString()}</td>
-                              <td className="p-4 font-medium text-slate-400">
-                                Free Starter Plan Quota
-                              </td>
-                              <td className="p-4 font-mono font-bold text-slate-400">₹0</td>
-                              <td className="p-4">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700/50 text-slate-300 border border-slate-600">
-                                  Active
-                                </span>
-                              </td>
-                              <td className="p-4 text-right">
-                                <span className="text-[11px] text-slate-500 font-mono">N/A</span>
+                                  <span>No past billing transactions or invoices found</span>
+                                  <span className="text-[11px] text-slate-500 font-normal">
+                                    Paid subscription receipts will automatically appear here once
+                                    processed.
+                                  </span>
+                                </div>
                               </td>
                             </tr>
                           )}
