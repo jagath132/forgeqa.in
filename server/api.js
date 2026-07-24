@@ -52,6 +52,40 @@ const ALLOWED_EXTENSIONS = [
   '.pptx',
 ];
 
+function isSampleTcId(id) {
+  if (typeof id !== 'string') return false;
+  return /^TC_(00[1-9]|01[0-2]|HIST_\d+)$/.test(id);
+}
+
+function isSampleQaResultData(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.summary === 'User Authentication & Registration — Test Matrix') return true;
+  if (Array.isArray(data.testCases) && data.testCases.some((tc) => isSampleTcId(tc?.tcId))) {
+    return true;
+  }
+  return false;
+}
+
+function filterSampleHistoryItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.filter((item) => {
+    if (!item) return false;
+    if (typeof item.id === 'string' && item.id.startsWith('TEST_HIST_')) return false;
+    if (isSampleQaResultData(item.result)) return false;
+    return true;
+  });
+}
+
+function filterSampleSuites(suites) {
+  if (!Array.isArray(suites)) return [];
+  return suites.filter((s) => {
+    if (!s) return false;
+    if (['auth_suite', 'checkout_suite', 'settings_suite'].includes(s.id)) return false;
+    if (Array.isArray(s.caseIds) && s.caseIds.some((id) => isSampleTcId(id))) return false;
+    return true;
+  });
+}
+
 function fileFilter(_req, file, cb) {
   const ext = path.extname(file.originalname).toLowerCase();
   if (ALLOWED_EXTENSIONS.includes(ext)) return cb(null, true);
@@ -1050,7 +1084,8 @@ export function createApiMiddleware(env) {
       }
 
       if (url.pathname === '/api/user/suites' && req.method === 'GET') {
-        const data = await authStore.loadUserData(user.id, 'suites');
+        const raw = await authStore.loadUserData(user.id, 'suites');
+        const data = filterSampleSuites(raw);
         sendJson(res, 200, { suites: data || [] });
         return;
       }
@@ -1058,13 +1093,14 @@ export function createApiMiddleware(env) {
       if (url.pathname === '/api/user/suites' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { suites } = JSON.parse(rawBody || '{}');
-        await authStore.saveUserData(user.id, 'suites', suites || []);
+        await authStore.saveUserData(user.id, 'suites', filterSampleSuites(suites));
         sendJson(res, 200, { ok: true });
         return;
       }
 
       if (url.pathname === '/api/history' && req.method === 'GET') {
-        const data = await authStore.loadUserData(user.id, 'history');
+        const raw = await authStore.loadUserData(user.id, 'history');
+        const data = filterSampleHistoryItems(raw);
         sendJson(res, 200, { items: data || [] });
         return;
       }
@@ -1072,21 +1108,23 @@ export function createApiMiddleware(env) {
       if (url.pathname === '/api/history' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { items } = JSON.parse(rawBody || '{}');
-        await authStore.saveUserData(user.id, 'history', items || []);
+        await authStore.saveUserData(user.id, 'history', filterSampleHistoryItems(items));
         sendJson(res, 200, { ok: true });
         return;
       }
 
       if (url.pathname === '/api/qa-result' && req.method === 'GET') {
         const data = await authStore.loadUserData(user.id, 'qaResult');
-        sendJson(res, 200, { result: data || null });
+        const cleanData = isSampleQaResultData(data) ? null : data;
+        sendJson(res, 200, { result: cleanData || null });
         return;
       }
 
       if (url.pathname === '/api/qa-result' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { result } = JSON.parse(rawBody || '{}');
-        await authStore.saveUserData(user.id, 'qaResult', result || null);
+        const cleanResult = isSampleQaResultData(result) ? null : result;
+        await authStore.saveUserData(user.id, 'qaResult', cleanResult || null);
         sendJson(res, 200, { ok: true });
         return;
       }

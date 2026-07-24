@@ -125,7 +125,14 @@ export const useAppStore = create<AppState>()((set, get) => ({
   logout: () => {
     clearSession();
     api.post('/api/auth/logout').catch(() => {});
-    set({ user: null });
+    set({
+      user: null,
+      qaResult: null,
+      scriptResult: null,
+      history: [],
+      profileName: '',
+      savedProviderKeys: {},
+    });
   },
 
   // Set user immediately after login — navigates to dashboard without any extra API calls
@@ -143,12 +150,23 @@ export const useAppStore = create<AppState>()((set, get) => ({
       getProfile().catch(() => ({ displayName: '' })),
     ])
       .then(([loadedHistory, loadedQaResult, settingsRes, loadedProfile]) => {
-        set({ history: loadedHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
+        const cleanHistory = loadedHistory.filter((item) => !isSampleHistoryItem(item));
+        if (cleanHistory.length !== loadedHistory.length) {
+          void saveHistory(cleanHistory);
+        }
+        const cleanQaResult = isSampleQaResult(loadedQaResult) ? null : loadedQaResult;
+        if (cleanQaResult !== loadedQaResult) {
+          void saveQaResult(null);
+        }
+
+        set({ history: cleanHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
         if (loadedProfile?.displayName) set({ profileName: loadedProfile.displayName });
-        if (loadedQaResult) {
-          set({ qaResult: loadedQaResult });
-        } else if (loadedHistory.length > 0) {
-          set({ qaResult: loadedHistory[0].result });
+        if (cleanQaResult) {
+          set({ qaResult: cleanQaResult });
+        } else if (cleanHistory.length > 0) {
+          set({ qaResult: cleanHistory[0].result });
+        } else {
+          set({ qaResult: null });
         }
       })
       .catch(() => {});
@@ -185,12 +203,23 @@ export const useAppStore = create<AppState>()((set, get) => ({
         getProfile().catch(() => ({ displayName: '' })),
       ])
         .then(([loadedHistory, loadedQaResult, settingsRes, loadedProfile]) => {
-          set({ history: loadedHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
+          const cleanHistory = loadedHistory.filter((item) => !isSampleHistoryItem(item));
+          if (cleanHistory.length !== loadedHistory.length) {
+            void saveHistory(cleanHistory);
+          }
+          const cleanQaResult = isSampleQaResult(loadedQaResult) ? null : loadedQaResult;
+          if (cleanQaResult !== loadedQaResult) {
+            void saveQaResult(null);
+          }
+
+          set({ history: cleanHistory, savedProviderKeys: settingsRes.data.keys ?? {} });
           if (loadedProfile?.displayName) set({ profileName: loadedProfile.displayName });
-          if (loadedQaResult) {
-            set({ qaResult: loadedQaResult });
-          } else if (loadedHistory.length > 0) {
-            set({ qaResult: loadedHistory[0].result });
+          if (cleanQaResult) {
+            set({ qaResult: cleanQaResult });
+          } else if (cleanHistory.length > 0) {
+            set({ qaResult: cleanHistory[0].result });
+          } else {
+            set({ qaResult: null });
           }
         })
         .catch(() => {});
@@ -200,6 +229,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }
   },
 }));
+
+function isSampleTcId(id?: string): boolean {
+  if (!id) return false;
+  return /^TC_(00[1-9]|01[0-2]|HIST_\d+)$/.test(id);
+}
+
+function isSampleQaResult(result: QaResponse | null): boolean {
+  if (!result || !Array.isArray(result.testCases)) return false;
+  if (result.summary === 'User Authentication & Registration — Test Matrix') return true;
+  return result.testCases.some((tc) => isSampleTcId(tc?.tcId));
+}
+
+function isSampleHistoryItem(item: HistoryItem): boolean {
+  if (!item) return false;
+  if (typeof item.id === 'string' && item.id.startsWith('TEST_HIST_')) return true;
+  if (item.result && isSampleQaResult(item.result)) return true;
+  return false;
+}
 
 export function getProviderLabel(provider: AiProvider | null): string {
   if (!provider) return 'Not Selected';
