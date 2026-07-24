@@ -89,6 +89,27 @@ export function AISettings() {
     }
   }
 
+  async function handleClearProvider() {
+    setSavingProvider(true);
+    setSettingsError('');
+    setSettingsMessage('');
+    try {
+      await api.delete('/api/settings/active-provider');
+      setActiveProvider(null);
+      setProvider(null);
+      setSelectedProvider(null);
+      setSettingsMessage('Provider deselected.');
+      window.setTimeout(() => setSettingsMessage(''), 3000);
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.error ?? err.message)
+        : 'Failed to deselect provider.';
+      setSettingsError(msg);
+    } finally {
+      setSavingProvider(false);
+    }
+  }
+
   async function handleSaveApiKey() {
     if (!selectedProvider && !storeProvider) {
       setSettingsError('Select a provider first.');
@@ -227,36 +248,48 @@ export function AISettings() {
               Click a card to select it, then save to activate.
             </p>
           </div>
-          <button
-            type="button"
-            disabled={saveDisabled}
-            onClick={handleSaveProvider}
-            className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-            style={{
-              background: saveDisabled ? 'var(--bg-tertiary)' : 'var(--accent)',
-              color: saveDisabled ? 'var(--text-muted)' : 'var(--color-surface)',
-              border: saveDisabled ? '1px solid var(--border-default)' : 'none',
-            }}
-          >
-            {savingProvider ? (
-              <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-            ) : (
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+          <div className="flex items-center gap-2">
+            {activeProvider && (
+              <button
+                type="button"
+                disabled={savingProvider}
+                onClick={handleClearProvider}
+                className="px-4 py-2.5 text-sm font-semibold rounded-xl transition-all cursor-pointer border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+                Deselect Provider
+              </button>
             )}
-            Save provider
-          </button>
+            <button
+              type="button"
+              disabled={saveDisabled}
+              onClick={handleSaveProvider}
+              className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              style={{
+                background: saveDisabled ? 'var(--bg-tertiary)' : 'var(--accent)',
+                color: saveDisabled ? 'var(--text-muted)' : 'var(--color-surface)',
+                border: saveDisabled ? '1px solid var(--border-default)' : 'none',
+              }}
+            >
+              {savingProvider ? (
+                <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              ) : (
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              )}
+              Save provider
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

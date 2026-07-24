@@ -100,10 +100,16 @@ export function SettingsPage() {
   const savedProviderKeys = useAppStore((s: any) => s.savedProviderKeys);
   const setSavedProviderKeys = useAppStore((s: any) => s.setSavedProviderKeys);
   const [selectedProvider, setSelectedProvider] = useState<AiProvider | null>(null);
-  const [activeProviderLocal, setActiveProviderLocal] = useState<AiProvider | null>(null);
+  const [activeProviderLocal, setActiveProviderLocal] = useState<AiProvider | null>(
+    activeProvider || storeProvider || null
+  );
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
+
+  useEffect(() => {
+    setActiveProviderLocal(activeProvider || storeProvider || null);
+  }, [activeProvider, storeProvider]);
 
   /* ── Billing & Usage state ── */
   const [billingPlan, setBillingPlan] = useState<any>(null);
@@ -466,15 +472,24 @@ export function SettingsPage() {
   async function handleSelectProvider(providerId: AiProvider) {
     // Toggle: if user taps the already-active provider, deselect it
     if (activeProviderLocal === providerId) {
-      // Deselect immediately — purely client-side, no API call
-      // (avoids catch block reverting the state back)
       setActiveProviderLocal(null);
       setSelectedProvider(null);
       setActiveProvider(null as any);
       setProvider(null as any);
       setSettingsError('');
-      setSettingsMessage('Provider deselected.');
-      setTimeout(() => setSettingsMessage(''), 3000);
+      try {
+        await api.delete('/api/settings/active-provider');
+        setSettingsMessage('Provider deselected.');
+        setTimeout(() => setSettingsMessage(''), 3000);
+      } catch (err: any) {
+        setActiveProviderLocal(providerId);
+        setActiveProvider(providerId as any);
+        setProvider(providerId as any);
+        const msg = axios.isAxiosError(err)
+          ? (err.response?.data?.error ?? err.message)
+          : 'Failed to deselect provider.';
+        setSettingsError(msg);
+      }
       return;
     }
 

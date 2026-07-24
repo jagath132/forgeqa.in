@@ -159,6 +159,7 @@ async function handleLogin(req, res, body) {
       name: userRecord.name || null,
       role: userRecord.role || 'Member',
       createdAt: userRecord.createdAt,
+      activeProvider: userRecord.activeProvider || null,
       has_seen_welcome: userRecord.has_seen_welcome || false,
     },
   });
