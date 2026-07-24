@@ -133,7 +133,7 @@ export function SuitesPage() {
       {suites.length === 0 && !showCreate && (
         <Card className="text-center py-8">
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-            No test suites created yet. Click "+ New Suite" to create your first suite.
+            No test suites created yet. Click &quot;+ New Suite&quot; to create your first suite.
           </p>
         </Card>
       )}

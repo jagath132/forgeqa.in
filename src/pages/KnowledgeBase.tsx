@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { api, type KnowledgeFile } from '../lib/api';
-import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 
 const fileIcons: Record<string, { label: string; color: string }> = {
@@ -20,8 +19,6 @@ function formatDate(value: string) {
 }
 
 export function KnowledgeBase() {
-  const setQaResult = useAppStore((s) => s.setQaResult);
-  const clearHistory = useAppStore((s) => s.clearHistory);
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
   const [search, setSearch] = useState('');
   const [sharePointUrl, setSharePointUrl] = useState('');
@@ -50,7 +47,7 @@ export function KnowledgeBase() {
     } finally {
       setIsLoading(false);
     }
-  }, [search, setQaResult, clearHistory]);
+  }, [search]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
