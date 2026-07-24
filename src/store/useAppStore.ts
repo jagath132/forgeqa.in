@@ -15,7 +15,6 @@ import {
   type TestScriptResponse,
   type User,
 } from '../lib/api';
-import { seedSampleData } from '../lib/seedData';
 
 interface ConfirmDialogState {
   open: boolean;
@@ -177,9 +176,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         provider: activeProv,
         authChecking: false,
       });
-
-      /* Seed sample data on first load for testing */
-      seedSampleData();
 
       // Load secondary data in the background — does NOT block authChecking
       Promise.all([

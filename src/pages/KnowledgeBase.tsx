@@ -45,10 +45,6 @@ export function KnowledgeBase() {
       const response = await api.get('/api/knowledge/files', { params: { search } });
       const loadedFiles: KnowledgeFile[] = response.data.files;
       setFiles(loadedFiles);
-      if (loadedFiles.length === 0) {
-        setQaResult(null);
-        clearHistory();
-      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to load files.');
     } finally {

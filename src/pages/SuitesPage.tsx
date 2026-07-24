@@ -15,36 +15,11 @@ export function SuitesPage() {
 
   useEffect(() => {
     getSuites().then((data) => {
-      const loaded =
-        data.length > 0
-          ? data
-          : [
-              {
-                id: 'smoke',
-                name: 'Smoke Tests',
-                description: 'Critical path validation for core functionality',
-                color: 'var(--accent-rose)',
-                caseIds: [],
-              },
-              {
-                id: 'regression',
-                name: 'Regression Suite',
-                description: 'Full regression covering all features',
-                color: 'var(--accent-violet)',
-                caseIds: [],
-              },
-              {
-                id: 'edge',
-                name: 'Edge Cases',
-                description: 'Boundary and error-handling scenarios',
-                color: 'var(--accent-amber)',
-                caseIds: [],
-              },
-            ];
-      setSuites(loaded);
-      setSelectedSuite(loaded[0]?.id ?? '');
+      setSuites(data);
+      if (data.length > 0) {
+        setSelectedSuite(data[0].id);
+      }
       setLoading(false);
-      if (data.length === 0) void saveSuites(loaded);
     });
   }, []);
 
@@ -154,6 +129,14 @@ export function SuitesPage() {
           + New Suite
         </button>
       </div>
+
+      {suites.length === 0 && !showCreate && (
+        <Card className="text-center py-8">
+          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+            No test suites created yet. Click "+ New Suite" to create your first suite.
+          </p>
+        </Card>
+      )}
 
       {showCreate && (
         <Card>
