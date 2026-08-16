@@ -39,10 +39,19 @@ async function getTransport() {
   return null;
 }
 
-const FROM_EMAIL =
-  process.env.SMTP_FROM || process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] || 'onboarding@resend.dev';
-const FROM = process.env.RESEND_FROM || 'ForgeQA <onboarding@resend.dev>';
-const BRAND = 'ForgeQA';
+function getFromEmail() {
+  return (
+    process.env.SMTP_FROM ||
+    process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] ||
+    'onboarding@resend.dev'
+  );
+}
+
+function getSenderName() {
+  return (
+    process.env.RESEND_FROM?.match(/^([^<]+)/)?.[1]?.trim() || process.env.APP_NAME || 'ForgeQA'
+  );
+}
 
 export async function sendPasswordResetEmail(to, resetUrl) {
   // 1. Try Resend if configured
@@ -50,11 +59,11 @@ export async function sendPasswordResetEmail(to, resetUrl) {
     try {
       const result = await sendPasswordResetEmailResend(to, resetUrl);
       if (result) {
-        console.log(`Password reset link: ${resetUrl}`);
+        console.log(`Password reset email delivered via Resend to: ${to}`);
         return true;
       }
     } catch (err) {
-      console.warn('Resend failed, checking SMTP fallback:', err.message);
+      console.warn('[Email] Resend attempt failed, checking SMTP fallback:', err.message);
     }
   }
 
@@ -62,10 +71,12 @@ export async function sendPasswordResetEmail(to, resetUrl) {
   const transport = await getTransport();
   if (transport) {
     const html = getPasswordResetEmailHtml(to, resetUrl);
+    const fromEmail = getFromEmail();
+    const brand = getSenderName();
 
     try {
       await transport.sendMail({
-        from: `"${BRAND}" <${FROM_EMAIL}>`,
+        from: `"${brand}" <${fromEmail}>`,
         to,
         subject: 'Reset Your ForgeQA Password',
         html,
@@ -73,13 +84,13 @@ export async function sendPasswordResetEmail(to, resetUrl) {
       console.log(`Password reset email sent via SMTP to ${to}`);
       return true;
     } catch (err) {
-      console.error('Failed to send password reset email via SMTP:', err.message);
+      console.error('[Email] Failed to send password reset email via SMTP:', err.message);
       return false;
     }
   }
 
   console.warn(
-    `⚠️ No active real email transport configured. Password reset link generated: ${resetUrl}`
+    `⚠️ [Email] No active email transport configured in production. Password reset link: ${resetUrl}`
   );
   return false;
 }

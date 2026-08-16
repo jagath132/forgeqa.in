@@ -197,7 +197,15 @@ async function cleanupFiles(files = []) {
   await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => undefined)));
 }
 
-export function createApiMiddleware(env) {
+export function createApiMiddleware(env = {}) {
+  if (env && typeof env === 'object') {
+    for (const [k, v] of Object.entries(env)) {
+      if (v !== undefined && v !== null && v !== '' && !process.env[k]) {
+        process.env[k] = String(v);
+      }
+    }
+  }
+
   let store;
   let knowledge;
   let dbReady = connectDb()

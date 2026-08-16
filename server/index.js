@@ -5,6 +5,17 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+// Load environment variables from .env if present
+const envPath = path.join(ROOT, '.env');
+if (fs.existsSync(envPath) && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(envPath);
+  } catch (err) {
+    console.warn('Could not load .env file:', err.message);
+  }
+}
+
 const DIST = path.join(ROOT, 'dist');
 const UPLOAD_DIR = path.resolve(ROOT, '.data', 'uploads');
 const PORT = parseInt(process.env.PORT || '3000', 10);

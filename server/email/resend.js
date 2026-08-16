@@ -2,20 +2,21 @@ import { Resend } from 'resend';
 import { getPasswordResetEmailHtml, getProductKeyEmailHtml } from './templates.js';
 
 let resendClient = null;
-let resendFailed = false;
+let lastApiKey = null;
 
 function getResend() {
-  if (resendFailed) return null;
-  if (!resendClient) {
-    const key = process.env.RESEND_API_KEY;
-    if (!key) {
-      resendFailed = true;
-      return null;
-    }
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
+    console.warn('[Resend] RESEND_API_KEY is not set in environment variables');
+    return null;
+  }
+  if (!resendClient || lastApiKey !== key) {
     resendClient = new Resend(key);
+    lastApiKey = key;
   }
   return resendClient;
 }
+
 function getFromEmail() {
   return process.env.RESEND_FROM || 'ForgeQA <onboarding@resend.dev>';
 }
@@ -34,11 +35,7 @@ export async function sendProductKeyEmailResend(to, productKey, customerName) {
   });
 
   if (error) {
-    console.error('Resend product key email failed:', error);
-    if (error.statusCode === 401 || error.message?.includes('invalid')) {
-      resendFailed = true;
-      console.warn('Resend API key invalid — disabling Resend for this session');
-    }
+    console.error('[Resend Product Key Error]:', error);
     return false;
   }
   console.log(`Product key email sent via Resend to ${to}, id=${data?.id}`);
@@ -60,11 +57,7 @@ export async function sendPasswordResetEmailResend(to, resetUrl) {
   });
 
   if (error) {
-    console.error('Resend password reset email failed:', error);
-    if (error.statusCode === 401 || error.message?.includes('invalid')) {
-      resendFailed = true;
-      console.warn('Resend API key invalid — disabling Resend for this session');
-    }
+    console.error('[Resend Password Reset Error]:', error);
     return false;
   }
   console.log(`Password reset email sent via Resend to ${to}, id=${data?.id}`);
@@ -85,11 +78,7 @@ export async function sendSupportEmailResend({ name, email, subject, message }) 
   });
 
   if (error) {
-    console.error('Resend support email failed:', error);
-    if (error.statusCode === 401 || error.message?.includes('invalid')) {
-      resendFailed = true;
-      console.warn('Resend API key invalid — disabling Resend for this session');
-    }
+    console.error('[Resend Support Error]:', error);
     return false;
   }
   console.log(`Support email sent via Resend from ${email}, id=${data?.id}`);
