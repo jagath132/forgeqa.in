@@ -44,24 +44,32 @@ export async function sendProductKeyEmailResend(to, productKey, customerName) {
 
 export async function sendPasswordResetEmailResend(to, resetUrl) {
   const client = getResend();
-  if (!client) return false;
+  if (!client) {
+    return { success: false, error: 'Resend API key is missing (RESEND_API_KEY not configured)' };
+  }
 
   const sender = getFromEmail();
   const resetHtml = getPasswordResetEmailHtml(to, resetUrl);
 
-  const { data, error } = await client.emails.send({
-    from: sender,
-    to: [to],
-    subject: 'Reset Your ForgeQA Password',
-    html: resetHtml,
-  });
+  try {
+    const { data, error } = await client.emails.send({
+      from: sender,
+      to: [to],
+      subject: 'Reset Your ForgeQA Password',
+      html: resetHtml,
+    });
 
-  if (error) {
-    console.error('[Resend Password Reset Error]:', error);
-    return false;
+    if (error) {
+      console.error('[Resend Password Reset Error]:', error);
+      const msg = error.message || error.name || JSON.stringify(error);
+      return { success: false, error: msg };
+    }
+    console.log(`Password reset email sent via Resend to ${to}, id=${data?.id}`);
+    return { success: true, id: data?.id };
+  } catch (err) {
+    console.error('[Resend Exception]:', err);
+    return { success: false, error: err.message || 'Unknown Resend exception' };
   }
-  console.log(`Password reset email sent via Resend to ${to}, id=${data?.id}`);
-  return true;
 }
 
 export async function sendSupportEmailResend({ name, email, subject, message }) {

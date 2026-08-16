@@ -214,9 +214,10 @@ async function handleForgotPassword(req, res, body) {
   const baseUrl = origin || process.env.APP_URL || 'http://127.0.0.1:5173';
   const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
   const sent = await sendPasswordResetEmail(email, resetUrl);
-  if (!sent) {
+  if (!sent || !sent.success) {
+    const detail = sent?.error || 'Email service is not configured.';
     sendJson(res, 500, {
-      error: 'Failed to send password reset email. Please ensure your email service is configured.',
+      error: `Failed to send password reset email: ${detail}`,
     });
     return;
   }

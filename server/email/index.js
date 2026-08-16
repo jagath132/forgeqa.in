@@ -54,17 +54,25 @@ function getSenderName() {
 }
 
 export async function sendPasswordResetEmail(to, resetUrl) {
+  const errors = [];
+
   // 1. Try Resend if configured
   if (process.env.RESEND_API_KEY) {
     try {
-      const result = await sendPasswordResetEmailResend(to, resetUrl);
-      if (result) {
+      const res = await sendPasswordResetEmailResend(to, resetUrl);
+      if (res && res.success) {
         console.log(`Password reset email delivered via Resend to: ${to}`);
-        return true;
+        return { success: true };
+      }
+      if (res?.error) {
+        errors.push(`Resend: ${res.error}`);
       }
     } catch (err) {
       console.warn('[Email] Resend attempt failed, checking SMTP fallback:', err.message);
+      errors.push(`Resend: ${err.message}`);
     }
+  } else {
+    errors.push('RESEND_API_KEY is not configured');
   }
 
   // 2. Try configured SMTP transport
@@ -82,17 +90,20 @@ export async function sendPasswordResetEmail(to, resetUrl) {
         html,
       });
       console.log(`Password reset email sent via SMTP to ${to}`);
-      return true;
+      return { success: true };
     } catch (err) {
       console.error('[Email] Failed to send password reset email via SMTP:', err.message);
-      return false;
+      errors.push(`SMTP: ${err.message}`);
     }
+  } else {
+    errors.push('SMTP transport is not configured');
   }
 
+  const combinedError = errors.join('; ');
   console.warn(
-    `⚠️ [Email] No active email transport configured in production. Password reset link: ${resetUrl}`
+    `⚠️ [Email] Delivery failed for ${to}. Reason: ${combinedError}. Direct Link: ${resetUrl}`
   );
-  return false;
+  return { success: false, error: combinedError };
 }
 
 export async function sendProductKeyEmail(to, productKey, customerName) {
