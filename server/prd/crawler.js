@@ -72,7 +72,9 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
             );
             if (submitBtn) {
               await Promise.all([
-                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
+                page
+                  .waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 })
+                  .catch(() => {}),
                 submitBtn.click(),
               ]);
               await page.waitForTimeout(1500);
@@ -107,11 +109,7 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
                 .filter(Boolean)
                 .slice(0, 30);
 
-            const headings = [
-              ...getTexts('h1'),
-              ...getTexts('h2'),
-              ...getTexts('h3'),
-            ].slice(0, 20);
+            const headings = [...getTexts('h1'), ...getTexts('h2'), ...getTexts('h3')].slice(0, 20);
 
             const buttons = Array.from(
               document.querySelectorAll('button, [role="button"], a.btn, .btn')
@@ -120,18 +118,22 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
               .filter(Boolean)
               .slice(0, 25);
 
-            const forms = Array.from(document.querySelectorAll('form, .form')).map((f) => {
-              const inputs = Array.from(f.querySelectorAll('input, select, textarea')).map((i) => ({
-                name: i.getAttribute('name') || i.getAttribute('id') || '',
-                type: i.getAttribute('type') || i.tagName.toLowerCase(),
-                placeholder: i.getAttribute('placeholder') || '',
-                label:
-                  i.labels?.[0]?.innerText?.trim() ||
-                  i.closest('label')?.innerText?.trim() ||
-                  '',
-              }));
-              return { inputs: inputs.slice(0, 15) };
-            }).slice(0, 5);
+            const forms = Array.from(document.querySelectorAll('form, .form'))
+              .map((f) => {
+                const inputs = Array.from(f.querySelectorAll('input, select, textarea')).map(
+                  (i) => ({
+                    name: i.getAttribute('name') || i.getAttribute('id') || '',
+                    type: i.getAttribute('type') || i.tagName.toLowerCase(),
+                    placeholder: i.getAttribute('placeholder') || '',
+                    label:
+                      i.labels?.[0]?.innerText?.trim() ||
+                      i.closest('label')?.innerText?.trim() ||
+                      '',
+                  })
+                );
+                return { inputs: inputs.slice(0, 15) };
+              })
+              .slice(0, 5);
 
             const links = Array.from(document.querySelectorAll('a[href]'))
               .map((a) => ({
@@ -147,10 +149,7 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
             removeTags.forEach((tag) => {
               bodyClone.querySelectorAll(tag).forEach((el) => el.remove());
             });
-            const rawText = (bodyClone.innerText || '')
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 2500);
+            const rawText = (bodyClone.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 2500);
 
             return {
               title: document.title || '',

@@ -197,7 +197,8 @@ async function handleForgotPassword(req, res, body) {
   const user = await authStore.findUserByEmail(email);
   if (!user) {
     sendJson(res, 404, {
-      error: 'No account found with this email address. Please check your spelling or register a new account.',
+      error:
+        'No account found with this email address. Please check your spelling or register a new account.',
     });
     return;
   }
@@ -209,8 +210,7 @@ async function handleForgotPassword(req, res, body) {
   }
 
   const origin =
-    req.headers.origin ||
-    (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
   const baseUrl = origin || process.env.APP_URL || 'http://127.0.0.1:5173';
   const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
   const sent = await sendPasswordResetEmail(email, resetUrl);

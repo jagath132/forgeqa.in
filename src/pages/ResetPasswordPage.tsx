@@ -433,7 +433,11 @@ export function ResetPasswordPage() {
                       ) : (
                         <X className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       )}
-                      <span className={rules.hasLength ? 'text-slate-800 font-medium' : 'text-slate-500'}>
+                      <span
+                        className={
+                          rules.hasLength ? 'text-slate-800 font-medium' : 'text-slate-500'
+                        }
+                      >
                         8+ characters
                       </span>
                     </div>
@@ -446,7 +450,9 @@ export function ResetPasswordPage() {
                       )}
                       <span
                         className={
-                          rules.hasUpper && rules.hasLower ? 'text-slate-800 font-medium' : 'text-slate-500'
+                          rules.hasUpper && rules.hasLower
+                            ? 'text-slate-800 font-medium'
+                            : 'text-slate-500'
                         }
                       >
                         Upper & lower case
@@ -459,7 +465,11 @@ export function ResetPasswordPage() {
                       ) : (
                         <X className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       )}
-                      <span className={rules.hasNumber ? 'text-slate-800 font-medium' : 'text-slate-500'}>
+                      <span
+                        className={
+                          rules.hasNumber ? 'text-slate-800 font-medium' : 'text-slate-500'
+                        }
+                      >
                         At least 1 number
                       </span>
                     </div>
@@ -470,7 +480,11 @@ export function ResetPasswordPage() {
                       ) : (
                         <X className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       )}
-                      <span className={rules.hasSpecial ? 'text-slate-800 font-medium' : 'text-slate-500'}>
+                      <span
+                        className={
+                          rules.hasSpecial ? 'text-slate-800 font-medium' : 'text-slate-500'
+                        }
+                      >
                         Special character (@$!%*...)
                       </span>
                     </div>
@@ -483,7 +497,11 @@ export function ResetPasswordPage() {
                       ) : (
                         <X className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       )}
-                      <span className={isMatch ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-medium'}>
+                      <span
+                        className={
+                          isMatch ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-medium'
+                        }
+                      >
                         {isMatch ? 'Passwords match' : 'Passwords do not match'}
                       </span>
                     </div>
@@ -516,7 +534,8 @@ export function ResetPasswordPage() {
                     onClick={() => navigate('/auth')}
                     className="text-xs text-slate-500 hover:text-slate-800 font-medium transition-colors cursor-pointer"
                   >
-                    Remember your password? <span className="text-blue-600 font-semibold underline">Sign In</span>
+                    Remember your password?{' '}
+                    <span className="text-blue-600 font-semibold underline">Sign In</span>
                   </button>
                 </div>
               </form>

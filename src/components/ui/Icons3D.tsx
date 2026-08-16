@@ -59,12 +59,7 @@ export function PrdIcon3D({ size = 20, className = '' }: Icon3DProps) {
         strokeWidth="1.5"
       />
       <path d="M14 2V8H20" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path
-        d="M8 12H16M8 16H13"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M8 12H16M8 16H13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       <path
         d="M17 14L18 16.5L20.5 17.5L18 18.5L17 21L16 18.5L13.5 17.5L16 16.5L17 14Z"
         fill="var(--accent-cyan, #06b6d4)"

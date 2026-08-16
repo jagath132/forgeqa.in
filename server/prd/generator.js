@@ -139,7 +139,9 @@ export async function generateWithClaudeStream({
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    const error = new Error(data.error?.message || `Claude streaming request failed (${response.status})`);
+    const error = new Error(
+      data.error?.message || `Claude streaming request failed (${response.status})`
+    );
     error.statusCode = response.status;
     throw error;
   }
@@ -177,13 +179,7 @@ export async function generateWithClaudeStream({
   }
 }
 
-export async function generatePrdStream({
-  apiKey,
-  provider = 'gemini',
-  model,
-  prompt,
-  onToken,
-}) {
+export async function generatePrdStream({ apiKey, provider = 'gemini', model, prompt, onToken }) {
   if (provider === 'gemini') {
     return generateWithGeminiStream({
       apiKey,
@@ -225,4 +221,3 @@ export async function generatePrdStream({
     onToken,
   });
 }
-

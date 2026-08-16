@@ -109,7 +109,9 @@ export const authStore = {
     let doc = await db.collection('user_api_keys').findOne({ userId: cleanUserId, provider });
     if (!doc) {
       try {
-        doc = await db.collection('user_api_keys').findOne({ userId: new ObjectId(cleanUserId), provider });
+        doc = await db
+          .collection('user_api_keys')
+          .findOne({ userId: new ObjectId(cleanUserId), provider });
       } catch {
         // ignore
       }

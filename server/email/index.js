@@ -39,7 +39,8 @@ async function getTransport() {
   return null;
 }
 
-const FROM_EMAIL = process.env.SMTP_FROM || process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] || 'onboarding@resend.dev';
+const FROM_EMAIL =
+  process.env.SMTP_FROM || process.env.RESEND_FROM?.match(/<(.+)>/)?.[1] || 'onboarding@resend.dev';
 const FROM = process.env.RESEND_FROM || 'ForgeQA <onboarding@resend.dev>';
 const BRAND = 'ForgeQA';
 
@@ -77,7 +78,9 @@ export async function sendPasswordResetEmail(to, resetUrl) {
     }
   }
 
-  console.warn(`⚠️ No active real email transport configured. Password reset link generated: ${resetUrl}`);
+  console.warn(
+    `⚠️ No active real email transport configured. Password reset link generated: ${resetUrl}`
+  );
   return false;
 }
 
@@ -109,7 +112,9 @@ export async function sendProductKeyEmail(to, productKey, customerName) {
     }
   }
 
-  console.warn(`⚠️ No active real email transport configured. Product key generated for ${to}: ${productKey}`);
+  console.warn(
+    `⚠️ No active real email transport configured. Product key generated for ${to}: ${productKey}`
+  );
   return false;
 }
 
@@ -169,6 +174,8 @@ export async function sendSupportEmail({ name, email, subject, message }) {
     }
   }
 
-  console.warn(`⚠️ No active real email transport configured. Support message from ${email} logged.`);
+  console.warn(
+    `⚠️ No active real email transport configured. Support message from ${email} logged.`
+  );
   return false;
 }

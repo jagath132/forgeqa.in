@@ -407,11 +407,6 @@ export async function savePrdToKnowledge(data: {
 }
 
 export async function exportPrdAsDocx(prdText: string, fileName?: string): Promise<Blob> {
-  const res = await api.post(
-    '/api/prd/export',
-    { prdText, fileName },
-    { responseType: 'blob' }
-  );
+  const res = await api.post('/api/prd/export', { prdText, fileName }, { responseType: 'blob' });
   return res.data;
 }
-

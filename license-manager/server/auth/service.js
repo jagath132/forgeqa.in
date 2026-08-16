@@ -1,34 +1,32 @@
-import jwt from "jsonwebtoken";
-import { adminStore } from "./store.js";
+import jwt from 'jsonwebtoken';
+import { adminStore } from './store.js';
 
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("JWT_SECRET is required");
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET is required');
     }
-    return "forgeqa_dev_jwt_secret_key_change_in_production_2026";
+    return 'forgeqa_dev_jwt_secret_key_change_in_production_2026';
   }
   return process.env.JWT_SECRET;
 }
 
 export function generateToken(admin) {
-  return jwt.sign(
-    { adminId: admin.id, email: admin.email, role: "admin" },
-    getJwtSecret(),
-    { expiresIn: "24h" }
-  );
+  return jwt.sign({ adminId: admin.id, email: admin.email, role: 'admin' }, getJwtSecret(), {
+    expiresIn: '24h',
+  });
 }
 
 export async function authenticateToken(req) {
-  const authHeader = req.headers["authorization"];
+  const authHeader = req.headers['authorization'];
   if (!authHeader) {
-    const err = new Error("Authorization header required");
+    const err = new Error('Authorization header required');
     err.statusCode = 401;
     throw err;
   }
-  const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
-    const err = new Error("Invalid authorization format");
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+    const err = new Error('Invalid authorization format');
     err.statusCode = 401;
     throw err;
   }
@@ -37,20 +35,20 @@ export async function authenticateToken(req) {
   try {
     payload = jwt.verify(parts[1], getJwtSecret());
   } catch (e) {
-    const err = new Error(e.message === "jwt expired" ? "Token expired" : "Invalid token");
+    const err = new Error(e.message === 'jwt expired' ? 'Token expired' : 'Invalid token');
     err.statusCode = 401;
     throw err;
   }
 
-  if (!payload.adminId || payload.role !== "admin") {
-    const err = new Error("Not authorized");
+  if (!payload.adminId || payload.role !== 'admin') {
+    const err = new Error('Not authorized');
     err.statusCode = 403;
     throw err;
   }
 
   const admin = await adminStore.findById(payload.adminId);
   if (!admin) {
-    const err = new Error("Admin no longer exists");
+    const err = new Error('Admin no longer exists');
     err.statusCode = 401;
     throw err;
   }

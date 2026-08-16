@@ -884,11 +884,19 @@ export function createApiMiddleware(env) {
         }
 
         const rawBody = await readRequestBody(req);
-        const { productName, moduleName, details, apiKey: requestApiKey, model, provider } =
-          JSON.parse(rawBody || '{}');
+        const {
+          productName,
+          moduleName,
+          details,
+          apiKey: requestApiKey,
+          model,
+          provider,
+        } = JSON.parse(rawBody || '{}');
 
         if (!details || details.trim().length < 15) {
-          sendJson(res, 400, { error: 'Please provide at least 15 characters of product details.' });
+          sendJson(res, 400, {
+            error: 'Please provide at least 15 characters of product details.',
+          });
           return;
         }
 
@@ -912,12 +920,18 @@ export function createApiMiddleware(env) {
           res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         };
 
-        sendSSE('phase', { phase: 'analyzing', message: 'Analyzing product context & requirements...' });
+        sendSSE('phase', {
+          phase: 'analyzing',
+          message: 'Analyzing product context & requirements...',
+        });
 
         const prompt = buildPrdPromptFromText({ productName, moduleName, details });
         const defaultModel = model || getDefaultModel(targetProvider);
 
-        sendSSE('phase', { phase: 'generating', message: 'Generating comprehensive PRD document...' });
+        sendSSE('phase', {
+          phase: 'generating',
+          message: 'Generating comprehensive PRD document...',
+        });
 
         let fullText = '';
         try {
@@ -951,8 +965,15 @@ export function createApiMiddleware(env) {
         }
 
         const rawBody = await readRequestBody(req);
-        const { url: targetUrl, email, password, focus, apiKey: requestApiKey, model, provider } =
-          JSON.parse(rawBody || '{}');
+        const {
+          url: targetUrl,
+          email,
+          password,
+          focus,
+          apiKey: requestApiKey,
+          model,
+          provider,
+        } = JSON.parse(rawBody || '{}');
 
         if (!targetUrl || targetUrl.trim().length < 4) {
           sendJson(res, 400, { error: 'Please provide a valid application URL to explore.' });
@@ -981,7 +1002,10 @@ export function createApiMiddleware(env) {
 
         let fullText = '';
         try {
-          sendSSE('phase', { phase: 'crawling', message: 'Exploring application & inspecting UI hierarchies...' });
+          sendSSE('phase', {
+            phase: 'crawling',
+            message: 'Exploring application & inspecting UI hierarchies...',
+          });
 
           const crawlReport = await crawlWebApp({
             url: targetUrl,
@@ -999,7 +1023,10 @@ export function createApiMiddleware(env) {
           const prompt = buildPrdPromptFromCrawl(crawlReport);
           const defaultModel = model || getDefaultModel(targetProvider);
 
-          sendSSE('phase', { phase: 'generating', message: 'Generating comprehensive PRD document...' });
+          sendSSE('phase', {
+            phase: 'generating',
+            message: 'Generating comprehensive PRD document...',
+          });
 
           await generatePrdStream({
             apiKey,
@@ -1069,7 +1096,8 @@ export function createApiMiddleware(env) {
           const safeName = `${fileName.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
 
           res.writeHead(200, {
-            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition': `attachment; filename="${safeName}"`,
             'Content-Length': buffer.length,
           });

@@ -60,9 +60,10 @@ export function PrdGeneratorPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isSavingToKb, setIsSavingToKb] = useState(false);
-  const [savedKbFile, setSavedKbFile] = useState<{ file: KnowledgeFile; chunkCount: number } | null>(
-    null
-  );
+  const [savedKbFile, setSavedKbFile] = useState<{
+    file: KnowledgeFile;
+    chunkCount: number;
+  } | null>(null);
 
   const prdEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -576,7 +577,10 @@ export function PrdGeneratorPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-1">
-                      Login Email <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">(optional)</span>
+                      Login Email{' '}
+                      <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">
+                        (optional)
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -589,7 +593,10 @@ export function PrdGeneratorPage() {
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-1">
-                      Password <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">(optional)</span>
+                      Password{' '}
+                      <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">
+                        (optional)
+                      </span>
                     </label>
                     <div className="relative">
                       <input
@@ -604,7 +611,11 @@ export function PrdGeneratorPage() {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -612,7 +623,10 @@ export function PrdGeneratorPage() {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-1">
-                    Module / Focus Area <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">(optional)</span>
+                    Module / Focus Area{' '}
+                    <span className="text-[10px] lowercase font-normal text-[var(--text-muted)]">
+                      (optional)
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -629,7 +643,8 @@ export function PrdGeneratorPage() {
                     <span>Safe Headless Exploration</span>
                   </div>
                   <p>
-                    ForgeQA navigates up to 20 internal pages, maps form elements, buttons, and user flows. Credentials are used only in memory and never persisted.
+                    ForgeQA navigates up to 20 internal pages, maps form elements, buttons, and user
+                    flows. Credentials are used only in memory and never persisted.
                   </p>
                 </div>
 
@@ -662,13 +677,19 @@ export function PrdGeneratorPage() {
             </h4>
             <ol className="text-xs text-[var(--text-muted)] space-y-2 list-decimal list-inside leading-relaxed">
               <li>
-                <strong className="text-[var(--text-primary)]">Review & Export</strong>: Download in Markdown (.md), PDF, or Word (.docx).
+                <strong className="text-[var(--text-primary)]">Review & Export</strong>: Download in
+                Markdown (.md), PDF, or Word (.docx).
               </li>
               <li>
-                <strong className="text-[var(--text-primary)]">Send to Knowledge Base</strong>: Indexes the PRD into vector chunks automatically.
+                <strong className="text-[var(--text-primary)]">Send to Knowledge Base</strong>:
+                Indexes the PRD into vector chunks automatically.
               </li>
               <li>
-                <strong className="text-[var(--text-primary)]">Automation Studio</strong>: Go to <Link to="/generator" className="text-[var(--accent)] underline font-medium">Generator</Link> to create app-aware test suites referencing this PRD.
+                <strong className="text-[var(--text-primary)]">Automation Studio</strong>: Go to{' '}
+                <Link to="/generator" className="text-[var(--accent)] underline font-medium">
+                  Generator
+                </Link>{' '}
+                to create app-aware test suites referencing this PRD.
               </li>
             </ol>
           </Card>
@@ -686,7 +707,9 @@ export function PrdGeneratorPage() {
                 </h3>
                 {currentPhase && (
                   <div className="flex items-center gap-2 mt-1 text-xs text-[var(--text-muted)]">
-                    {isGenerating && <span className="inline-block w-2 h-2 rounded-full bg-cyan-500 animate-ping" />}
+                    {isGenerating && (
+                      <span className="inline-block w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
+                    )}
                     <span className="font-medium text-[var(--accent)]">{currentPhase.message}</span>
                   </div>
                 )}
@@ -755,7 +778,11 @@ export function PrdGeneratorPage() {
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] transition-all cursor-pointer"
                     title="Copy Markdown"
                   >
-                    {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                    {isCopied ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-500" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                     <span>{isCopied ? 'Copied' : 'Copy'}</span>
                   </button>
                 </div>
@@ -770,7 +797,8 @@ export function PrdGeneratorPage() {
                   <div>
                     <p className="font-bold">Successfully saved to Knowledge Base!</p>
                     <p className="text-[11px] opacity-90">
-                      Created document <strong>{savedKbFile.file.file_name}</strong> ({savedKbFile.chunkCount} searchable vector chunks).
+                      Created document <strong>{savedKbFile.file.file_name}</strong> (
+                      {savedKbFile.chunkCount} searchable vector chunks).
                     </p>
                   </div>
                 </div>
@@ -804,49 +832,70 @@ export function PrdGeneratorPage() {
 
                     if (trimmed.startsWith('# ')) {
                       return (
-                        <h1 key={idx} className="text-xl font-extrabold text-[var(--text-primary)] pt-3 pb-1 border-b border-[var(--border-subtle)]">
+                        <h1
+                          key={idx}
+                          className="text-xl font-extrabold text-[var(--text-primary)] pt-3 pb-1 border-b border-[var(--border-subtle)]"
+                        >
                           {trimmed.replace(/^#\s+/, '')}
                         </h1>
                       );
                     }
                     if (trimmed.startsWith('## ')) {
                       return (
-                        <h2 key={idx} className="text-base font-bold text-[var(--accent)] pt-4 pb-1 border-b border-[var(--border-subtle)]/50">
+                        <h2
+                          key={idx}
+                          className="text-base font-bold text-[var(--accent)] pt-4 pb-1 border-b border-[var(--border-subtle)]/50"
+                        >
                           {trimmed.replace(/^##\s+/, '')}
                         </h2>
                       );
                     }
                     if (trimmed.startsWith('### ')) {
                       return (
-                        <h3 key={idx} className="text-sm font-semibold text-[var(--text-primary)] pt-2">
+                        <h3
+                          key={idx}
+                          className="text-sm font-semibold text-[var(--text-primary)] pt-2"
+                        >
                           {trimmed.replace(/^###\s+/, '')}
                         </h3>
                       );
                     }
                     if (trimmed.startsWith('#### ')) {
                       return (
-                        <h4 key={idx} className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] pt-2">
+                        <h4
+                          key={idx}
+                          className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] pt-2"
+                        >
                           {trimmed.replace(/^####\s+/, '')}
                         </h4>
                       );
                     }
                     if (/^[-*+]\s+/.test(trimmed)) {
                       return (
-                        <li key={idx} className="ml-4 list-disc text-xs sm:text-sm text-[var(--text-secondary)]">
+                        <li
+                          key={idx}
+                          className="ml-4 list-disc text-xs sm:text-sm text-[var(--text-secondary)]"
+                        >
                           {renderFormattedText(trimmed.replace(/^[-*+]\s+/, ''))}
                         </li>
                       );
                     }
                     if (/^\d+\.\s+/.test(trimmed)) {
                       return (
-                        <li key={idx} className="ml-4 list-decimal text-xs sm:text-sm text-[var(--text-secondary)]">
+                        <li
+                          key={idx}
+                          className="ml-4 list-decimal text-xs sm:text-sm text-[var(--text-secondary)]"
+                        >
                           {renderFormattedText(trimmed.replace(/^\d+\.\s+/, ''))}
                         </li>
                       );
                     }
                     if (trimmed.startsWith('> ')) {
                       return (
-                        <blockquote key={idx} className="pl-3 py-1 border-l-2 border-[var(--accent)] text-xs italic text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-r">
+                        <blockquote
+                          key={idx}
+                          className="pl-3 py-1 border-l-2 border-[var(--accent)] text-xs italic text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-r"
+                        >
                           {renderFormattedText(trimmed.replace(/^>\s+/, ''))}
                         </blockquote>
                       );
@@ -867,7 +916,9 @@ export function PrdGeneratorPage() {
                   <div>
                     <p className="font-semibold text-[var(--text-primary)]">No PRD Generated Yet</p>
                     <p className="text-xs max-w-sm mt-1">
-                      Choose <strong>Describe Product</strong> to paste requirements or <strong>Explore from URL</strong> to let ForgeQA crawl your live web application.
+                      Choose <strong>Describe Product</strong> to paste requirements or{' '}
+                      <strong>Explore from URL</strong> to let ForgeQA crawl your live web
+                      application.
                     </p>
                   </div>
                 </div>

@@ -675,7 +675,9 @@ export function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  aria-label={
+                    showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
+                  }
                   className="absolute right-0 top-0 cursor-pointer"
                   style={{ color: 'var(--graphite)' }}
                 >
