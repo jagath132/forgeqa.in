@@ -6,6 +6,7 @@ import { AuthPage } from './pages/AuthPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { CompleteRegistrationPage } from './pages/CompleteRegistrationPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { PrdGeneratorPage } from './pages/PrdGeneratorPage';
 import { GeneratorPage } from './pages/GeneratorPage';
 import { TestScripts } from './pages/TestScripts';
 import { KnowledgeBase } from './pages/KnowledgeBase';
@@ -37,6 +38,7 @@ function AppLayout() {
   useEffect(() => {
     const titles: Record<string, string> = {
       '/dashboard': 'Dashboard — ForgeQA',
+      '/prd-generator': 'PRD Generator — ForgeQA',
       '/generator': 'Generator — ForgeQA',
       '/test-scripts': 'Test Scripts — ForgeQA',
       '/knowledge': 'Knowledge Base — ForgeQA',
@@ -55,6 +57,7 @@ function AppLayout() {
           <div ref={contentRef} className="flex-1 px-4 py-6 lg:px-8 lg:py-8 overflow-y-auto">
             <Routes>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/prd-generator" element={<PrdGeneratorPage />} />
               <Route path="/generator" element={<GeneratorPage />} />
               <Route path="/test-scripts" element={<TestScripts />} />
               <Route path="/knowledge" element={<KnowledgeBase />} />
@@ -199,7 +202,12 @@ export default function App() {
     };
   }, []);
 
-  if (window.location.pathname.startsWith('/reset-password/')) {
+  if (
+    location.pathname === '/reset-password' ||
+    location.pathname.startsWith('/reset-password/') ||
+    location.pathname === '/auth/reset-password' ||
+    location.pathname.startsWith('/auth/reset-password/')
+  ) {
     return <ResetPasswordPage />;
   }
 

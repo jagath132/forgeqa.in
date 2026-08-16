@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForgeQA — Market Research & Competitive Analysis</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0d14;
+            --bg-secondary: #121824;
+            --bg-card: rgba(22, 30, 46, 0.7);
+            --bg-card-hover: rgba(30, 41, 64, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(56, 189, 248, 0.3);
+            
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            
+            --accent-cyan: #38bdf8;
+            --accent-purple: #c084fc;
+            --accent-green: #4ade80;
+            --accent-red: #f87171;
+            --accent-yellow: #facc15;
+            
+            --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+            --shadow-glow: 0 0 25px rgba(56, 189, 248, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header Section */
+        header {
+            text-align: center;
+            padding: 3rem 1.5rem;
+            margin-bottom: 2.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            box-shadow: var(--shadow-glow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 2px;
+            background: var(--gradient-primary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            margin-bottom: 1.25rem;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.75rem;
+            font-weight: 800;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            max-width: 750px;
+            margin: 0 auto;
+        }
+
+        /* Section Styling */
+        section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title span {
+            color: var(--accent-cyan);
+        }
+
+        /* Executive Summary Card */
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid var(--accent-cyan);
+            border-radius: 14px;
+            padding: 1.75rem 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .summary-card p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        /* Competitor Matrix Table */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 1.1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: middle;
+        }
+
+        th {
+            background: rgba(18, 24, 36, 0.9);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        th.highlight-col {
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--accent-cyan);
+            border-bottom: 2px solid var(--accent-cyan);
+        }
+
+        td.highlight-col {
+            background: rgba(56, 189, 248, 0.04);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Status Tags */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.65rem;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .tag-success {
+            background: rgba(74, 222, 128, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+
+        .tag-danger {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+        }
+
+        .tag-warning {
+            background: rgba(250, 204, 21, 0.12);
+            color: var(--accent-yellow);
+            border: 1px solid rgba(250, 204, 21, 0.25);
+        }
+
+        /* Grid Layout for Cards */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 640px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-highlight);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .vs-box {
+            margin-top: 1rem;
+            padding: 0.85rem 1rem;
+            background: rgba(56, 189, 248, 0.06);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .vs-box strong {
+            color: var(--accent-cyan);
+        }
+
+        /* Feature Differentiators List */
+        .feature-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid rgba(56, 189, 248, 0.25);
+        }
+
+        .feature-card h3 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Positioning Statement Callout */
+        .callout-quote {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(192, 132, 252, 0.1) 100%);
+            border: 1px solid rgba(192, 132, 252, 0.3);
+            border-radius: 16px;
+            padding: 2rem 2.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .callout-quote blockquote {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+            line-height: 1.7;
+            font-style: italic;
+        }
+
+        .callout-quote span {
+            color: var(--accent-cyan);
+            font-style: normal;
+            font-weight: 700;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <header>
+        <div class="badge">Strategic Market Intelligence</div>
+        <h1>ForgeQA Competitive Analysis</h1>
+        <p>A comprehensive market research breakdown comparing ForgeQA against leading AI QA automation platforms in 2026.</p>
+    </header>
+
+    <!-- Executive Summary -->
+    <section>
+        <h2 class="section-title"><span>📌</span> Executive Summary</h2>
+        <div class="summary-card">
+            <p>The <strong>AI Test Automation Market in 2026</strong> is rapidly transitioning from basic prompt wrappers to <strong>Agentic AI & Document-Grounded RAG Workflows</strong>. While legacy platforms (Katalon, mabl, testRigor) emphasize locked-in cloud execution grids, <strong>ForgeQA</strong> uniquely bridges the gap between institutional domain knowledge, 100% open code export (Playwright/Cypress), multi-LLM choice, and zero vendor lock-in.</p>
+        </div>
+    </section>
+
+    <!-- Competitor Matrix -->
+    <section>
+        <h2 class="section-title"><span>📊</span> Competitor Matrix & Feature Comparison</h2>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Capability</th>
+                        <th class="highlight-col">⚡ ForgeQA</th>
+                        <th>Katalon AI</th>
+                        <th>mabl</th>
+                        <th>testRigor</th>
+                        <th>LambdaTest KaneAI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Domain RAG Ingestion</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">✔ PDF, DOCX, OCR, Specs</span></td>
+                        <td><span class="tag tag-danger">✖ No</span></td>
+                        <td><span class="tag tag-danger">✖ No</span></td>
+                        <td><span class="tag tag-danger">✖ No</span></td>
+                        <td><span class="tag tag-danger">✖ No</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Multi-LLM Selection</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">✔ 6 AI Providers</span></td>
+                        <td><span class="tag tag-danger">✖ Fixed Proprietary</span></td>
+                        <td><span class="tag tag-danger">✖ Fixed Proprietary</span></td>
+                        <td><span class="tag tag-danger">✖ Fixed Model</span></td>
+                        <td><span class="tag tag-danger">✖ Fixed LLM</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Code Ownership</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">✔ 100% Native Code</span></td>
+                        <td><span class="tag tag-warning">⚠ Proprietary Script</span></td>
+                        <td><span class="tag tag-danger">✖ Cloud Runner Only</span></td>
+                        <td><span class="tag tag-danger">✖ Plain English Only</span></td>
+                        <td><span class="tag tag-warning">⚠ Platform Grid</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Supported Frameworks</strong></td>
+                        <td class="highlight-col">Playwright, Cypress, Selenium, Appium</td>
+                        <td>Katalon Engine</td>
+                        <td>mabl SaaS Engine</td>
+                        <td>testRigor Engine</td>
+                        <td>LambdaTest Grid</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Languages</strong></td>
+                        <td class="highlight-col">TS, JS, Python, Java, C#</td>
+                        <td>Groovy, Java</td>
+                        <td>Proprietary</td>
+                        <td>Plain English</td>
+                        <td>JS, Python</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Build Regression</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">✔ Direct APK / ZIP</span></td>
+                        <td><span class="tag tag-warning">⚠ Web Grid</span></td>
+                        <td><span class="tag tag-warning">⚠ Web URL Only</span></td>
+                        <td><span class="tag tag-warning">⚠ Web UI Only</span></td>
+                        <td><span class="tag tag-warning">⚠ Cloud Grid</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>API Key Encryption</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">✔ AES-256-GCM</span></td>
+                        <td><span class="tag tag-danger">✖ N/A</span></td>
+                        <td><span class="tag tag-danger">✖ N/A</span></td>
+                        <td><span class="tag tag-danger">✖ N/A</span></td>
+                        <td><span class="tag tag-danger">✖ N/A</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pricing</strong></td>
+                        <td class="highlight-col"><span class="tag tag-success">Freemium + ₹999/mo</span></td>
+                        <td>$2,000+/mo</td>
+                        <td>$1,500+/mo</td>
+                        <td>$900+/mo</td>
+                        <td>Usage-Based Grid</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- In-Depth Competitor Breakdown -->
+    <section>
+        <h2 class="section-title"><span>🔍</span> Detailed Competitor Breakdown</h2>
+        <div class="grid-2">
+            <!-- Katalon -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Katalon (Katalon Studio & TestOps)</h3>
+                    <span class="tag tag-warning">Legacy Leader</span>
+                </div>
+                <p><strong>Strengths:</strong> Rich object repository, wide UI recorder coverage for web and mobile.</p>
+                <p><strong>Weaknesses:</strong> Heavy system resource consumption, locked into Katalon's Groovy-based engine, high price tag ($2400+/yr per seat).</p>
+                <div class="vs-box">
+                    <strong>ForgeQA Edge:</strong> Generates lightweight native TypeScript/Python Playwright scripts directly from PRD docs without IDE bloat.
+                </div>
+            </div>
+
+            <!-- mabl -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">mabl</h3>
+                    <span class="tag tag-warning">Low-Code SaaS</span>
+                </div>
+                <p><strong>Strengths:</strong> Cloud-native visual recorder, automated visual regression, low-code authoring.</p>
+                <p><strong>Weaknesses:</strong> Severe vendor lock-in. Generated tests cannot be exported as standard code to run on self-hosted CI/CD runners.</p>
+                <div class="vs-box">
+                    <strong>ForgeQA Edge:</strong> 100% open code ownership. Copy or download scripts to run freely anywhere (GitHub Actions, Jenkins, local).
+                </div>
+            </div>
+
+            <!-- testRigor -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">testRigor</h3>
+                    <span class="tag tag-warning">Plain-English AI</span>
+                </div>
+                <p><strong>Strengths:</strong> Enables non-technical manual QAs to write automation in natural language.</p>
+                <p><strong>Weaknesses:</strong> Does not generate actual code files. Complex edge cases or custom logic are difficult to express in plain English syntax.</p>
+                <div class="vs-box">
+                    <strong>ForgeQA Edge:</strong> Provides both structured manual test case specs and production-grade developer automation code.
+                </div>
+            </div>
+
+            <!-- LambdaTest KaneAI -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">LambdaTest KaneAI</h3>
+                    <span class="tag tag-warning">Cloud Grid Agent</span>
+                </div>
+                <p><strong>Strengths:</strong> Generates tests via natural language prompts directly on cloud browser instances.</p>
+                <p><strong>Weaknesses:</strong> Lacks document RAG ingestion to ground test generation in deep domain specifications and user story context.</p>
+                <div class="vs-box">
+                    <strong>ForgeQA Edge:</strong> Integrated RAG engine parses complex PRDs, architecture PDFs, and wireframe screenshots before generating tests.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Differentiators -->
+    <section>
+        <h2 class="section-title"><span>⚡</span> What Makes ForgeQA Unique?</h2>
+        <div class="grid-3">
+            <div class="card feature-card">
+                <div class="feature-icon">📄</div>
+                <h3>1. Document-Grounded RAG Pipeline</h3>
+                <p>Upload PRDs, SRS docs, Excel specs, or UI screenshots (via Tesseract.js OCR). ForgeQA extracts domain context to prevent hallucinated test cases.</p>
+            </div>
+
+            <div class="card feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>2. 6-in-1 Multi-LLM Provider Freedom</h3>
+                <p>Switch dynamically between Gemini 2.0, GPT-4o, Claude 3.5, Groq LLaMA, OpenRouter, and OpenCode with AES-256-GCM encrypted BYO keys.</p>
+            </div>
+
+            <div class="card feature-card">
+                <div class="feature-icon">💻</div>
+                <h3>3. 100% Code Ownership</h3>
+                <p>Outputs clean, human-readable Playwright, Cypress, Selenium, or Appium scripts in TS, JS, Python, Java, or C# with 0 vendor lock-in.</p>
+            </div>
+
+            <div class="card feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>4. Complete End-to-End QA Lifecycle</h3>
+                <p>Unified workflow: Document RAG ➔ AI Test Cases ➔ Suite Organization ➔ Script Compilation ➔ APK/ZIP Build Artifact Regression.</p>
+            </div>
+
+            <div class="card feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>5. Accessible & Transparent Pricing</h3>
+                <p>Self-serve freemium tier with Pro starting at ₹999/mo ($12/mo), making enterprise-grade QA AI accessible to startups and dev teams.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Strategic Positioning Statement -->
+    <section>
+        <h2 class="section-title"><span>🎯</span> Strategic Positioning Statement</h2>
+        <div class="callout-quote">
+            <blockquote>
+                "For QA Teams, Developers, and Product Leaders who require comprehensive test coverage without spending weeks writing manual scripts or being trapped in high-cost vendor ecosystems — <span>ForgeQA</span> delivers <strong>RAG document-grounded AI test generation</strong> and <strong>100% open Playwright/Cypress code export</strong> with zero vendor lock-in."
+            </blockquote>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        ForgeQA Product Strategy & Market Research Report • Generated July 2026
+    </footer>
+</div>
+
+</body>
+</html>

@@ -3,9 +3,9 @@ import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  // Ensure critical secrets are on process.env for server-side modules
   for (const key of [
     'RESEND_API_KEY',
+    'RESEND_FROM',
     'JWT_SECRET',
     'ENCRYPTION_SECRET',
     'MONGO_URI',
@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     'STRIPE_ENTERPRISE_PRICE_ID',
     'VITE_SENTRY_DSN',
   ]) {
-    if (env[key]) process.env[key] ??= env[key];
+    if (env[key]) process.env[key] = env[key];
   }
 
   // Cache the API middleware so we don't re-import + rebuild on every request in dev

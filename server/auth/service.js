@@ -7,7 +7,12 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 const REFRESH_EXPIRES_IN = process.env.REFRESH_EXPIRES_IN || '7d';
 
 function getJwtSecret() {
-  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
+  if (!process.env.JWT_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    return 'forgeqa_dev_jwt_secret_key_change_in_production_2026';
+  }
   return process.env.JWT_SECRET;
 }
 
@@ -16,8 +21,12 @@ function hashToken(token) {
 }
 
 function getEncryptionSecret() {
-  if (!process.env.ENCRYPTION_SECRET)
-    throw new Error('ENCRYPTION_SECRET environment variable is required');
+  if (!process.env.ENCRYPTION_SECRET) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_SECRET environment variable is required');
+    }
+    return 'forgeqa_dev_encryption_secret_key_32bytes_min';
+  }
   return process.env.ENCRYPTION_SECRET;
 }
 

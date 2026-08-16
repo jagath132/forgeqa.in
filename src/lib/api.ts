@@ -372,3 +372,46 @@ export async function createCheckoutSession(data: {
   const res = await api.post<{ url: string }>('/api/payments/create-checkout', data);
   return res.data;
 }
+
+export type PrdFromTextRequest = {
+  productName?: string;
+  moduleName?: string;
+  details: string;
+  provider?: AiProvider;
+  model?: string;
+  apiKey?: string;
+};
+
+export type PrdFromUrlRequest = {
+  url: string;
+  email?: string;
+  password?: string;
+  focus?: string;
+  provider?: AiProvider;
+  model?: string;
+  apiKey?: string;
+};
+
+export type PrdSaveToKbResponse = {
+  ok: boolean;
+  file: KnowledgeFile;
+  chunkCount: number;
+};
+
+export async function savePrdToKnowledge(data: {
+  prdText: string;
+  fileName?: string;
+}): Promise<PrdSaveToKbResponse> {
+  const res = await api.post<PrdSaveToKbResponse>('/api/prd/save-to-knowledge', data);
+  return res.data;
+}
+
+export async function exportPrdAsDocx(prdText: string, fileName?: string): Promise<Blob> {
+  const res = await api.post(
+    '/api/prd/export',
+    { prdText, fileName },
+    { responseType: 'blob' }
+  );
+  return res.data;
+}
+

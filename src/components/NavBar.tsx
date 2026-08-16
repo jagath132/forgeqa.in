@@ -8,6 +8,7 @@ import { UserProfile } from './UserProfile';
 import { GlobalSearch } from './GlobalSearch';
 import {
   DashboardIcon3D,
+  PrdIcon3D,
   GeneratorIcon3D,
   ScriptsIcon3D,
   KnowledgeIcon3D,
@@ -70,6 +71,13 @@ const NAV_ITEMS_BUILD: NavItem[] = [
     path: '/dashboard',
     icon: <DashboardIcon3D size={18} />,
     color: 'violet',
+  },
+  {
+    key: 'prd-generator',
+    label: 'PRD Generator',
+    path: '/prd-generator',
+    icon: <PrdIcon3D size={18} />,
+    color: 'cyan',
   },
   {
     key: 'generator',

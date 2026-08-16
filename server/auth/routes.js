@@ -195,18 +195,34 @@ async function handleForgotPassword(req, res, body) {
   }
 
   const user = await authStore.findUserByEmail(email);
-  if (user) {
-    const resetToken = await authStore.createPasswordResetToken(email);
-    if (resetToken) {
-      const baseUrl = process.env.APP_URL || 'http://127.0.0.1:5173';
-      const resetUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
-      await sendPasswordResetEmail(email, resetUrl);
-    }
+  if (!user) {
+    sendJson(res, 404, {
+      error: 'No account found with this email address. Please check your spelling or register a new account.',
+    });
+    return;
+  }
+
+  const resetToken = await authStore.createPasswordResetToken(email);
+  if (!resetToken) {
+    sendJson(res, 500, { error: 'Unable to generate password reset token. Please try again.' });
+    return;
+  }
+
+  const origin =
+    req.headers.origin ||
+    (req.headers.referer ? new URL(req.headers.referer).origin : null);
+  const baseUrl = origin || process.env.APP_URL || 'http://127.0.0.1:5173';
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+  const sent = await sendPasswordResetEmail(email, resetUrl);
+  if (!sent) {
+    sendJson(res, 500, {
+      error: 'Failed to send password reset email. Please ensure your email service is configured.',
+    });
+    return;
   }
 
   sendJson(res, 200, {
-    message:
-      'If this email is registered, a password reset link has been sent. Please check your inbox and follow the instructions to reset your password.',
+    message: `A password reset link has been sent to ${email}. Please check your inbox.`,
   });
 }
 

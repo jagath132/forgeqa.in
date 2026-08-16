@@ -45,6 +45,35 @@ export function DashboardIcon3D({ size = 20, className = '' }: Icon3DProps) {
   );
 }
 
+export function PrdIcon3D({ size = 20, className = '' }: Icon3DProps) {
+  return (
+    <IconContainer size={size} className={className}>
+      <path
+        d="M4 4C4 2.89543 4.89543 2 6 2H14L20 8V20C20 21.1046 19.1046 22 18 22H6C4.89543 22 4 21.1046 4 20V4Z"
+        fill="currentColor"
+        opacity="0.15"
+      />
+      <path
+        d="M4 4C4 2.89543 4.89543 2 6 2H14L20 8V20C20 21.1046 19.1046 22 18 22H6C4.89543 22 4 21.1046 4 20V4Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path
+        d="M8 12H16M8 16H13"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M17 14L18 16.5L20.5 17.5L18 18.5L17 21L16 18.5L13.5 17.5L16 16.5L17 14Z"
+        fill="var(--accent-cyan, #06b6d4)"
+        opacity="0.9"
+      />
+    </IconContainer>
+  );
+}
+
 export function GeneratorIcon3D({ size = 20, className = '' }: Icon3DProps) {
   return (
     <IconContainer size={size} className={className}>

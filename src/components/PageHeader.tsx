@@ -37,6 +37,14 @@ const pageMeta: Record<
     badgeClass: 'badge-cyan',
     gradient: 'var(--gradient-cyan)',
   },
+  'prd-generator': {
+    title: 'PRD Generator',
+    description:
+      'Generate structured Product Requirements Documents and push directly to Knowledge Base for RAG test synthesis.',
+    badge: 'PRD Studio',
+    badgeClass: 'badge-cyan',
+    gradient: 'var(--gradient-cyan)',
+  },
   'ai-settings': {
     title: 'Provider Configuration',
     description:

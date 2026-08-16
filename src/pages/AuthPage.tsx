@@ -340,6 +340,16 @@ export function AuthPage() {
                     Try again in {formatCountdown(lockoutCountdown)}
                   </span>
                 )}
+                {mode === 'forgot' && error.toLowerCase().includes('no account') && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/register')}
+                    className="mt-2.5 flex items-center gap-1 text-xs font-bold underline cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--accent, #2563eb)' }}
+                  >
+                    Click here to create a new account &rarr;
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -610,14 +620,32 @@ export function AuthPage() {
               {mode === 'forgot' && (
                 <button
                   type="submit"
-                  disabled={isLoading || !email}
-                  className="w-full py-2.5 text-sm font-semibold rounded-xl transition-all cursor-pointer"
+                  disabled={isLoading || !email || !isValidEmail}
+                  className="w-full py-2.5 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: 'var(--ink)', color: 'var(--paper)', border: 'none' }}
                 >
                   {isLoading ? (
-                    <span className="h-4 w-4 rounded-full border-2 border-[var(--paper)] border-t-transparent animate-spin" />
+                    <>
+                      <span className="h-4 w-4 rounded-full border-2 border-[var(--paper)] border-t-transparent animate-spin shrink-0" />
+                      <span>Sending Reset Link...</span>
+                    </>
                   ) : (
-                    'Send Reset Link'
+                    <>
+                      <svg
+                        className="h-4 w-4 shrink-0"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"
+                        />
+                      </svg>
+                      <span>Send Reset Link</span>
+                    </>
                   )}
                 </button>
               )}

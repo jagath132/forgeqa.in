@@ -2,7 +2,12 @@ import jwt from "jsonwebtoken";
 import { adminStore } from "./store.js";
 
 function getJwtSecret() {
-  if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is required");
+  if (!process.env.JWT_SECRET) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET is required");
+    }
+    return "forgeqa_dev_jwt_secret_key_change_in_production_2026";
+  }
   return process.env.JWT_SECRET;
 }
 

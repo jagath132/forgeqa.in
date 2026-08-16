@@ -14,6 +14,13 @@ import { generateWithOpenAI, generateWithOpenAIStream } from './ai/openai.js';
 import { generateTestScript } from './test-scripts/generator.js';
 import { generateRegressionTestCases } from './regression/generator.js';
 import { generateRegressionScripts } from './regression/scripts.js';
+import { crawlWebApp } from './prd/crawler.js';
+import {
+  buildPrdPromptFromText,
+  buildPrdPromptFromCrawl,
+  generatePrdStream,
+} from './prd/generator.js';
+import { convertMarkdownToDocx } from './prd/export.js';
 import {
   storeBuildArtifact,
   getLatestBuild,
@@ -174,13 +181,16 @@ async function resolveApiKey(provider, requestApiKey, env, userId) {
     try {
       const dbKey = await authStore.getEncryptedApiKey(userId, provider);
       if (dbKey) {
-        return decryptApiKey(dbKey.encryptedKey, dbKey.iv, dbKey.authTag);
+        const decrypted = decryptApiKey(dbKey.encryptedKey, dbKey.iv, dbKey.authTag);
+        if (decrypted && decrypted.trim()) {
+          return decrypted.trim();
+        }
       }
     } catch (err) {
       console.error('Error retrieving API key from database:', err);
     }
   }
-  return env[providerEnvKeyMap[provider]] || '';
+  return env?.[providerEnvKeyMap[provider]] || process.env[providerEnvKeyMap[provider]] || '';
 }
 
 async function cleanupFiles(files = []) {
@@ -860,6 +870,213 @@ export function createApiMiddleware(env) {
         });
 
         sendJson(res, 200, result);
+        return;
+      }
+
+      // === PRD Generator endpoints ===
+
+      if (url.pathname === '/api/prd/generate-from-text' && req.method === 'POST') {
+        const { checkPlanLimit, incrementAiGenerations } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'aiGenerations', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
+
+        const rawBody = await readRequestBody(req);
+        const { productName, moduleName, details, apiKey: requestApiKey, model, provider } =
+          JSON.parse(rawBody || '{}');
+
+        if (!details || details.trim().length < 15) {
+          sendJson(res, 400, { error: 'Please provide at least 15 characters of product details.' });
+          return;
+        }
+
+        const targetProvider = provider || user.activeProvider || 'gemini';
+        const apiKey = await resolveApiKey(targetProvider, requestApiKey, env, user.id);
+        if (!apiKey) {
+          sendJson(res, 500, {
+            error: `Missing ${targetProvider} API key. Please configure it in Settings or env.`,
+          });
+          return;
+        }
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+
+        const sendSSE = (event, data) => {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+
+        sendSSE('phase', { phase: 'analyzing', message: 'Analyzing product context & requirements...' });
+
+        const prompt = buildPrdPromptFromText({ productName, moduleName, details });
+        const defaultModel = model || getDefaultModel(targetProvider);
+
+        sendSSE('phase', { phase: 'generating', message: 'Generating comprehensive PRD document...' });
+
+        let fullText = '';
+        try {
+          await generatePrdStream({
+            apiKey,
+            provider: targetProvider,
+            model: defaultModel,
+            prompt,
+            onToken: (token) => {
+              fullText += token;
+              sendSSE('token', { token });
+            },
+          });
+
+          await incrementAiGenerations(user.id);
+          sendSSE('complete', { prdText: fullText });
+        } catch (error) {
+          sendSSE('error', { error: error.message || 'PRD generation failed.' });
+        }
+
+        res.end();
+        return;
+      }
+
+      if (url.pathname === '/api/prd/generate-from-url' && req.method === 'POST') {
+        const { checkPlanLimit, incrementAiGenerations } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'aiGenerations', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
+
+        const rawBody = await readRequestBody(req);
+        const { url: targetUrl, email, password, focus, apiKey: requestApiKey, model, provider } =
+          JSON.parse(rawBody || '{}');
+
+        if (!targetUrl || targetUrl.trim().length < 4) {
+          sendJson(res, 400, { error: 'Please provide a valid application URL to explore.' });
+          return;
+        }
+
+        const targetProvider = provider || user.activeProvider || 'gemini';
+        const apiKey = await resolveApiKey(targetProvider, requestApiKey, env, user.id);
+        if (!apiKey) {
+          sendJson(res, 500, {
+            error: `Missing ${targetProvider} API key. Please configure it in Settings or env.`,
+          });
+          return;
+        }
+
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+
+        const sendSSE = (event, data) => {
+          res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        };
+
+        let fullText = '';
+        try {
+          sendSSE('phase', { phase: 'crawling', message: 'Exploring application & inspecting UI hierarchies...' });
+
+          const crawlReport = await crawlWebApp({
+            url: targetUrl,
+            email,
+            password,
+            focus,
+            maxPages: 20,
+          });
+
+          sendSSE('phase', {
+            phase: 'analyzing',
+            message: `Discovered ${crawlReport.totalPagesExplored} pages. Synthesizing features & flows...`,
+          });
+
+          const prompt = buildPrdPromptFromCrawl(crawlReport);
+          const defaultModel = model || getDefaultModel(targetProvider);
+
+          sendSSE('phase', { phase: 'generating', message: 'Generating comprehensive PRD document...' });
+
+          await generatePrdStream({
+            apiKey,
+            provider: targetProvider,
+            model: defaultModel,
+            prompt,
+            onToken: (token) => {
+              fullText += token;
+              sendSSE('token', { token });
+            },
+          });
+
+          await incrementAiGenerations(user.id);
+          sendSSE('complete', { prdText: fullText, crawlReport });
+        } catch (error) {
+          sendSSE('error', { error: error.message || 'URL exploration & PRD generation failed.' });
+        }
+
+        res.end();
+        return;
+      }
+
+      if (url.pathname === '/api/prd/save-to-knowledge' && req.method === 'POST') {
+        const rawBody = await readRequestBody(req);
+        const { prdText, fileName } = JSON.parse(rawBody || '{}');
+
+        if (!prdText || !prdText.trim()) {
+          sendJson(res, 400, { error: 'PRD text is empty.' });
+          return;
+        }
+
+        const safeFileName = fileName
+          ? `${fileName.replace(/\.md$/i, '')}.md`
+          : `PRD-${new Date().toISOString().slice(0, 10)}.md`;
+
+        try {
+          const file = await knowledge.saveExtractedKnowledge(
+            {
+              fileName: safeFileName,
+              fileType: 'txt',
+              sourceType: 'upload',
+              text: prdText,
+              pageCount: 1,
+            },
+            user.id
+          );
+
+          const refreshResult = await knowledge.refreshChunks(user.id);
+          sendJson(res, 200, { ok: true, file, chunkCount: refreshResult.chunkCount });
+        } catch (kbError) {
+          sendJson(res, 500, { error: kbError.message || 'Failed to save PRD to Knowledge Base.' });
+        }
+        return;
+      }
+
+      if (url.pathname === '/api/prd/export' && req.method === 'POST') {
+        const rawBody = await readRequestBody(req);
+        const { prdText, fileName = 'PRD' } = JSON.parse(rawBody || '{}');
+
+        if (!prdText || !prdText.trim()) {
+          sendJson(res, 400, { error: 'PRD text is empty.' });
+          return;
+        }
+
+        try {
+          const buffer = await convertMarkdownToDocx(prdText, fileName);
+          const safeName = `${fileName.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
+
+          res.writeHead(200, {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename="${safeName}"`,
+            'Content-Length': buffer.length,
+          });
+          res.end(buffer);
+        } catch (docxErr) {
+          sendJson(res, 500, { error: `DOCX generation failed: ${docxErr.message}` });
+        }
         return;
       }
 

@@ -34,6 +34,7 @@ export function createKnowledgeService(store, env = {}) {
   }
 
   return {
+    saveExtractedKnowledge,
     async processUpload(file, userId) {
       const parsed = await extractTextFromFile(file);
 

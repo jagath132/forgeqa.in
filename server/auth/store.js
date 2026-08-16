@@ -105,7 +105,16 @@ export const authStore = {
 
   async getEncryptedApiKey(userId, provider) {
     const db = getDb();
-    return db.collection('user_api_keys').findOne({ userId, provider });
+    const cleanUserId = String(userId || '');
+    let doc = await db.collection('user_api_keys').findOne({ userId: cleanUserId, provider });
+    if (!doc) {
+      try {
+        doc = await db.collection('user_api_keys').findOne({ userId: new ObjectId(cleanUserId), provider });
+      } catch {
+        // ignore
+      }
+    }
+    return doc;
   },
 
   async saveEncryptedApiKey(userId, provider, { encryptedKey, iv, authTag }) {
@@ -234,10 +243,16 @@ export const authStore = {
     const passwordHash = crypto
       .pbkdf2Sync(newPassword, salt, PBKDF2_ITERATIONS, 64, 'sha512')
       .toString('hex');
-    await db
-      .collection('users')
-      .updateOne({ _id: new ObjectId(user.id) }, { $set: { passwordHash, salt } });
-    await db.collection('password_reset_tokens').deleteOne({ userId: user.id });
+    let query;
+    try {
+      query = { _id: new ObjectId(user.id) };
+    } catch {
+      query = { _id: user.id };
+    }
+    await db.collection('users').updateOne(query, { $set: { passwordHash, salt } });
+    await db.collection('password_reset_tokens').deleteMany({
+      $or: [{ userId: user.id }, { userId: String(user._id || user.id) }],
+    });
     return user;
   },
 };

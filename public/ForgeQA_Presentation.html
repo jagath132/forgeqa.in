@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForgeQA — Built Platform Capabilities Presentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent: #0ea5e9;
+      --accent-purple: #8b5cf6;
+      --accent-green: #22c55e;
+      --accent-amber: #f59e0b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .presentation-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-purple));
+      border-radius: 6px;
+    }
+
+    .slide-counter {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--card-bg);
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .slides-wrapper {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .slide {
+      position: absolute;
+      width: 100%;
+      max-width: 1200px;
+      height: calc(100vh - 160px);
+      max-height: 675px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(20px) scale(0.98);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      background: rgba(14, 165, 233, 0.1);
+      border: 1px solid rgba(14, 165, 233, 0.3);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      margin-bottom: 0.75rem;
+      width: fit-content;
+    }
+
+    h1.slide-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      flex: 1;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      flex: 1;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .card.accent-border { border-color: var(--accent); }
+    .card.purple-border { border-color: var(--accent-purple); }
+    .card.green-border { border-color: var(--accent-green); }
+    .card.amber-border { border-color: var(--accent-amber); }
+
+    .card-header {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .list-items {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .list-items li {
+      font-size: 0.925rem;
+      color: var(--text);
+      line-height: 1.45;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .list-items li::before {
+      content: "•";
+      color: var(--accent);
+      font-weight: bold;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .title-slide-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-left: 4px solid var(--accent);
+      padding-left: 2rem;
+    }
+
+    .footer-bar {
+      margin-top: auto;
+      padding-top: 1rem;
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    @media print {
+      body { overflow: visible; }
+      .top-bar, .controls { display: none; }
+      .slide {
+        position: relative !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+        page-break-after: always;
+        height: 100vh !important;
+        max-height: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="presentation-container">
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-logo"></div>
+        ForgeQA.in Presentation
+      </div>
+      <div class="slide-counter" id="counter">Slide 1 of 8</div>
+      <div class="controls">
+        <button class="btn" id="prevBtn">← Prev</button>
+        <button class="btn" id="nextBtn">Next →</button>
+        <button class="btn" onclick="window.print()">🖨️ PDF</button>
+      </div>
+    </div>
+
+    <div class="slides-wrapper">
+
+      <!-- SLIDE 1 -->
+      <div class="slide active">
+        <div class="title-slide-content">
+          <div class="badge">ForgeQA Platform</div>
+          <h1 style="font-size: 3.5rem; margin-bottom: 0.5rem; color: var(--text);">ForgeQA</h1>
+          <h2 style="font-size: 1.75rem; color: var(--accent); margin-bottom: 1rem;">AI-Powered Test Generation & Automation Platform</h2>
+          <p style="font-size: 1.15rem; color: var(--muted); font-style: italic; margin-bottom: 2rem;">Turn Plain-Text Requirements into Categorized Test Cases, Code Scripts & Regression Runs</p>
+          <p style="font-size: 0.95rem; color: var(--text); max-width: 700px; line-height: 1.6;">
+            A simple, professional overview of the core features and capabilities built into the ForgeQA platform.
+          </p>
+        </div>
+        <div style="background: rgba(15,23,42,0.8); border: 1px solid var(--card-border); padding: 1rem 1.5rem; border-radius: 10px; margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--muted);">
+            <span><strong>Tech Stack:</strong> React 19, TypeScript, Node.js, Express, MongoDB, Zustand</span>
+            <span><strong>Website:</strong> https://forgeqa.in</span>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Built Features Presentation</span>
+          <span>Slide 1 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 2 -->
+      <div class="slide">
+        <div class="badge">Core Modules</div>
+        <h1 class="slide-title">Built Platform Modules</h1>
+        <div class="grid-3">
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">1. AI Test Generator</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Converts software requirements into structured test matrices with positive, negative, validation, and edge cases.</p>
+            <span style="font-size: 0.75rem; color: var(--accent); font-weight: 600;">Exports to Excel, PDF, DOCX</span>
+          </div>
+          <div class="card purple-border">
+            <div class="card-header" style="color: var(--accent-purple);">2. Script Code Generator</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Transforms test cases into executable automation code across 4 frameworks and 5 programming languages.</p>
+            <span style="font-size: 0.75rem; color: var(--accent-purple); font-weight: 600;">Playwright, Cypress, Selenium, Puppeteer</span>
+          </div>
+          <div class="card green-border">
+            <div class="card-header" style="color: var(--accent-green);">3. Multi-AI BYOK Engine</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Connect user-managed API keys for Gemini, OpenAI, Claude, Groq, OpenRouter, or OpenCode.</p>
+            <span style="font-size: 0.75rem; color: var(--accent-green); font-weight: 600;">Secure Per-User Storage</span>
+          </div>
+          <div class="card amber-border">
+            <div class="card-header" style="color: var(--accent-amber);">4. RAG Knowledge Base</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Upload PDF, Word, TXT, or SharePoint files. Semantic chunking grounds AI generation in company documentation.</p>
+            <span style="font-size: 0.75rem; color: var(--accent-amber); font-weight: 600;">Document Chunk Status Tracker</span>
+          </div>
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">5. Regression Engine</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Upload Web and Android (.apk) build artifacts, configure webhooks, and trigger regression test runs.</p>
+            <span style="font-size: 0.75rem; color: var(--accent); font-weight: 600;">Screenshot Fail Artifacts & Webhooks</span>
+          </div>
+          <div class="card purple-border">
+            <div class="card-header" style="color: var(--accent-purple);">6. Suites & License Control</div>
+            <p style="font-size: 0.875rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.75rem;">Organize suites, set case statuses (Draft, Reviewed, Approved), manage team roles, and shield IP.</p>
+            <span style="font-size: 0.75rem; color: var(--accent-purple); font-weight: 600;">Screen Capture Protection Included</span>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Module Overview</span>
+          <span>Slide 2 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 3 -->
+      <div class="slide">
+        <div class="badge">Test Matrix Generator</div>
+        <h1 class="slide-title">AI Test Case Generator (/generator)</h1>
+        <div class="grid-2">
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">Categorized Test Cases</div>
+            <ul class="list-items">
+              <li><strong>Positive Cases:</strong> Standard successful user paths</li>
+              <li><strong>Negative Cases:</strong> Error conditions & invalid inputs</li>
+              <li><strong>Validation Checks:</strong> Boundary lengths & format constraints</li>
+              <li><strong>Edge Cases:</strong> Unusual scenarios & extreme inputs</li>
+              <li><strong>Schema Fields:</strong> Test Case ID (TC_001...), Summary, Test Steps, Expected Result, Status</li>
+            </ul>
+          </div>
+          <div class="card green-border">
+            <div class="card-header" style="color: var(--accent-green);">Export & History Management</div>
+            <ul class="list-items">
+              <li><strong>Excel Export (.xlsx):</strong> Download structured spreadsheet matrices</li>
+              <li><strong>PDF Export (.pdf):</strong> Generate printable test specification documents</li>
+              <li><strong>Word Export (.docx):</strong> Download formatted Word documentation</li>
+              <li><strong>Persistent History:</strong> Stores up to 50 generation runs per user</li>
+              <li><strong>Quick Reload:</strong> Instant retrieval & deletion of historical runs</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Test Generator</span>
+          <span>Slide 3 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 4 -->
+      <div class="slide">
+        <div class="badge">Code Generator & BYOK</div>
+        <h1 class="slide-title">Multi-Framework Script Generator & AI Providers</h1>
+        <div class="grid-2">
+          <div class="card purple-border">
+            <div class="card-header" style="color: var(--accent-purple);">Frameworks & Languages</div>
+            <ul class="list-items">
+              <li><strong>Playwright:</strong> TypeScript, JavaScript, Python, Java, C#</li>
+              <li><strong>Cypress:</strong> JavaScript, TypeScript</li>
+              <li><strong>Selenium:</strong> Python, Java, JavaScript, TypeScript, C#</li>
+              <li><strong>Puppeteer:</strong> JavaScript, TypeScript</li>
+              <li><strong>Configuration:</strong> Target URL, Headless toggle, Viewport width/height</li>
+            </ul>
+          </div>
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">Bring Your Own Key (BYOK) AI</div>
+            <ul class="list-items">
+              <li><strong>Google Gemini:</strong> Gemini 2.0 Flash & Gemini 2.5 Flash</li>
+              <li><strong>OpenAI:</strong> GPT-4o & GPT models</li>
+              <li><strong>Anthropic:</strong> Claude 3.5 Sonnet</li>
+              <li><strong>Groq & OpenRouter:</strong> Fast cloud AI inference</li>
+              <li><strong>OpenCode / Local AI:</strong> Custom endpoint support</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Script Engine</span>
+          <span>Slide 4 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 5 -->
+      <div class="slide">
+        <div class="badge">Knowledge Base</div>
+        <h1 class="slide-title">RAG Knowledge Base & Document Processing (/knowledge)</h1>
+        <div class="grid-2">
+          <div class="card amber-border">
+            <div class="card-header" style="color: var(--accent-amber);">Supported Documents & Uploads</div>
+            <ul class="list-items">
+              <li><strong>PDF Documents (.pdf):</strong> Analyzed via server pdf-parse</li>
+              <li><strong>Word Files (.docx):</strong> Converted via Mammoth parser</li>
+              <li><strong>Text & Markdown (.txt, .md):</strong> Raw spec ingestion</li>
+              <li><strong>SharePoint Sync:</strong> Integration for shared team documents</li>
+              <li><strong>Image OCR:</strong> Tesseract.js image text extraction</li>
+            </ul>
+          </div>
+          <div class="card green-border">
+            <div class="card-header" style="color: var(--accent-green);">Semantic Chunking & AI Context</div>
+            <ul class="list-items">
+              <li><strong>Chunking Pipeline:</strong> Processing → Needs Chunking → Ready</li>
+              <li><strong>Relevance Scoring:</strong> Rank-scores chunks against input requirements</li>
+              <li><strong>Grounded Generation:</strong> AI references internal documentation during test creation</li>
+              <li><strong>File Storage:</strong> Document metadata & chunks stored in MongoDB</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Document RAG</span>
+          <span>Slide 5 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 6 -->
+      <div class="slide">
+        <div class="badge">Regression Engine</div>
+        <h1 class="slide-title">Automated Regression Testing Engine (/regression)</h1>
+        <div class="grid-3">
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">Build Artifact Uploads</div>
+            <ul class="list-items">
+              <li>Upload Web build zip files</li>
+              <li>Upload Android APK (.apk) builds</li>
+              <li>Track build version & file size</li>
+              <li>Store build history in storage</li>
+            </ul>
+          </div>
+          <div class="card purple-border">
+            <div class="card-header" style="color: var(--accent-purple);">Build Webhook Triggers</div>
+            <ul class="list-items">
+              <li>Webhook endpoint configuration</li>
+              <li>Auto-trigger runs on new builds</li>
+              <li>Select Web or Mobile platform</li>
+              <li>Integration with build scripts</li>
+            </ul>
+          </div>
+          <div class="card green-border">
+            <div class="card-header" style="color: var(--accent-green);">Run Execution & Logs</div>
+            <ul class="list-items">
+              <li>Statuses: Pending, Running, Passed, Failed</li>
+              <li>Actual vs Expected output logs</li>
+              <li>Screenshot failure artifacts</li>
+              <li>Execution completion metrics</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Regression Automation</span>
+          <span>Slide 6 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 7 -->
+      <div class="slide">
+        <div class="badge">Suites & Security</div>
+        <h1 class="slide-title">Test Suites, Team Roles & Security Protection</h1>
+        <div class="grid-3">
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">Test Suites (/suites)</div>
+            <ul class="list-items">
+              <li>Organize cases into custom suites</li>
+              <li>Color-coded badges & descriptions</li>
+              <li>Status tracking: Draft, Reviewed, Approved</li>
+            </ul>
+          </div>
+          <div class="card purple-border">
+            <div class="card-header" style="color: var(--accent-purple);">Team Roles & Product Keys</div>
+            <ul class="list-items">
+              <li>Product key activation system</li>
+              <li>Team Roles: Admin, Member, Viewer</li>
+              <li>User profiles & password updates</li>
+            </ul>
+          </div>
+          <div class="card amber-border">
+            <div class="card-header" style="color: var(--accent-amber);">Screen Capture Shield</div>
+            <ul class="list-items">
+              <li>Blocks PrintScreen & Win+Shift+S</li>
+              <li>Disables right-click context menu</li>
+              <li>Prevents image dragging & data snips</li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Governance & Security</span>
+          <span>Slide 7 of 8</span>
+        </div>
+      </div>
+
+      <!-- SLIDE 8 -->
+      <div class="slide">
+        <div class="badge">Architecture & Access</div>
+        <h1 class="slide-title">Tech Stack Summary & Platform Access</h1>
+        <div class="grid-2">
+          <div class="card accent-border">
+            <div class="card-header" style="color: var(--accent);">Full Technical Stack</div>
+            <ul class="list-items">
+              <li><strong>Frontend:</strong> React 19, TypeScript, Vite, TailwindCSS v4, Zustand, Framer Motion, Three.js hero scene</li>
+              <li><strong>Backend:</strong> Node.js (v24), Express API, MongoDB driver, JWT Auth with refresh cookie</li>
+              <li><strong>Parsers & Utilities:</strong> ExcelJS / XLSX, pdf-parse, Mammoth, Tesseract.js, Multer</li>
+            </ul>
+          </div>
+          <div class="card green-border" style="align-items: center; justify-content: center; text-align: center;">
+            <div style="font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem;">
+              ForgeQA Platform
+            </div>
+            <p style="font-size: 1rem; color: var(--accent-green); margin-bottom: 0.75rem;">
+              Website: https://forgeqa.in
+            </p>
+            <p style="font-size: 0.85rem; color: var(--muted);">
+              Server Command: <code>node server/index.js</code><br>Dev UI Command: <code>npm run dev</code>
+            </p>
+          </div>
+        </div>
+        <div class="footer-bar">
+          <span>ForgeQA Summary</span>
+          <span>Slide 8 of 8</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const counter = document.getElementById('counter');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    function updateSlides() {
+      slides.forEach((slide, idx) => {
+        if (idx === currentSlide) {
+          slide.classList.add('active');
+        } else {
+          slide.classList.remove('active');
+        }
+      });
+      counter.textContent = `Slide ${currentSlide + 1} of ${slides.length}`;
+      prevBtn.style.opacity = currentSlide === 0 ? '0.5' : '1';
+      nextBtn.style.opacity = currentSlide === slides.length - 1 ? '0.5' : '1';
+    }
+
+    prevBtn.addEventListener('click', () => {
+      if (currentSlide > 0) {
+        currentSlide--;
+        updateSlides();
+      }
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (currentSlide < slides.length - 1) {
+        currentSlide++;
+        updateSlides();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'Space') {
+        if (currentSlide < slides.length - 1) {
+          currentSlide++;
+          updateSlides();
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentSlide > 0) {
+          currentSlide--;
+          updateSlides();
+        }
+      }
+    });
+
+    updateSlides();
+  </script>
+</body>
+</html>
