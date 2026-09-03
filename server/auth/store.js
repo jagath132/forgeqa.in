@@ -1,8 +1,17 @@
 import crypto from 'node:crypto';
+import util from 'node:util';
 import { ObjectId } from 'mongodb';
 import { getDb } from '../db.js';
 
-const PBKDF2_ITERATIONS = 600000;
+const pbkdf2Async = util.promisify(crypto.pbkdf2);
+
+export const DEFAULT_PBKDF2_ITERATIONS = parseInt(process.env.PBKDF2_ITERATIONS || '210000', 10);
+export const LEGACY_PBKDF2_ITERATIONS = 600000;
+
+export async function hashPassword(password, salt, iterations = DEFAULT_PBKDF2_ITERATIONS) {
+  const buf = await pbkdf2Async(password, salt, iterations, 64, 'sha512');
+  return buf.toString('hex');
+}
 
 export const authStore = {
   async findUserByEmail(email) {
@@ -48,7 +57,7 @@ export const authStore = {
     return db.collection('users').countDocuments();
   },
 
-  async createUserFromHash({ email, passwordHash, salt, name, subscriptionTier }) {
+  async createUserFromHash({ email, passwordHash, salt, name, subscriptionTier, iterations }) {
     const db = getDb();
     const userCount = await this.countUsers();
     const role = userCount === 0 ? 'Admin' : 'Member';
@@ -56,6 +65,7 @@ export const authStore = {
       email: email.trim().toLowerCase(),
       passwordHash,
       salt,
+      iterations: iterations || DEFAULT_PBKDF2_ITERATIONS,
       name: name || null,
       role,
       createdAt: new Date().toISOString(),
@@ -80,15 +90,14 @@ export const authStore = {
   async createUser({ email, password, name }) {
     const db = getDb();
     const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = crypto
-      .pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 64, 'sha512')
-      .toString('hex');
+    const passwordHash = await hashPassword(password, salt, DEFAULT_PBKDF2_ITERATIONS);
     const userCount = await this.countUsers();
     const role = userCount === 0 ? 'Admin' : 'Member';
     const doc = {
       email: email.trim().toLowerCase(),
       passwordHash,
       salt,
+      iterations: DEFAULT_PBKDF2_ITERATIONS,
       name: name || null,
       role,
       createdAt: new Date().toISOString(),
@@ -101,6 +110,20 @@ export const authStore = {
       role: doc.role,
       createdAt: doc.createdAt,
     };
+  },
+
+  async upgradeUserPasswordHash(userId, newPasswordHash, salt, iterations) {
+    const db = getDb();
+    try {
+      await db
+        .collection('users')
+        .updateOne(
+          { _id: new ObjectId(userId) },
+          { $set: { passwordHash: newPasswordHash, salt, iterations } }
+        );
+    } catch {
+      // non-blocking migration error
+    }
   },
 
   async getEncryptedApiKey(userId, provider) {
@@ -197,9 +220,10 @@ export const authStore = {
     }
     const user = await db.collection('users').findOne(query);
     if (!user) throw new Error('User not found.');
-    const checkHash = crypto
-      .pbkdf2Sync(currentPassword, user.salt, PBKDF2_ITERATIONS, 64, 'sha512')
-      .toString('hex');
+
+    const userIterations = user.iterations || LEGACY_PBKDF2_ITERATIONS;
+    const checkHash = await hashPassword(currentPassword, user.salt, userIterations);
+
     let match = false;
     try {
       match = crypto.timingSafeEqual(
@@ -210,30 +234,31 @@ export const authStore = {
       match = false;
     }
     if (!match) throw new Error('Current password is incorrect.');
+
     const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = crypto
-      .pbkdf2Sync(newPassword, salt, PBKDF2_ITERATIONS, 64, 'sha512')
-      .toString('hex');
+    const passwordHash = await hashPassword(newPassword, salt, DEFAULT_PBKDF2_ITERATIONS);
     await db
       .collection('users')
-      .updateOne({ _id: new ObjectId(userId) }, { $set: { passwordHash, salt } });
+      .updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { passwordHash, salt, iterations: DEFAULT_PBKDF2_ITERATIONS } }
+      );
     return true;
   },
 
   async resetUserPassword(userId, newPassword) {
     const db = getDb();
     const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = crypto
-      .pbkdf2Sync(newPassword, salt, PBKDF2_ITERATIONS, 64, 'sha512')
-      .toString('hex');
-    const { ObjectId } = await import('mongodb');
+    const passwordHash = await hashPassword(newPassword, salt, DEFAULT_PBKDF2_ITERATIONS);
     let query;
     try {
       query = { _id: new ObjectId(userId) };
     } catch {
       query = { _id: userId };
     }
-    await db.collection('users').updateOne(query, { $set: { passwordHash, salt } });
+    await db
+      .collection('users')
+      .updateOne(query, { $set: { passwordHash, salt, iterations: DEFAULT_PBKDF2_ITERATIONS } });
     return true;
   },
 
@@ -242,16 +267,16 @@ export const authStore = {
     if (!user) throw new Error('Invalid or expired reset token.');
     const db = getDb();
     const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = crypto
-      .pbkdf2Sync(newPassword, salt, PBKDF2_ITERATIONS, 64, 'sha512')
-      .toString('hex');
+    const passwordHash = await hashPassword(newPassword, salt, DEFAULT_PBKDF2_ITERATIONS);
     let query;
     try {
       query = { _id: new ObjectId(user.id) };
     } catch {
       query = { _id: user.id };
     }
-    await db.collection('users').updateOne(query, { $set: { passwordHash, salt } });
+    await db
+      .collection('users')
+      .updateOne(query, { $set: { passwordHash, salt, iterations: DEFAULT_PBKDF2_ITERATIONS } });
     await db.collection('password_reset_tokens').deleteMany({
       $or: [{ userId: user.id }, { userId: String(user._id || user.id) }],
     });

@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { authStore } from './store.js';
+import {
+  authStore,
+  hashPassword,
+  DEFAULT_PBKDF2_ITERATIONS,
+  LEGACY_PBKDF2_ITERATIONS,
+} from './store.js';
 import { getDb } from '../db.js';
 import { isDisposableEmail } from './disposable-emails.js';
 import {
@@ -85,21 +90,30 @@ async function handleValidateKey(req, res, body) {
 }
 
 async function handleLogin(req, res, body) {
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-  if (!(await checkRateLimit(clientIp))) {
-    sendJson(res, 429, { error: 'Too many login attempts. Try again later.' });
-    return;
-  }
-
-  const { email, password, rememberDevice, deviceToken } = body;
+  const { email, password } = body || {};
 
   if (!email || !password) {
     sendJson(res, 400, { error: 'Email and password are required.' });
     return;
   }
 
-  const lockoutKey = `login:${email.trim().toLowerCase()}`;
-  if (await checkAccountLockout(lockoutKey)) {
+  const cleanEmail = email.trim().toLowerCase();
+  const lockoutKey = `login:${cleanEmail}`;
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+
+  // Run rate limit, lockout check, and user lookup in parallel
+  const [rateLimitAllowed, isLocked, userRecord] = await Promise.all([
+    checkRateLimit(clientIp),
+    checkAccountLockout(lockoutKey),
+    authStore.findUserWithPassword(cleanEmail),
+  ]);
+
+  if (!rateLimitAllowed) {
+    sendJson(res, 429, { error: 'Too many login attempts. Try again later.' });
+    return;
+  }
+
+  if (isLocked) {
     const db = getDb();
     const lockoutRecord = await db
       .collection('rate_limits')
@@ -117,24 +131,25 @@ async function handleLogin(req, res, body) {
     return;
   }
 
-  const userRecord = await authStore.findUserWithPassword(email);
-  const dummyHash = crypto.pbkdf2Sync('dummy', 'salt', 600000, 64, 'sha512').toString('hex');
+  if (!userRecord || !userRecord.passwordHash || !userRecord.salt) {
+    // Constant-time protection against user enumeration (async, non-blocking)
+    await hashPassword(password, 'dummysalt12345678', DEFAULT_PBKDF2_ITERATIONS);
+    recordFailedAttempt(lockoutKey);
+    sendJson(res, 401, { error: 'Invalid email or password.' });
+    return;
+  }
+
+  const userIterations = userRecord.iterations || LEGACY_PBKDF2_ITERATIONS;
+  const checkHash = await hashPassword(password, userRecord.salt, userIterations);
 
   let match = false;
-  if (userRecord && userRecord.passwordHash && userRecord.salt) {
-    const checkHash = crypto
-      .pbkdf2Sync(password, userRecord.salt, 600000, 64, 'sha512')
-      .toString('hex');
-    try {
-      match = crypto.timingSafeEqual(
-        Buffer.from(userRecord.passwordHash, 'hex'),
-        Buffer.from(checkHash, 'hex')
-      );
-    } catch {
-      match = false;
-    }
-  } else {
-    crypto.timingSafeEqual(Buffer.from(dummyHash, 'hex'), Buffer.from(dummyHash, 'hex'));
+  try {
+    match = crypto.timingSafeEqual(
+      Buffer.from(userRecord.passwordHash, 'hex'),
+      Buffer.from(checkHash, 'hex')
+    );
+  } catch {
+    match = false;
   }
 
   if (!match) {
@@ -143,7 +158,22 @@ async function handleLogin(req, res, body) {
     return;
   }
 
+  // Clear lockout in background
   clearLockout(lockoutKey);
+
+  // Background upgrade of legacy hashes to faster OWASP iteration standard
+  if (!userRecord.iterations || userRecord.iterations > DEFAULT_PBKDF2_ITERATIONS) {
+    hashPassword(password, userRecord.salt, DEFAULT_PBKDF2_ITERATIONS)
+      .then((newHash) => {
+        authStore.upgradeUserPasswordHash(
+          userRecord._id.toString(),
+          newHash,
+          userRecord.salt,
+          DEFAULT_PBKDF2_ITERATIONS
+        );
+      })
+      .catch(() => {});
+  }
 
   const userId = userRecord._id.toString();
 
@@ -469,7 +499,7 @@ async function handleStartRegistration(req, res, body) {
   const db = getDb();
   const pendingId = crypto.randomBytes(16).toString('hex');
   const salt = crypto.randomBytes(16).toString('hex');
-  const passwordHash = crypto.pbkdf2Sync(password, salt, 600000, 64, 'sha512').toString('hex');
+  const passwordHash = await hashPassword(password, salt, DEFAULT_PBKDF2_ITERATIONS);
 
   await db.collection('pending_registrations').updateOne(
     { email: email.toLowerCase().trim() },
@@ -763,9 +793,7 @@ async function handleCompleteRegistration(req, res, body) {
   } else {
     const salt = crypto.randomBytes(16).toString('hex');
     const randomPassword = crypto.randomBytes(32).toString('hex');
-    const passwordHash = crypto
-      .pbkdf2Sync(randomPassword, salt, 600000, 64, 'sha512')
-      .toString('hex');
+    const passwordHash = await hashPassword(randomPassword, salt, DEFAULT_PBKDF2_ITERATIONS);
     user = await authStore.createUserFromHash({
       email: email.toLowerCase().trim(),
       passwordHash,
@@ -804,6 +832,7 @@ async function handleDeleteAccount(req, res, url, body, user) {
     name: userDoc.name || null,
     deletedAt: new Date().toISOString(),
   });
+  const isProd = process.env.NODE_ENV === 'production';
   res.setHeader('Set-Cookie', [
     `token=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
     `refreshToken=; HttpOnly; SameSite=Strict; Path=/${isProd ? '; Secure' : ''}; Expires=Thu, 01 Jan 1970 00:00:00 GMT`,
