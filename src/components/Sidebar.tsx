@@ -9,8 +9,6 @@ import {
   KnowledgeIcon3D,
   SettingsIcon3D,
   ShieldIcon3D,
-  BarChartIcon3D,
-  LayersIcon3D,
 } from './ui/Icons3D';
 
 /**

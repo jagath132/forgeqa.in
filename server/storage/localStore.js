@@ -134,9 +134,7 @@ export function createLocalKnowledgeStore() {
     async searchChunks(query = '', limit = 50, userId, fileId = null) {
       const state = await readStore();
       const cleanQuery = (query || '').trim().toLowerCase();
-      const terms = cleanQuery
-        ? cleanQuery.split(/\W+/).filter((term) => term.length > 1)
-        : [];
+      const terms = cleanQuery ? cleanQuery.split(/\W+/).filter((term) => term.length > 1) : [];
 
       return state.knowledge_chunks
         .filter((chunk) => {

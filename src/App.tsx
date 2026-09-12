@@ -15,7 +15,6 @@ import { KnowledgeBase } from './pages/KnowledgeBase';
 import { SettingsPage } from './pages/SettingsPage';
 
 import { RegressionPage } from './pages/RegressionPage';
-import { AdminPage } from './pages/AdminPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { NavBar } from './components/NavBar';
 import { ErrorBoundary } from './components/ErrorBoundary';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, Download, Play, Terminal, Code2 } from 'lucide-react';
+import { Copy, Check, Download, Terminal, Code2 } from 'lucide-react';
 import type { TestingFramework, ScriptLanguage } from '../../contracts';
 
 interface CodeStudioProps {
@@ -87,7 +87,11 @@ export function CodeStudio({
             className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 transition-colors font-semibold"
             title="Copy to Clipboard"
           >
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-emerald-300" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
@@ -111,9 +115,7 @@ export function CodeStudio({
                   <td className="pr-4 py-0.5 text-right text-slate-600 select-none w-10 text-[11px]">
                     {idx + 1}
                   </td>
-                  <td className="py-0.5 pl-2 text-slate-200 whitespace-pre">
-                    {line || ' '}
-                  </td>
+                  <td className="py-0.5 pl-2 text-slate-200 whitespace-pre">{line || ' '}</td>
                 </tr>
               ))}
             </tbody>

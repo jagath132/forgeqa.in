@@ -107,11 +107,24 @@ function PhaseStepper({ currentPhase }: { currentPhase: string | null }) {
           boxShadow: '0 0 8px rgba(34,211,238,0.5)',
           transition: 'width 0.6s ease',
           width:
-            currentIndex < 0 ? '0%' : currentIndex === 0 ? '0%' : currentIndex === 1 ? '40%' : '80%',
+            currentIndex < 0
+              ? '0%'
+              : currentIndex === 0
+                ? '0%'
+                : currentIndex === 1
+                  ? '40%'
+                  : '80%',
         }}
       />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          position: 'relative',
+        }}
+      >
         {PHASES.map((phase, idx) => {
           const isActive = idx === currentIndex;
           const isDone = idx < currentIndex;
@@ -119,7 +132,13 @@ function PhaseStepper({ currentPhase }: { currentPhase: string | null }) {
           return (
             <div
               key={phase.key}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flex: 1 }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                flex: 1,
+              }}
             >
               {/* Step dot */}
               <div
@@ -134,20 +153,22 @@ function PhaseStepper({ currentPhase }: { currentPhase: string | null }) {
                   background: isDone
                     ? 'linear-gradient(135deg, #34d399, #059669)'
                     : isActive
-                    ? 'linear-gradient(135deg, #818cf8, #22d3ee)'
-                    : 'rgba(30,41,59,0.8)',
+                      ? 'linear-gradient(135deg, #818cf8, #22d3ee)'
+                      : 'rgba(30,41,59,0.8)',
                   border: isDone
                     ? '2px solid rgba(52,211,153,0.4)'
                     : isActive
-                    ? '2px solid rgba(129,140,248,0.5)'
-                    : '2px solid rgba(99,102,241,0.2)',
+                      ? '2px solid rgba(129,140,248,0.5)'
+                      : '2px solid rgba(99,102,241,0.2)',
                   boxShadow: isActive ? '0 0 16px rgba(129,140,248,0.5)' : 'none',
                   transition: 'all 0.4s ease',
                   position: 'relative',
                   zIndex: 1,
                 }}
               >
-                {isDone ? '✓' : isActive ? (
+                {isDone ? (
+                  '✓'
+                ) : isActive ? (
                   <span
                     style={{
                       display: 'inline-block',
@@ -159,7 +180,9 @@ function PhaseStepper({ currentPhase }: { currentPhase: string | null }) {
                     }}
                   />
                 ) : (
-                  <span style={{ color: 'rgba(148,163,184,0.4)', fontSize: '10px' }}>{idx + 1}</span>
+                  <span style={{ color: 'rgba(148,163,184,0.4)', fontSize: '10px' }}>
+                    {idx + 1}
+                  </span>
                 )}
               </div>
 
@@ -211,19 +234,19 @@ export function GeneratingLoader({
     phase === 'complete'
       ? 'Generation complete!'
       : phase === 'error'
-      ? 'Generation failed'
-      : phase === 'connecting'
-      ? 'Connecting to AI...'
-      : 'Generating Test Matrix';
+        ? 'Generation failed'
+        : phase === 'connecting'
+          ? 'Connecting to AI...'
+          : 'Generating Test Matrix';
 
   const phaseSubLabel =
     phase === 'complete'
       ? 'All test cases are ready'
       : phase === 'error'
-      ? 'An error occurred during generation'
-      : phase === 'connecting'
-      ? 'Establishing secure stream connection'
-      : 'ForgeQA AI is synthesizing your test cases';
+        ? 'An error occurred during generation'
+        : phase === 'connecting'
+          ? 'Establishing secure stream connection'
+          : 'ForgeQA AI is synthesizing your test cases';
 
   return (
     <div
@@ -258,7 +281,15 @@ export function GeneratingLoader({
       />
 
       {/* ── Hero section: orb + title ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', zIndex: 1 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '20px',
+          zIndex: 1,
+        }}
+      >
         <AIOrb />
 
         <div style={{ textAlign: 'center' }}>

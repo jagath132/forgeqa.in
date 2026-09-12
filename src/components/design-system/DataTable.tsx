@@ -1,14 +1,7 @@
 import React, { useState } from 'react';
 import type { TestCase, TestCaseCategory } from '../../contracts';
 import { StatusBadge } from './StatusBadge';
-import {
-  ChevronDown,
-  ChevronRight,
-  Download,
-  Edit2,
-  Trash2,
-  Search,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Edit2, Trash2, Search } from 'lucide-react';
 
 interface DataTableProps {
   testCases: TestCase[];
@@ -16,7 +9,13 @@ interface DataTableProps {
   onFilterChange: (cat: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  categoryCounts: { all: number; positive: number; negative: number; edge: number; validation: number };
+  categoryCounts: {
+    all: number;
+    positive: number;
+    negative: number;
+    edge: number;
+    validation: number;
+  };
   onUpdateTestCase?: (index: number, updated: TestCase) => void;
   onDeleteTestCase?: (index: number) => void;
   onExportExcel?: () => void;
@@ -36,12 +35,10 @@ export function DataTable({
   onDeleteTestCase,
   onExportExcel,
   onExportCsv,
-  onExportJson,
+  onExportJson: _onExportJson,
   className = '',
 }: DataTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<TestCase | null>(null);
 
   const getCategoryBadgeVariant = (cat: TestCaseCategory) => {
     const c = (cat || '').toLowerCase();
@@ -49,19 +46,6 @@ export function DataTable({
     if (c.includes('negative')) return 'danger';
     if (c.includes('edge')) return 'warning';
     return 'violet';
-  };
-
-  const handleStartEdit = (index: number, tc: TestCase) => {
-    setEditingIndex(index);
-    setEditForm({ ...tc });
-  };
-
-  const handleSaveEdit = (index: number) => {
-    if (editForm && onUpdateTestCase) {
-      onUpdateTestCase(index, editForm);
-    }
-    setEditingIndex(null);
-    setEditForm(null);
   };
 
   return (
@@ -112,9 +96,7 @@ export function DataTable({
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
           <div className="relative flex-1 sm:flex-initial">
-            <Search
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground"
-            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Filter matrix..."
@@ -196,7 +178,10 @@ export function DataTable({
                           <ChevronRight className="h-3.5 w-3.5" />
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono font-semibold" style={{ color: 'var(--color-accent)' }}>
+                      <td
+                        className="px-4 py-3 font-mono font-semibold"
+                        style={{ color: 'var(--color-accent)' }}
+                      >
                         {tc.tcId}
                       </td>
                       <td className="px-4 py-3">
@@ -217,19 +202,18 @@ export function DataTable({
                           {tc.status || 'draft'}
                         </span>
                       </td>
-                      <td
-                        className="px-4 py-3 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleStartEdit(idx, tc)}
-                            className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-muted-foreground"
-                            title="Edit test case"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
+                          {onUpdateTestCase && (
+                            <button
+                              type="button"
+                              onClick={() => onUpdateTestCase(idx, tc)}
+                              className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-muted-foreground"
+                              title="Edit test case"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                           {onDeleteTestCase && (
                             <button
                               type="button"
@@ -263,9 +247,7 @@ export function DataTable({
                               </p>
                               <ol className="mt-1 list-decimal list-inside space-y-1 font-mono text-xs text-secondary-foreground">
                                 {Array.isArray(tc.testSteps) ? (
-                                  tc.testSteps.map((step, sIdx) => (
-                                    <li key={sIdx}>{step}</li>
-                                  ))
+                                  tc.testSteps.map((step, sIdx) => <li key={sIdx}>{step}</li>)
                                 ) : (
                                   <li>{tc.testSteps}</li>
                                 )}
@@ -301,7 +283,10 @@ export function DataTable({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-xs" style={{ color: 'var(--color-accent)' }}>
+                    <span
+                      className="font-mono font-bold text-xs"
+                      style={{ color: 'var(--color-accent)' }}
+                    >
                       {tc.tcId}
                     </span>
                     <StatusBadge
@@ -327,15 +312,15 @@ export function DataTable({
                   </div>
                 </div>
 
-                <p className="text-xs font-semibold text-foreground leading-snug">
-                  {tc.summary}
-                </p>
+                <p className="text-xs font-semibold text-foreground leading-snug">{tc.summary}</p>
 
                 <div
                   className="p-2 rounded text-[11px] font-mono"
                   style={{ background: 'var(--bg-tertiary)' }}
                 >
-                  <span className="text-muted-foreground uppercase text-[9px] block">Expected:</span>
+                  <span className="text-muted-foreground uppercase text-[9px] block">
+                    Expected:
+                  </span>
                   <span className="text-foreground">{tc.expected}</span>
                 </div>
 

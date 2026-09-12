@@ -38,7 +38,9 @@ function DashboardMetric({
       className={`p-3.5 rounded-xl bg-white border ${border} shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between min-w-0 overflow-hidden`}
     >
       <div className="flex items-center gap-2 min-w-0">
-        <div className={`w-7 h-7 rounded-lg ${bg} ${color} flex items-center justify-center shrink-0`}>
+        <div
+          className={`w-7 h-7 rounded-lg ${bg} ${color} flex items-center justify-center shrink-0`}
+        >
           <Icon className="w-3.5 h-3.5" />
         </div>
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
@@ -53,9 +55,7 @@ function DashboardMetric({
         >
           {value}
         </div>
-        <div className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
-          {sublabel}
-        </div>
+        <div className="text-[11px] font-medium text-slate-400 truncate mt-0.5">{sublabel}</div>
       </div>
     </div>
   );

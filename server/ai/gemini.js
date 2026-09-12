@@ -247,7 +247,6 @@ export async function generateWithGeminiStream({ apiKey, prompt, model, onToken 
   }
 }
 
-
 /**
  * Strips markdown code fences that AI models often add around code output.
  * Handles: ```javascript, ```typescript, ```python, ``` etc.
@@ -313,4 +312,3 @@ export async function generateWithGeminiRaw({ apiKey, prompt, model }) {
 
   return stripMarkdownFences(text);
 }
-

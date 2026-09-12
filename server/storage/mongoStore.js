@@ -145,9 +145,7 @@ export function createMongoKnowledgeStore() {
     async searchChunks(query = '', limit = 50, userId, fileId = null) {
       const db = getDb();
       const cleanQuery = (query || '').trim().toLowerCase();
-      const terms = cleanQuery
-        ? cleanQuery.split(/\W+/).filter((t) => t.length > 1)
-        : [];
+      const terms = cleanQuery ? cleanQuery.split(/\W+/).filter((t) => t.length > 1) : [];
 
       const userFileIds = await db
         .collection('knowledge_files')

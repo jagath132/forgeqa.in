@@ -14,7 +14,8 @@ export function getFileType(fileName = '', mimeType = '') {
   if (extension === '.docx') return 'docx';
   if (extension === '.xlsx' || extension === '.xls') return 'excel';
   if (extension === '.csv') return 'csv';
-  if (extension === '.md' || extension === '.markdown' || mimeType.includes('markdown')) return 'markdown';
+  if (extension === '.md' || extension === '.markdown' || mimeType.includes('markdown'))
+    return 'markdown';
   if (TEXT_EXTENSIONS.has(extension) || mimeType.startsWith('text/')) return 'text';
   if (IMAGE_EXTENSIONS.has(extension) || mimeType.startsWith('image/')) return 'image';
 

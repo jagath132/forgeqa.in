@@ -27,7 +27,9 @@ export function KnowledgeBase() {
   const [search, setSearch] = useState('');
   const [sharePointUrl, setSharePointUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading' | 'parsing' | 'chunking' | 'ready'>('idle');
+  const [uploadStage, setUploadStage] = useState<
+    'idle' | 'uploading' | 'parsing' | 'chunking' | 'ready'
+  >('idle');
   const [isUploading, setIsUploading] = useState(false);
   const [isChunking, setIsChunking] = useState(false);
   const [chunkRefreshNeeded, setChunkRefreshNeeded] = useState(false);
@@ -35,7 +37,8 @@ export function KnowledgeBase() {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [filePendingDelete, setFilePendingDelete] = useState<KnowledgeFile | null>(null);
-  const [selectedFileForSlicePreview, setSelectedFileForSlicePreview] = useState<KnowledgeFile | null>(null);
+  const [selectedFileForSlicePreview, setSelectedFileForSlicePreview] =
+    useState<KnowledgeFile | null>(null);
 
   const readyCount = files.filter((file) => file.status === 'ready').length;
   const needsChunkingCount = files.filter((file) => file.status === 'needs_chunking').length;
@@ -103,7 +106,9 @@ export function KnowledgeBase() {
         setShowReadyBanner(true);
         await loadFiles();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Unable to upload and auto-chunk files.');
+        setMessage(
+          error instanceof Error ? error.message : 'Unable to upload and auto-chunk files.'
+        );
         setUploadStage('idle');
       } finally {
         setIsUploading(false);
@@ -159,7 +164,9 @@ export function KnowledgeBase() {
       setShowReadyBanner(true);
       await loadFiles();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to fetch and chunk SharePoint document.');
+      setMessage(
+        error instanceof Error ? error.message : 'Unable to fetch and chunk SharePoint document.'
+      );
       setUploadStage('idle');
     } finally {
       setIsUploading(false);
@@ -398,10 +405,13 @@ export function KnowledgeBase() {
               <div className="mt-4 p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 shadow-xs animate-fade-in">
                 <div className="flex items-center justify-between text-xs font-semibold mb-2">
                   <span className="flex items-center gap-2 text-indigo-700">
-                    <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${uploadStage !== 'ready' ? 'animate-spin' : ''}`} />
+                    <Sparkles
+                      className={`w-3.5 h-3.5 text-indigo-600 ${uploadStage !== 'ready' ? 'animate-spin' : ''}`}
+                    />
                     {uploadStage === 'uploading' && 'Stage 1/3: Uploading raw document...'}
                     {uploadStage === 'parsing' && 'Stage 2/3: Parsing document & OCR structure...'}
-                    {uploadStage === 'chunking' && 'Stage 3/3: Auto-chunking & generating embeddings...'}
+                    {uploadStage === 'chunking' &&
+                      'Stage 3/3: Auto-chunking & generating embeddings...'}
                     {uploadStage === 'ready' && '✓ Indexed & Ready For AI Prompt Injection!'}
                     {uploadStage === 'idle' && 'Processing complete'}
                   </span>
@@ -414,13 +424,21 @@ export function KnowledgeBase() {
                   />
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-medium">
-                  <span className={uploadProgress >= 15 ? 'text-indigo-600 font-bold' : ''}>1. Upload</span>
+                  <span className={uploadProgress >= 15 ? 'text-indigo-600 font-bold' : ''}>
+                    1. Upload
+                  </span>
                   <span>→</span>
-                  <span className={uploadProgress >= 35 ? 'text-indigo-600 font-bold' : ''}>2. Text Parsing</span>
+                  <span className={uploadProgress >= 35 ? 'text-indigo-600 font-bold' : ''}>
+                    2. Text Parsing
+                  </span>
                   <span>→</span>
-                  <span className={uploadProgress >= 70 ? 'text-indigo-600 font-bold' : ''}>3. Auto-Chunking</span>
+                  <span className={uploadProgress >= 70 ? 'text-indigo-600 font-bold' : ''}>
+                    3. Auto-Chunking
+                  </span>
                   <span>→</span>
-                  <span className={uploadProgress >= 100 ? 'text-emerald-600 font-bold' : ''}>4. Vector Ready</span>
+                  <span className={uploadProgress >= 100 ? 'text-emerald-600 font-bold' : ''}>
+                    4. Vector Ready
+                  </span>
                 </div>
               </div>
             ) : null}

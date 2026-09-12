@@ -522,9 +522,7 @@ export function TestCasesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#0F172A] mb-1">
-                    Suite
-                  </label>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1">Suite</label>
                   <select
                     value={newSuite}
                     onChange={(e) => setNewSuite(e.target.value)}

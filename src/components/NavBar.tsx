@@ -15,9 +15,8 @@ import {
   KnowledgeIcon3D,
   SettingsIcon3D,
   ShieldIcon3D,
-  BarChartIcon3D,
-  LayersIcon3D,
 } from './ui/Icons3D';
+import type { User } from '../lib/api';
 
 const navBarTokens = {
   colors: {
@@ -103,8 +102,6 @@ const NAV_ITEMS_MATRIX: NavItem[] = [
     icon: <GeneratorIcon3D size={18} />,
     color: 'rose',
   },
-
-
 ];
 
 // Stage 3: Script Studio
@@ -128,7 +125,6 @@ const NAV_ITEMS_EXECUTION: NavItem[] = [
     color: 'violet',
   },
 ];
-
 
 // Configuration
 const NAV_ITEMS_SYSTEM: NavItem[] = [
@@ -397,13 +393,13 @@ function MobileNavDrawer({
   activeKey,
   user,
   onLogout,
-  platformOk,
-  providerLabel,
+  platformOk: _platformOk,
+  providerLabel: _providerLabel,
 }: {
   onClose: () => void;
   onNavigate: (path: string) => void;
   activeKey: string;
-  user: any;
+  user: User | null;
   onLogout: () => void;
   platformOk: boolean;
   providerLabel: string;
@@ -516,7 +512,6 @@ function MobileNavDrawer({
                 />
               ))}
             </div>
-
 
             <SectionHeader label="Configuration" />
             <div>

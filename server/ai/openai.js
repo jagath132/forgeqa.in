@@ -117,6 +117,8 @@ export async function generateWithOpenAI({
     throw error;
   }
 
-  return text.replace(/^```[a-zA-Z0-9_+-]*\s*\n?/m, '').replace(/```\s*$/m, '').trim();
-
+  return text
+    .replace(/^```[a-zA-Z0-9_+-]*\s*\n?/m, '')
+    .replace(/```\s*$/m, '')
+    .trim();
 }

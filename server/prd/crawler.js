@@ -241,10 +241,14 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
               resp = rootResp;
               currentTarget = origin;
             } else {
-              throw new Error(`The URL "${currentTarget}" returned 404 Not Found. Please verify that the application or path exists and is running.`);
+              throw new Error(
+                `The URL "${currentTarget}" returned 404 Not Found. Please verify that the application or path exists and is running.`
+              );
             }
           } else {
-            throw new Error(`The URL "${currentTarget}" returned 404 Not Found. Please verify the URL and ensure the target server is running.`);
+            throw new Error(
+              `The URL "${currentTarget}" returned 404 Not Found. Please verify the URL and ensure the target server is running.`
+            );
           }
         } else {
           throw new Error(`HTTP ${resp.status}: ${resp.statusText || 'Unable to access URL'}`);
@@ -267,7 +271,8 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
 
       // Extract buttons
       const buttons = [];
-      const buttonRegex = /<(?:button|a)[^>]*(?:class="[^"]*(?:btn|button)[^"]*"|role="button")[^>]*>(.*?)<\/(?:button|a)>/gi;
+      const buttonRegex =
+        /<(?:button|a)[^>]*(?:class="[^"]*(?:btn|button)[^"]*"|role="button")[^>]*>(.*?)<\/(?:button|a)>/gi;
       let bMatch;
       while ((bMatch = buttonRegex.exec(html)) !== null && buttons.length < 20) {
         const bText = bMatch[1].replace(/<[^>]+>/g, '').trim();

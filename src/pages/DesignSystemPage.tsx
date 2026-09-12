@@ -79,7 +79,13 @@ export function DesignSystemPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {[
             { label: 'Canvas', hex: '#F7F9FC', bg: '#F7F9FC', text: '#0F172A', border: true },
-            { label: 'Card / Surface', hex: '#FFFFFF', bg: '#FFFFFF', text: '#0F172A', border: true },
+            {
+              label: 'Card / Surface',
+              hex: '#FFFFFF',
+              bg: '#FFFFFF',
+              text: '#0F172A',
+              border: true,
+            },
             { label: 'Indigo Brand', hex: '#4F46E5', bg: '#4F46E5', text: '#FFFFFF' },
             { label: 'Indigo Light', hex: '#EEF2FF', bg: '#EEF2FF', text: '#4F46E5', border: true },
             { label: 'Slate Dark', hex: '#0F172A', bg: '#0F172A', text: '#FFFFFF' },

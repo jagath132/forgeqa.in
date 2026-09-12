@@ -1,15 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Layers,
-  X,
-  Search,
-  Copy,
-  Check,
-  FileText,
-  Clock,
-  Sparkles,
-  ExternalLink,
-} from 'lucide-react';
+import { Layers, X, Search, Copy, Check, Sparkles } from 'lucide-react';
 import { api, type KnowledgeFile } from '../lib/api';
 
 interface ChunkRecord {
@@ -121,7 +111,9 @@ export function ChunkSlicePreviewModal({ file, onClose }: ChunkSlicePreviewModal
             <div>•</div>
             <div>~{estimatedTokens.toLocaleString()} Estimated Tokens</div>
             <div>•</div>
-            <div>Status: <strong className="text-slate-800 uppercase">{file.status}</strong></div>
+            <div>
+              Status: <strong className="text-slate-800 uppercase">{file.status}</strong>
+            </div>
           </div>
 
           <div className="relative w-full sm:w-64">
@@ -141,7 +133,9 @@ export function ChunkSlicePreviewModal({ file, onClose }: ChunkSlicePreviewModal
           {loading ? (
             <div className="space-y-3 py-8 text-center">
               <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-xs text-slate-500">Retrieving vector slices from knowledge index...</p>
+              <p className="text-xs text-slate-500">
+                Retrieving vector slices from knowledge index...
+              </p>
             </div>
           ) : filteredChunks.length === 0 ? (
             <div className="text-center py-12 px-4 bg-white rounded-xl border border-dashed border-slate-200">

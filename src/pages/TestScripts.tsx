@@ -151,8 +151,8 @@ export function TestScripts() {
       if (axios.isAxiosError(requestError)) {
         setError(
           requestError.response?.data?.error ||
-          requestError.message ||
-          'Unable to generate test script.'
+            requestError.message ||
+            'Unable to generate test script.'
         );
       } else if (requestError instanceof Error) {
         setError(requestError.message);
@@ -492,8 +492,9 @@ export function TestScripts() {
                 {testCases.map((testCase) => (
                   <label
                     key={testCase.tcId}
-                    className={`flex items-start gap-3 rounded-lg p-3.5 transition-colors cursor-pointer ${selectedIds.includes(testCase.tcId) ? 'card-highlight' : ''
-                      }`}
+                    className={`flex items-start gap-3 rounded-lg p-3.5 transition-colors cursor-pointer ${
+                      selectedIds.includes(testCase.tcId) ? 'card-highlight' : ''
+                    }`}
                     style={{
                       background: selectedIds.includes(testCase.tcId)
                         ? 'var(--accent-soft)'
@@ -509,10 +510,7 @@ export function TestScripts() {
                     />
                     <div className="text-sm leading-relaxed">
                       <div className="flex items-center gap-1.5">
-                        <span
-                          className="font-semibold"
-                          style={{ color: 'var(--text-primary)' }}
-                        >
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                           {testCase.tcId}
                         </span>
                         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -547,18 +545,20 @@ export function TestScripts() {
             className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl border shadow-sm transition-all"
             style={{
               background: 'var(--bg-card)',
-              borderColor: savedScripts.length > 0 ? 'var(--color-accent)' : 'var(--border-default)',
+              borderColor:
+                savedScripts.length > 0 ? 'var(--color-accent)' : 'var(--border-default)',
             }}
           >
             <div>
               <div className="flex items-center gap-2.5">
                 <span
-                  className={`h-2.5 w-2.5 rounded-full ${savedScripts.length > 0
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    savedScripts.length > 0
                       ? 'bg-emerald-500 animate-pulse'
                       : isLoading
                         ? 'bg-blue-500 animate-ping'
                         : 'bg-slate-400'
-                    }`}
+                  }`}
                 />
                 <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
                   Generated Scripts Library
@@ -591,11 +591,17 @@ export function TestScripts() {
           {savedScripts.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                <span
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   Select Generated Suite to View
                 </span>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {savedScripts.length} {savedScripts.length === 1 ? 'suite available' : 'suites available (switch anytime)'}
+                  {savedScripts.length}{' '}
+                  {savedScripts.length === 1
+                    ? 'suite available'
+                    : 'suites available (switch anytime)'}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -605,8 +611,9 @@ export function TestScripts() {
                     <div
                       key={saved.id}
                       onClick={() => handleSelectScript(saved.id)}
-                      className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${isActive ? 'card-highlight ring-2 ring-[var(--accent)]' : ''
-                        }`}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
+                        isActive ? 'card-highlight ring-2 ring-[var(--accent)]' : ''
+                      }`}
                       style={{
                         background: isActive ? 'var(--accent-soft)' : 'var(--bg-secondary)',
                         borderColor: isActive ? 'var(--accent)' : 'var(--border-subtle)',
@@ -618,17 +625,30 @@ export function TestScripts() {
                             {saved.framework} • {saved.language}
                           </span>
                           {isActive && (
-                            <span className="flex items-center gap-1 text-[11px] font-bold" style={{ color: 'var(--accent)' }}>
-                              <span className="h-1.5 w-1.5 rounded-full animate-ping" style={{ background: 'var(--accent)' }} />
+                            <span
+                              className="flex items-center gap-1 text-[11px] font-bold"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              <span
+                                className="h-1.5 w-1.5 rounded-full animate-ping"
+                                style={{ background: 'var(--accent)' }}
+                              />
                               Active in Studio
                             </span>
                           )}
                         </div>
-                        <h4 className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                        <h4
+                          className="text-sm font-bold truncate"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
                           {saved.fileName}
                         </h4>
-                        <p className="text-xs mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                          {saved.testCaseCount} automated {saved.testCaseCount === 1 ? 'test case' : 'test cases'}
+                        <p
+                          className="text-xs mt-1 font-medium"
+                          style={{ color: 'var(--text-secondary)' }}
+                        >
+                          {saved.testCaseCount} automated{' '}
+                          {saved.testCaseCount === 1 ? 'test case' : 'test cases'}
                         </p>
                       </div>
 
@@ -639,7 +659,10 @@ export function TestScripts() {
                         <span style={{ color: 'var(--text-muted)' }}>
                           {formatHistoryTime(saved.timestamp)}
                         </span>
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center gap-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
                             onClick={() => downloadSpecificScript(saved)}

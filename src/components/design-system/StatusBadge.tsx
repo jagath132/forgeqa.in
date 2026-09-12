@@ -17,7 +17,10 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const variantStyles: Record<BadgeVariant, { bg: string; text: string; border: string; dot: string }> = {
+const variantStyles: Record<
+  BadgeVariant,
+  { bg: string; text: string; border: string; dot: string }
+> = {
   default: {
     bg: 'var(--bg-tertiary)',
     text: 'var(--text-secondary)',

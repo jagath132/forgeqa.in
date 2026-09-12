@@ -144,10 +144,7 @@ export const TestScriptCodeViewer: React.FC<TestScriptCodeViewerProps> = ({
           /\b(test|describe|it|expect|beforeEach|afterEach)\b/g,
           '<span class="hl-fn">$1</span>'
         )
-        .replace(
-          /\b(page|browser|context|cy|driver)\b/g,
-          '<span class="hl-obj">$1</span>'
-        )
+        .replace(/\b(page|browser|context|cy|driver)\b/g, '<span class="hl-obj">$1</span>')
         .replace(
           /\b(goto|click|fill|type|waitForSelector|locator|getByRole|getByText|assert)\b/g,
           '<span class="hl-call">$1</span>'

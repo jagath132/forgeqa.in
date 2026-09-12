@@ -250,7 +250,10 @@ export function PrdGeneratorPage() {
             ? `${productName.trim()} - ${moduleName.trim()}`
             : productName.trim() ||
               moduleName.trim() ||
-              `PRD (${accumulatedPrd.replace(/^[#\s*_-]+/, '').slice(0, 36).trim()}...)`;
+              `PRD (${accumulatedPrd
+                .replace(/^[#\s*_-]+/, '')
+                .slice(0, 36)
+                .trim()}...)`;
 
         addToPrdHistory({
           title,
@@ -694,7 +697,12 @@ export function PrdGeneratorPage() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleGenerateFromUrl} className="space-y-4" autoComplete="off" autoCapitalize="off">
+              <form
+                onSubmit={handleGenerateFromUrl}
+                className="space-y-4"
+                autoComplete="off"
+                autoCapitalize="off"
+              >
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-1">
                     Application URL *
@@ -1219,14 +1227,17 @@ export function PrdGeneratorPage() {
                   </p>
                   <p className="text-xs max-w-sm mt-1 text-[var(--text-muted)]">
                     When you generate PRDs using product details or web crawling, ForgeQA
-                    automatically archives them here for instant restoration, downloading, and reuse.
+                    automatically archives them here for instant restoration, downloading, and
+                    reuse.
                   </p>
                 </div>
               </div>
             ) : filteredPrdHistory.length === 0 ? (
               <div className="py-8 text-center text-[var(--text-muted)]">
                 <p className="font-medium text-xs">No PRD entries match your filter.</p>
-                <p className="text-[11px] mt-0.5">Try clearing the search query or switching tabs.</p>
+                <p className="text-[11px] mt-0.5">
+                  Try clearing the search query or switching tabs.
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1279,7 +1290,10 @@ export function PrdGeneratorPage() {
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
                           {item.productName && (
                             <span className="truncate max-w-[140px]">
-                              App: <strong className="text-[var(--text-secondary)]">{item.productName}</strong>
+                              App:{' '}
+                              <strong className="text-[var(--text-secondary)]">
+                                {item.productName}
+                              </strong>
                             </span>
                           )}
                           {item.appUrl && (
@@ -1288,9 +1302,7 @@ export function PrdGeneratorPage() {
                             </span>
                           )}
                           <span>• {item.wordCount} words</span>
-                          {item.provider && (
-                            <span className="capitalize">• {item.provider}</span>
-                          )}
+                          {item.provider && <span className="capitalize">• {item.provider}</span>}
                         </div>
 
                         {/* Snippet Preview */}
