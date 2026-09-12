@@ -24,7 +24,7 @@ export async function generateWithOpenAIStream({
         { role: 'user', content: prompt },
       ],
       temperature: 0.1,
-      max_tokens: 4096,
+      max_tokens: 8192,
       stream: true,
     }),
   });
@@ -94,7 +94,7 @@ export async function generateWithOpenAI({
         },
       ],
       temperature: 0.1,
-      max_tokens: 4096,
+      max_tokens: 8192,
     }),
   });
 
@@ -117,5 +117,6 @@ export async function generateWithOpenAI({
     throw error;
   }
 
-  return text;
+  return text.replace(/^```[a-zA-Z0-9_+-]*\s*\n?/m, '').replace(/```\s*$/m, '').trim();
+
 }

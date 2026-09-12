@@ -131,17 +131,24 @@ export function createLocalKnowledgeStore() {
       await writeStore(state);
     },
 
-    async searchChunks(query, limit = 8, userId) {
+    async searchChunks(query = '', limit = 50, userId, fileId = null) {
       const state = await readStore();
-      const terms = query
-        .toLowerCase()
-        .split(/\W+/)
-        .filter((term) => term.length > 2);
+      const cleanQuery = (query || '').trim().toLowerCase();
+      const terms = cleanQuery
+        ? cleanQuery.split(/\W+/).filter((term) => term.length > 1)
+        : [];
 
       return state.knowledge_chunks
+        .filter((chunk) => {
+          if (fileId && chunk.file_id !== fileId) return false;
+          return true;
+        })
         .map((chunk) => {
           const text = chunk.chunk_text.toLowerCase();
-          const score = terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
+          const score =
+            terms.length === 0
+              ? 1
+              : terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
           const file = state.knowledge_files.find((item) => item.id === chunk.file_id);
 
           return {

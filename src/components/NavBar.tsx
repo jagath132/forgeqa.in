@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore, getProviderLabel } from '../store/useAppStore';
 import { ForgeQAIcon } from './ui/ForgeQALogo';
@@ -64,7 +65,8 @@ interface NavItem {
   color: NavColor;
 }
 
-const NAV_ITEMS_BUILD: NavItem[] = [
+// Stage 0: Command Center (always first)
+const NAV_ITEMS_OVERVIEW: NavItem[] = [
   {
     key: 'dashboard',
     label: 'Command Center',
@@ -72,6 +74,10 @@ const NAV_ITEMS_BUILD: NavItem[] = [
     icon: <DashboardIcon3D size={18} />,
     color: 'violet',
   },
+];
+
+// Stage 1: Ingest & PRD
+const NAV_ITEMS_INGEST: NavItem[] = [
   {
     key: 'prd-generator',
     label: 'PRD Generator',
@@ -80,29 +86,40 @@ const NAV_ITEMS_BUILD: NavItem[] = [
     color: 'cyan',
   },
   {
-    key: 'generator',
-    label: 'Automation Studio',
-    path: '/generator',
-    icon: <GeneratorIcon3D size={18} />,
-    color: 'rose',
-  },
-  {
-    key: 'test-scripts',
-    label: 'Execution Library',
-    path: '/test-scripts',
-    icon: <ScriptsIcon3D size={18} />,
-    color: 'emerald',
-  },
-  {
     key: 'knowledge',
-    label: 'Quality Knowledge Hub',
+    label: 'Knowledge Hub',
     path: '/knowledge',
     icon: <KnowledgeIcon3D size={18} />,
     color: 'cyan',
   },
 ];
 
-const NAV_ITEMS_MONITOR: NavItem[] = [
+// Stage 2: AI Test Matrix
+const NAV_ITEMS_MATRIX: NavItem[] = [
+  {
+    key: 'generator',
+    label: 'AI Test Matrix',
+    path: '/generator',
+    icon: <GeneratorIcon3D size={18} />,
+    color: 'rose',
+  },
+
+
+];
+
+// Stage 3: Script Studio
+const NAV_ITEMS_STUDIO: NavItem[] = [
+  {
+    key: 'test-scripts',
+    label: 'Script Studio',
+    path: '/test-scripts',
+    icon: <ScriptsIcon3D size={18} />,
+    color: 'emerald',
+  },
+];
+
+// Stage 4: Regression Monitor
+const NAV_ITEMS_EXECUTION: NavItem[] = [
   {
     key: 'regression',
     label: 'Regression Monitor',
@@ -110,22 +127,10 @@ const NAV_ITEMS_MONITOR: NavItem[] = [
     icon: <ShieldIcon3D size={18} />,
     color: 'violet',
   },
-  {
-    key: 'analytics',
-    label: 'Quality Insights',
-    path: '/analytics',
-    icon: <BarChartIcon3D size={18} />,
-    color: 'amber',
-  },
-  {
-    key: 'suites',
-    label: 'Test Collections',
-    path: '/suites',
-    icon: <LayersIcon3D size={18} />,
-    color: 'cyan',
-  },
 ];
 
+
+// Configuration
 const NAV_ITEMS_SYSTEM: NavItem[] = [
   {
     key: 'settings',
@@ -136,7 +141,14 @@ const NAV_ITEMS_SYSTEM: NavItem[] = [
   },
 ];
 
-const allNavItems = [...NAV_ITEMS_BUILD, ...NAV_ITEMS_MONITOR, ...NAV_ITEMS_SYSTEM];
+const allNavItems = [
+  ...NAV_ITEMS_OVERVIEW,
+  ...NAV_ITEMS_INGEST,
+  ...NAV_ITEMS_MATRIX,
+  ...NAV_ITEMS_STUDIO,
+  ...NAV_ITEMS_EXECUTION,
+  ...NAV_ITEMS_SYSTEM,
+];
 
 function MobileNavButton() {
   const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
@@ -445,9 +457,9 @@ function MobileNavDrawer({
             </button>
           </div>
           <nav style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
-            <SectionHeader label="Build Workspace" />
+            <SectionHeader label="Overview" />
             <div>
-              {NAV_ITEMS_BUILD.map((item) => (
+              {NAV_ITEMS_OVERVIEW.map((item) => (
                 <MobileNavItem
                   key={item.key}
                   item={item}
@@ -456,9 +468,10 @@ function MobileNavDrawer({
                 />
               ))}
             </div>
-            <SectionHeader label="Quality Insights" />
+
+            <SectionHeader label="1. Ingest & PRD" />
             <div>
-              {NAV_ITEMS_MONITOR.map((item) => (
+              {NAV_ITEMS_INGEST.map((item) => (
                 <MobileNavItem
                   key={item.key}
                   item={item}
@@ -467,6 +480,44 @@ function MobileNavDrawer({
                 />
               ))}
             </div>
+
+            <SectionHeader label="2. AI Test Matrix" />
+            <div>
+              {NAV_ITEMS_MATRIX.map((item) => (
+                <MobileNavItem
+                  key={item.key}
+                  item={item}
+                  active={activeKey === item.key}
+                  onClick={() => onNavigate(item.path)}
+                />
+              ))}
+            </div>
+
+            <SectionHeader label="3. Script Studio" />
+            <div>
+              {NAV_ITEMS_STUDIO.map((item) => (
+                <MobileNavItem
+                  key={item.key}
+                  item={item}
+                  active={activeKey === item.key}
+                  onClick={() => onNavigate(item.path)}
+                />
+              ))}
+            </div>
+
+            <SectionHeader label="4. Test Runs & Defects" />
+            <div>
+              {NAV_ITEMS_EXECUTION.map((item) => (
+                <MobileNavItem
+                  key={item.key}
+                  item={item}
+                  active={activeKey === item.key}
+                  onClick={() => onNavigate(item.path)}
+                />
+              ))}
+            </div>
+
+
             <SectionHeader label="Configuration" />
             <div>
               {NAV_ITEMS_SYSTEM.map((item) => (
@@ -568,13 +619,30 @@ export function NavBar() {
             className="hidden md:flex items-center gap-0.5 flex-1 overflow-x-auto min-w-0 mx-1 nav-scrollbar"
             style={{ paddingBottom: '4px' }}
           >
-            {allNavItems.map((item) => (
-              <DesktopNavItem
-                key={item.key}
-                item={item}
-                active={activeKey === item.key}
-                onClick={() => navigateToPage(item.path)}
-              />
+            {[
+              NAV_ITEMS_OVERVIEW,
+              NAV_ITEMS_INGEST,
+              NAV_ITEMS_MATRIX,
+              NAV_ITEMS_STUDIO,
+              NAV_ITEMS_EXECUTION,
+              NAV_ITEMS_SYSTEM,
+            ].map((group, groupIdx) => (
+              <React.Fragment key={groupIdx}>
+                {groupIdx > 0 && (
+                  <div
+                    className="h-3.5 w-[1px] mx-1 shrink-0"
+                    style={{ background: 'var(--color-border)' }}
+                  />
+                )}
+                {group.map((item) => (
+                  <DesktopNavItem
+                    key={item.key}
+                    item={item}
+                    active={activeKey === item.key}
+                    onClick={() => navigateToPage(item.path)}
+                  />
+                ))}
+              </React.Fragment>
             ))}
           </div>
 

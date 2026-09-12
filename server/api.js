@@ -52,6 +52,8 @@ const ALLOWED_EXTENSIONS = [
   '.ico',
   '.json',
   '.txt',
+  '.md',
+  '.markdown',
   '.pdf',
   '.csv',
   '.xlsx',
@@ -629,7 +631,9 @@ export function createApiMiddleware(env = {}) {
 
       if (url.pathname === '/api/knowledge/search' && req.method === 'GET') {
         const query = url.searchParams.get('q') ?? '';
-        const chunks = await knowledge.searchChunks(query, 8, user.id);
+        const fileId = url.searchParams.get('fileId') || null;
+        const limit = Number(url.searchParams.get('limit') || '50');
+        const chunks = await knowledge.searchChunks(query, limit, user.id, fileId);
         sendJson(res, 200, { chunks });
         return;
       }

@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { Eye, Sparkles } from 'lucide-react';
 import { api, type KnowledgeFile } from '../lib/api';
 import { Card } from '../components/ui/Card';
+import { ChunkSlicePreviewModal } from '../components/ChunkSlicePreviewModal';
 
 const fileIcons: Record<string, { label: string; color: string }> = {
   pdf: { label: 'PDF', color: 'badge-danger' },
   docx: { label: 'DOC', color: 'badge-primary' },
   excel: { label: 'XLS', color: 'badge-success' },
   csv: { label: 'CSV', color: 'badge-success' },
+  markdown: { label: 'MD', color: 'badge-primary' },
+  md: { label: 'MD', color: 'badge-primary' },
   text: { label: 'TXT', color: 'badge' },
   image: { label: 'IMG', color: 'badge-warning' },
 };
@@ -23,6 +27,7 @@ export function KnowledgeBase() {
   const [search, setSearch] = useState('');
   const [sharePointUrl, setSharePointUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading' | 'parsing' | 'chunking' | 'ready'>('idle');
   const [isUploading, setIsUploading] = useState(false);
   const [isChunking, setIsChunking] = useState(false);
   const [chunkRefreshNeeded, setChunkRefreshNeeded] = useState(false);
@@ -30,6 +35,7 @@ export function KnowledgeBase() {
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [filePendingDelete, setFilePendingDelete] = useState<KnowledgeFile | null>(null);
+  const [selectedFileForSlicePreview, setSelectedFileForSlicePreview] = useState<KnowledgeFile | null>(null);
 
   const readyCount = files.filter((file) => file.status === 'ready').length;
   const needsChunkingCount = files.filter((file) => file.status === 'needs_chunking').length;
@@ -68,26 +74,43 @@ export function KnowledgeBase() {
       const formData = new FormData();
       acceptedFiles.forEach((file) => formData.append('files', file));
       setIsUploading(true);
-      setUploadProgress(4);
+      setUploadStage('uploading');
+      setUploadProgress(15);
       setMessage('');
       try {
+        setUploadProgress(35);
+        setUploadStage('parsing');
         await api.post('/api/knowledge/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           onUploadProgress: (event) => {
             if (!event.total) return;
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+            const pct = Math.round((event.loaded / event.total) * 35) + 15;
+            setUploadProgress(Math.min(pct, 55));
           },
         });
-        setChunkRefreshNeeded(true);
+
+        // Auto-chunk immediately after upload so users don't have to remember to refresh
+        setUploadStage('chunking');
+        setUploadProgress(75);
+        const chunkRes = await api.post('/api/knowledge/chunks/refresh');
+
+        setUploadProgress(100);
+        setUploadStage('ready');
+        setChunkRefreshNeeded(false);
         setMessage(
-          'Knowledge files parsed and saved. Click Create / Refresh chunks to rebuild embeddings.'
+          `Auto-chunked ${acceptedFiles.length} file(s) into ${chunkRes.data.chunkCount} vector slices. Ready for prompt context!`
         );
+        setShowReadyBanner(true);
         await loadFiles();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Unable to upload knowledge files.');
+        setMessage(error instanceof Error ? error.message : 'Unable to upload and auto-chunk files.');
+        setUploadStage('idle');
       } finally {
         setIsUploading(false);
-        window.setTimeout(() => setUploadProgress(0), 800);
+        window.setTimeout(() => {
+          setUploadProgress(0);
+          setUploadStage('idle');
+        }, 2200);
       }
     },
     [loadFiles]
@@ -99,9 +122,11 @@ export function KnowledgeBase() {
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'text/plain': ['.txt', '.md'],
+      'text/markdown': ['.md', '.markdown'],
+      'text/x-markdown': ['.md', '.markdown'],
+      'text/plain': ['.txt', '.md', '.markdown'],
       'text/csv': ['.csv'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xls'],
       'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'],
     },
   });
@@ -112,21 +137,36 @@ export function KnowledgeBase() {
       return;
     }
     setIsUploading(true);
+    setUploadStage('uploading');
     setUploadProgress(25);
     setMessage('');
     try {
+      setUploadStage('parsing');
+      setUploadProgress(50);
       await api.post('/api/knowledge/sharepoint', { url: sharePointUrl.trim() });
       setSharePointUrl('');
-      setChunkRefreshNeeded(true);
+
+      setUploadStage('chunking');
+      setUploadProgress(80);
+      const chunkRes = await api.post('/api/knowledge/chunks/refresh');
+
+      setUploadProgress(100);
+      setUploadStage('ready');
+      setChunkRefreshNeeded(false);
       setMessage(
-        'SharePoint document parsed. Click Create / Refresh chunks to rebuild embeddings.'
+        `SharePoint document parsed & auto-chunked into ${chunkRes.data.chunkCount} vector slices.`
       );
+      setShowReadyBanner(true);
       await loadFiles();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to fetch SharePoint document.');
+      setMessage(error instanceof Error ? error.message : 'Unable to fetch and chunk SharePoint document.');
+      setUploadStage('idle');
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
+      window.setTimeout(() => {
+        setUploadProgress(0);
+        setUploadStage('idle');
+      }, 2200);
     }
   }
 
@@ -318,7 +358,7 @@ export function KnowledgeBase() {
                 Upload Documents
               </h2>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                PDFs, DOCX, TXT, CSV, XLSX, and images.
+                PDFs, DOCX, Markdown (.md), TXT, CSV, XLSX, and images.
               </p>
             </div>
             <div
@@ -355,22 +395,32 @@ export function KnowledgeBase() {
             </div>
 
             {uploadProgress > 0 ? (
-              <div className="mt-4">
-                <div
-                  className="flex justify-between text-xs font-medium mb-1"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  <span>{isUploading ? 'Uploading & Parsing' : 'Complete'}</span>
-                  <span style={{ color: 'var(--accent)' }}>{uploadProgress}%</span>
+              <div className="mt-4 p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 shadow-xs animate-fade-in">
+                <div className="flex items-center justify-between text-xs font-semibold mb-2">
+                  <span className="flex items-center gap-2 text-indigo-700">
+                    <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${uploadStage !== 'ready' ? 'animate-spin' : ''}`} />
+                    {uploadStage === 'uploading' && 'Stage 1/3: Uploading raw document...'}
+                    {uploadStage === 'parsing' && 'Stage 2/3: Parsing document & OCR structure...'}
+                    {uploadStage === 'chunking' && 'Stage 3/3: Auto-chunking & generating embeddings...'}
+                    {uploadStage === 'ready' && '✓ Indexed & Ready For AI Prompt Injection!'}
+                    {uploadStage === 'idle' && 'Processing complete'}
+                  </span>
+                  <span className="font-mono text-indigo-600 font-bold">{uploadProgress}%</span>
                 </div>
-                <div
-                  className="h-1.5 rounded-full overflow-hidden"
-                  style={{ background: 'var(--bg-tertiary)' }}
-                >
+                <div className="h-2 rounded-full overflow-hidden bg-indigo-100/60">
                   <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{ width: `${uploadProgress}%`, background: 'var(--gradient-primary)' }}
+                    className="h-full rounded-full transition-all duration-300 bg-gradient-to-r from-indigo-600 via-blue-600 to-emerald-500"
+                    style={{ width: `${uploadProgress}%` }}
                   />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 font-medium">
+                  <span className={uploadProgress >= 15 ? 'text-indigo-600 font-bold' : ''}>1. Upload</span>
+                  <span>→</span>
+                  <span className={uploadProgress >= 35 ? 'text-indigo-600 font-bold' : ''}>2. Text Parsing</span>
+                  <span>→</span>
+                  <span className={uploadProgress >= 70 ? 'text-indigo-600 font-bold' : ''}>3. Auto-Chunking</span>
+                  <span>→</span>
+                  <span className={uploadProgress >= 100 ? 'text-emerald-600 font-bold' : ''}>4. Vector Ready</span>
                 </div>
               </div>
             ) : null}
@@ -602,14 +652,25 @@ export function KnowledgeBase() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <button
-                          className="btn-ghost px-3 py-1 text-xs"
-                          style={{ color: 'var(--danger)' }}
-                          onClick={() => setFilePendingDelete(file)}
-                          type="button"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition-colors border border-indigo-100 cursor-pointer"
+                            onClick={() => setSelectedFileForSlicePreview(file)}
+                            type="button"
+                            title="Inspect vector chunks"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>View Slices</span>
+                          </button>
+                          <button
+                            className="btn-ghost px-2.5 py-1 text-xs"
+                            style={{ color: 'var(--danger)' }}
+                            onClick={() => setFilePendingDelete(file)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -653,6 +714,12 @@ export function KnowledgeBase() {
           setFilePendingDelete(null);
           void deleteFile(fileId);
         }}
+      />
+
+      {/* Interactive Vector Chunk Slice Preview Modal */}
+      <ChunkSlicePreviewModal
+        file={selectedFileForSlicePreview}
+        onClose={() => setSelectedFileForSlicePreview(null)}
       />
     </div>
   );

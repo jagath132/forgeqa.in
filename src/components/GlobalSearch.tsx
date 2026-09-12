@@ -29,16 +29,11 @@ const searchIndex = [
   },
   {
     label: 'Quality Insights',
-    path: '/analytics',
+    path: '/dashboard',
     category: 'Pages',
-    keywords: 'analytics charts trends reports',
+    keywords: 'analytics charts trends reports insights telemetry dashboard',
   },
-  {
-    label: 'Test Collections',
-    path: '/suites',
-    category: 'Pages',
-    keywords: 'suites plans organize folders tags',
-  },
+
   {
     label: 'Regression Monitor',
     path: '/regression',

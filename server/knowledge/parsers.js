@@ -4,7 +4,7 @@ import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { createWorker } from 'tesseract.js';
 
-const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.csv']);
+const TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv']);
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff']);
 
 export function getFileType(fileName = '', mimeType = '') {
@@ -14,6 +14,7 @@ export function getFileType(fileName = '', mimeType = '') {
   if (extension === '.docx') return 'docx';
   if (extension === '.xlsx' || extension === '.xls') return 'excel';
   if (extension === '.csv') return 'csv';
+  if (extension === '.md' || extension === '.markdown' || mimeType.includes('markdown')) return 'markdown';
   if (TEXT_EXTENSIONS.has(extension) || mimeType.startsWith('text/')) return 'text';
   if (IMAGE_EXTENSIONS.has(extension) || mimeType.startsWith('image/')) return 'image';
 
@@ -45,6 +46,7 @@ export async function extractTextFromBuffer(buffer, metadata) {
       return parseExcel(buffer);
     case 'csv':
     case 'text':
+    case 'markdown':
       return parseText(buffer);
     case 'image':
       return parseImage(buffer);

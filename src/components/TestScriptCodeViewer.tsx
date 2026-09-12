@@ -111,9 +111,9 @@ export const TestScriptCodeViewer: React.FC<TestScriptCodeViewerProps> = ({
   const renderHighlightedCode = (text: string) => {
     const linesArr = text.split('\n');
     return linesArr.map((line, lineIdx) => {
-      let formattedLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-      if (formattedLine.trim().startsWith('//') || formattedLine.trim().startsWith('#')) {
+      if (escaped.trim().startsWith('//') || escaped.trim().startsWith('#')) {
         return (
           <div key={lineIdx} className="table-row">
             {showLineNumbers && (
@@ -121,29 +121,43 @@ export const TestScriptCodeViewer: React.FC<TestScriptCodeViewerProps> = ({
                 {lineIdx + 1}
               </span>
             )}
-            <span className="table-cell italic text-slate-500 font-mono">{line}</span>
+            <span className="table-cell italic text-slate-500 font-mono">{escaped}</span>
           </div>
         );
       }
 
-      formattedLine = formattedLine
+      // 1. Temporarily extract string literals to prevent tag attributes from being replaced
+      const strings: string[] = [];
+      const withPlaceholders = escaped.replace(/('[^']*'|"[^"]*"|`[^`]*`)/g, (match) => {
+        const placeholder = `___FORGEQA_STR_${strings.length}___`;
+        strings.push(match);
+        return placeholder;
+      });
+
+      // 2. Safely highlight keywords using classes with no style attribute quotes
+      let formattedLine = withPlaceholders
         .replace(
           /\b(import|export|from|const|let|var|async|await|function|return|if|else|def|class|type|interface)\b/g,
-          '<span style="color:#f43f5e;font-weight:600">$1</span>'
+          '<span class="hl-kw">$1</span>'
         )
         .replace(
           /\b(test|describe|it|expect|beforeEach|afterEach)\b/g,
-          '<span style="color:#a855f7;font-weight:600">$1</span>'
+          '<span class="hl-fn">$1</span>'
         )
-        .replace(/('[^']*'|"[^"]*"|`[^`]*`)/g, '<span style="color:#10b981">$1</span>')
         .replace(
           /\b(page|browser|context|cy|driver)\b/g,
-          '<span style="color:#06b6d4;font-weight:600">$1</span>'
+          '<span class="hl-obj">$1</span>'
         )
         .replace(
           /\b(goto|click|fill|type|waitForSelector|locator|getByRole|getByText|assert)\b/g,
-          '<span style="color:#3b82f6">$1</span>'
+          '<span class="hl-call">$1</span>'
         );
+
+      // 3. Re-inject strings safely wrapped in string span class
+      formattedLine = formattedLine.replace(/___FORGEQA_STR_(\d+)___/g, (_, idx) => {
+        const originalStr = strings[Number(idx)] ?? '';
+        return `<span class="hl-str">${originalStr}</span>`;
+      });
 
       return (
         <div key={lineIdx} className="table-row hover:bg-slate-800/40 transition-colors">

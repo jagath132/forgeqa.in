@@ -16,8 +16,13 @@ import {
   Layers,
   CheckCircle2,
   Lock,
+  History,
+  Trash2,
+  Clock,
+  Search,
+  ArrowUpRight,
 } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, type PrdHistoryItem } from '../store/useAppStore';
 import { savePrdToKnowledge, exportPrdAsDocx, type KnowledgeFile } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { MobilePageHeader } from '../components/PageHeader';
@@ -33,6 +38,11 @@ interface PhaseState {
 export function PrdGeneratorPage() {
   const navigate = useNavigate();
   const provider = useAppStore((s) => s.activeProvider || s.provider || 'gemini');
+  const prdHistory = useAppStore((s) => s.prdHistory);
+  const addToPrdHistory = useAppStore((s) => s.addToPrdHistory);
+  const deletePrdHistoryItem = useAppStore((s) => s.deletePrdHistoryItem);
+  const clearPrdHistory = useAppStore((s) => s.clearPrdHistory);
+  const openConfirm = useAppStore((s) => s.openConfirm);
 
   // Mode & Form States
   const [mode, setMode] = useState<GenerationMode>('text');
@@ -65,8 +75,65 @@ export function PrdGeneratorPage() {
     chunkCount: number;
   } | null>(null);
 
+  // History Filter & State
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilterMode, setHistoryFilterMode] = useState<'all' | 'text' | 'url'>('all');
+  const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
+
   const prdEndRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleRestorePrd = (item: PrdHistoryItem) => {
+    setPrdText(item.prdText);
+    setMode(item.mode);
+    if (item.mode === 'text') {
+      if (item.productName) setProductName(item.productName);
+      if (item.moduleName) setModuleName(item.moduleName);
+      if (item.details) setDetails(item.details);
+    } else {
+      if (item.appUrl) setAppUrl(item.appUrl);
+      if (item.focusArea) setFocusArea(item.focusArea);
+    }
+    setErrorMsg(null);
+    setSavedKbFile(null);
+    setCurrentPhase({ phase: 'complete', message: `Loaded: ${item.title}` });
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  const handleCopyHistoryPrd = (item: PrdHistoryItem) => {
+    navigator.clipboard.writeText(item.prdText);
+    setCopiedHistoryId(item.id);
+    setTimeout(() => setCopiedHistoryId(null), 2000);
+  };
+
+  const handleDownloadHistoryPrd = (item: PrdHistoryItem) => {
+    const safeTitle = item.title.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50) || 'PRD';
+    const blob = new Blob([item.prdText], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeTitle}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const filteredPrdHistory = prdHistory.filter((item) => {
+    const matchesMode = historyFilterMode === 'all' || item.mode === historyFilterMode;
+    if (!matchesMode) return false;
+    if (!historySearch.trim()) return true;
+    const q = historySearch.toLowerCase();
+    return (
+      item.title.toLowerCase().includes(q) ||
+      (item.productName && item.productName.toLowerCase().includes(q)) ||
+      (item.moduleName && item.moduleName.toLowerCase().includes(q)) ||
+      (item.appUrl && item.appUrl.toLowerCase().includes(q)) ||
+      (item.focusArea && item.focusArea.toLowerCase().includes(q)) ||
+      item.prdText.toLowerCase().includes(q)
+    );
+  });
 
   // Auto-scroll as tokens stream in
   useEffect(() => {
@@ -125,6 +192,7 @@ export function PrdGeneratorPage() {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let accumulatedPrd = '';
 
       let isStreaming = true;
       while (isStreaming) {
@@ -158,9 +226,14 @@ export function PrdGeneratorPage() {
             if (eventType === 'phase') {
               setCurrentPhase(data);
             } else if (eventType === 'token') {
-              setPrdText((prev) => prev + (data.token || ''));
+              const token = data.token || '';
+              accumulatedPrd += token;
+              setPrdText((prev) => prev + token);
             } else if (eventType === 'complete') {
-              if (data.prdText) setPrdText(data.prdText);
+              if (data.prdText) {
+                accumulatedPrd = data.prdText;
+                setPrdText(data.prdText);
+              }
               setCurrentPhase({ phase: 'complete', message: 'PRD synthesis complete' });
             } else if (eventType === 'error') {
               setErrorMsg(data.error || 'Generation error encountered.');
@@ -169,6 +242,26 @@ export function PrdGeneratorPage() {
             // Ignore parse errors on partial frames
           }
         }
+      }
+
+      if (accumulatedPrd.trim()) {
+        const title =
+          productName.trim() && moduleName.trim()
+            ? `${productName.trim()} - ${moduleName.trim()}`
+            : productName.trim() ||
+              moduleName.trim() ||
+              `PRD (${accumulatedPrd.replace(/^[#\s*_-]+/, '').slice(0, 36).trim()}...)`;
+
+        addToPrdHistory({
+          title,
+          mode: 'text',
+          productName: productName.trim() || undefined,
+          moduleName: moduleName.trim() || undefined,
+          details,
+          prdText: accumulatedPrd,
+          wordCount: accumulatedPrd.trim().split(/\s+/).filter(Boolean).length,
+          provider: typeof provider === 'string' ? provider : undefined,
+        });
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -221,6 +314,7 @@ export function PrdGeneratorPage() {
 
       const decoder = new TextDecoder();
       let buffer = '';
+      let accumulatedPrd = '';
 
       let isStreaming = true;
       while (isStreaming) {
@@ -254,9 +348,14 @@ export function PrdGeneratorPage() {
             if (eventType === 'phase') {
               setCurrentPhase(data);
             } else if (eventType === 'token') {
-              setPrdText((prev) => prev + (data.token || ''));
+              const token = data.token || '';
+              accumulatedPrd += token;
+              setPrdText((prev) => prev + token);
             } else if (eventType === 'complete') {
-              if (data.prdText) setPrdText(data.prdText);
+              if (data.prdText) {
+                accumulatedPrd = data.prdText;
+                setPrdText(data.prdText);
+              }
               setCurrentPhase({ phase: 'complete', message: 'PRD synthesis complete' });
             } else if (eventType === 'error') {
               setErrorMsg(data.error || 'Generation error encountered.');
@@ -265,6 +364,26 @@ export function PrdGeneratorPage() {
             // Ignore parse errors
           }
         }
+      }
+
+      if (accumulatedPrd.trim()) {
+        let urlHost = appUrl.trim();
+        try {
+          urlHost = new URL(appUrl.startsWith('http') ? appUrl : `https://${appUrl}`).hostname;
+        } catch {
+          // fallback
+        }
+        const title = focusArea.trim() ? `${urlHost} - ${focusArea.trim()}` : `PRD for ${urlHost}`;
+
+        addToPrdHistory({
+          title,
+          mode: 'url',
+          appUrl: appUrl.trim(),
+          focusArea: focusArea.trim() || undefined,
+          prdText: accumulatedPrd,
+          wordCount: accumulatedPrd.trim().split(/\s+/).filter(Boolean).length,
+          provider: typeof provider === 'string' ? provider : undefined,
+        });
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {
@@ -435,7 +554,7 @@ export function PrdGeneratorPage() {
       <MobilePageHeader pageKey="prd-generator" />
 
       {/* Hero / Mode Selector Tabs */}
-      <div className="flex items-center justify-start p-1 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] backdrop-blur-md">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-1.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] backdrop-blur-md">
         <div className="flex items-center gap-1 p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-subtle)] w-full sm:w-auto">
           <button
             type="button"
@@ -463,6 +582,22 @@ export function PrdGeneratorPage() {
             <span>Explore from URL</span>
           </button>
         </div>
+
+        {prdHistory.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              historyRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-primary)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] transition-all cursor-pointer self-stretch sm:self-auto"
+          >
+            <History className="h-4 w-4 text-[var(--accent)]" />
+            <span>PRD History</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)]/15 text-[var(--accent)]">
+              {prdHistory.length}
+            </span>
+          </button>
+        )}
       </div>
 
       {errorMsg && (
@@ -559,13 +694,15 @@ export function PrdGeneratorPage() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleGenerateFromUrl} className="space-y-4">
+              <form onSubmit={handleGenerateFromUrl} className="space-y-4" autoComplete="off" autoCapitalize="off">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-1">
                     Application URL *
                   </label>
                   <input
-                    type="text"
+                    type="url"
+                    name="explore_app_url"
+                    autoComplete="off"
                     required
                     value={appUrl}
                     onChange={(e) => setAppUrl(e.target.value)}
@@ -584,6 +721,11 @@ export function PrdGeneratorPage() {
                     </label>
                     <input
                       type="text"
+                      name="explore_test_user_identity"
+                      id="explore_test_user_identity"
+                      autoComplete="new-password"
+                      data-lpignore="true"
+                      data-1p-ignore="true"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="test@example.com"
@@ -601,6 +743,11 @@ export function PrdGeneratorPage() {
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
+                        name="explore_test_user_secret"
+                        id="explore_test_user_secret"
+                        autoComplete="new-password"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
@@ -960,8 +1107,274 @@ export function PrdGeneratorPage() {
           </Card>
         </div>
       </div>
+
+      {/* PRD Generation History Section */}
+      <section ref={historyRef} id="prd-history-section" className="pt-4">
+        <Card className="p-5 sm:p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center font-bold">
+                <History className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)]">
+                    Generated PRD History
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                    {prdHistory.length} {prdHistory.length === 1 ? 'document' : 'documents'}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  Browse, preview, download, or restore previously synthesized PRD specifications
+                </p>
+              </div>
+            </div>
+
+            {prdHistory.length > 0 && (
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <button
+                  type="button"
+                  onClick={() =>
+                    openConfirm(
+                      'Clear All PRD History',
+                      'Are you sure you want to delete all saved PRD generation history? This action cannot be undone.',
+                      clearPrdHistory,
+                      'Clear All'
+                    )
+                  }
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--danger,#ef4444)] hover:bg-[var(--danger,#ef4444)]/10 transition-all cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Clear All</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Filters & Search Toolbar */}
+          {prdHistory.length > 0 && (
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1 p-1 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-subtle)] overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilterMode('all')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    historyFilterMode === 'all'
+                      ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  All ({prdHistory.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilterMode('text')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    historyFilterMode === 'text'
+                      ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <FileText className="h-3 w-3" />
+                  <span>Text Specs ({prdHistory.filter((h) => h.mode === 'text').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilterMode('url')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    historyFilterMode === 'url'
+                      ? 'bg-[var(--bg-primary)] text-[var(--accent)] shadow-sm'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <Globe className="h-3 w-3" />
+                  <span>URL Crawl ({prdHistory.filter((h) => h.mode === 'url').length})</span>
+                </button>
+              </div>
+
+              <div className="relative min-w-[220px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Search PRD history..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-primary)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* History List or Empty States */}
+          <div className="mt-4">
+            {prdHistory.length === 0 ? (
+              <div className="py-12 flex flex-col items-center justify-center text-center text-[var(--text-muted)] space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--accent)]">
+                  <History className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-[var(--text-primary)]">
+                    No PRD History Yet
+                  </p>
+                  <p className="text-xs max-w-sm mt-1 text-[var(--text-muted)]">
+                    When you generate PRDs using product details or web crawling, ForgeQA
+                    automatically archives them here for instant restoration, downloading, and reuse.
+                  </p>
+                </div>
+              </div>
+            ) : filteredPrdHistory.length === 0 ? (
+              <div className="py-8 text-center text-[var(--text-muted)]">
+                <p className="font-medium text-xs">No PRD entries match your filter.</p>
+                <p className="text-[11px] mt-0.5">Try clearing the search query or switching tabs.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredPrdHistory.map((item) => {
+                  const isCopiedThis = copiedHistoryId === item.id;
+                  const previewSnippet = item.prdText
+                    .replace(/^[#\s*_-]+/gm, '')
+                    .replace(/\n+/g, ' ')
+                    .slice(0, 160);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="group rounded-xl p-4 border border-[var(--border-subtle)] bg-[var(--bg-primary)] hover:border-[var(--accent)]/50 transition-all flex flex-col justify-between space-y-3"
+                    >
+                      <div>
+                        {/* Card Header: Mode Badge + Time */}
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                              item.mode === 'text'
+                                ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            }`}
+                          >
+                            {item.mode === 'text' ? (
+                              <>
+                                <FileText className="h-2.5 w-2.5" />
+                                <span>Text Specs</span>
+                              </>
+                            ) : (
+                              <>
+                                <Globe className="h-2.5 w-2.5" />
+                                <span>URL Crawl</span>
+                              </>
+                            )}
+                          </span>
+
+                          <div className="flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatHistoryTime(item.createdAt)}</span>
+                          </div>
+                        </div>
+
+                        {/* Title & Target Details */}
+                        <h3 className="font-semibold text-sm text-[var(--text-primary)] line-clamp-1 group-hover:text-[var(--accent)] transition-colors">
+                          {item.title}
+                        </h3>
+
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
+                          {item.productName && (
+                            <span className="truncate max-w-[140px]">
+                              App: <strong className="text-[var(--text-secondary)]">{item.productName}</strong>
+                            </span>
+                          )}
+                          {item.appUrl && (
+                            <span className="truncate max-w-[180px] font-mono text-[10px]">
+                              {item.appUrl}
+                            </span>
+                          )}
+                          <span>• {item.wordCount} words</span>
+                          {item.provider && (
+                            <span className="capitalize">• {item.provider}</span>
+                          )}
+                        </div>
+
+                        {/* Snippet Preview */}
+                        <p className="mt-2 text-xs text-[var(--text-secondary)] line-clamp-2 leading-relaxed bg-[var(--bg-secondary)] p-2 rounded-lg border border-[var(--border-subtle)]">
+                          {previewSnippet}...
+                        </p>
+                      </div>
+
+                      {/* Card Action Buttons */}
+                      <div className="pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRestorePrd(item)}
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all cursor-pointer"
+                          title="Load this PRD into the editor and preview"
+                        >
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                          <span>Load & View</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyHistoryPrd(item)}
+                            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer"
+                            title="Copy Markdown"
+                          >
+                            {isCopiedThis ? (
+                              <Check className="h-3.5 w-3.5 text-[var(--success,#10b981)]" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadHistoryPrd(item)}
+                            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-all cursor-pointer"
+                            title="Download (.md)"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openConfirm(
+                                'Delete PRD History Entry',
+                                `Delete "${item.title}" from your saved PRD history?`,
+                                () => deletePrdHistoryItem(item.id),
+                                'Delete'
+                              )
+                            }
+                            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger,#ef4444)] hover:bg-[var(--danger,#ef4444)]/10 transition-all cursor-pointer"
+                            title="Delete Entry"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </Card>
+      </section>
     </div>
   );
+}
+
+function formatHistoryTime(dateStr: string) {
+  try {
+    return new Intl.DateTimeFormat('en', {
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    }).format(new Date(dateStr));
+  } catch {
+    return dateStr;
+  }
 }
 
 function renderFormattedText(text: string) {

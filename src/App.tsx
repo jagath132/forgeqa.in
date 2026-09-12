@@ -6,13 +6,14 @@ import { AuthPage } from './pages/AuthPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { CompleteRegistrationPage } from './pages/CompleteRegistrationPage';
 import { DashboardPage } from './pages/DashboardPage';
+
+import { DesignSystemPage } from './pages/DesignSystemPage';
 import { PrdGeneratorPage } from './pages/PrdGeneratorPage';
 import { GeneratorPage } from './pages/GeneratorPage';
 import { TestScripts } from './pages/TestScripts';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { SettingsPage } from './pages/SettingsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SuitesPage } from './pages/SuitesPage';
+
 import { RegressionPage } from './pages/RegressionPage';
 import { AdminPage } from './pages/AdminPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -38,13 +39,13 @@ function AppLayout() {
   useEffect(() => {
     const titles: Record<string, string> = {
       '/dashboard': 'Dashboard — ForgeQA',
+      '/design-system': 'Design System — ForgeQA',
       '/prd-generator': 'PRD Generator — ForgeQA',
       '/generator': 'Generator — ForgeQA',
       '/test-scripts': 'Test Scripts — ForgeQA',
       '/knowledge': 'Knowledge Base — ForgeQA',
       '/settings': 'Settings — ForgeQA',
       '/analytics': 'Analytics — ForgeQA',
-      '/suites': 'Suites — ForgeQA',
       '/regression': 'Regression — ForgeQA',
     };
     document.title = titles[pathname] || 'ForgeQA — AI-Powered Test Automation Platform';
@@ -57,6 +58,9 @@ function AppLayout() {
           <div ref={contentRef} className="flex-1 px-4 py-6 lg:px-8 lg:py-8 overflow-y-auto">
             <Routes>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/test-runs" element={<Navigate to="/generator" replace />} />
+              <Route path="/defects" element={<Navigate to="/generator" replace />} />
+              <Route path="/design-system" element={<DesignSystemPage />} />
               <Route path="/prd-generator" element={<PrdGeneratorPage />} />
               <Route path="/generator" element={<GeneratorPage />} />
               <Route path="/test-scripts" element={<TestScripts />} />
@@ -65,9 +69,8 @@ function AppLayout() {
               <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
               <Route path="/license-manager" element={<Navigate to="/dashboard" replace />} />
               <Route path="/ai-settings" element={<Navigate to="/settings" replace />} />
-              <Route path="/profile" element={<Navigate to="/settings" replace />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/suites" element={<SuitesPage />} />
+              <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
+
               <Route path="/regression" element={<RegressionPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

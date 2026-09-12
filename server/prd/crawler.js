@@ -197,40 +197,128 @@ export async function crawlWebApp({ url, email, password, focus, maxPages = 20 }
       throw new Error(`Browser crawl failed: ${err.message}`);
     }
   } else {
-    // Fallback: Fetch single page via HTTP
+    // Fallback: Robust single/multi-page fetch via HTTP when Playwright is unavailable
     try {
-      const resp = await fetch(targetUrlObj.href, {
+      // Normalize URL (try https first, fallback to http if necessary)
+      let currentTarget = targetUrlObj.href;
+      let resp = await fetch(currentTarget, {
+        method: 'GET',
+        redirect: 'follow',
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 ForgeQA/1.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ForgeQA/1.0',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
         },
+      }).catch(async (err) => {
+        // If https failed and user didn't specify protocol, try http
+        if (targetUrlObj.protocol === 'https:' && !url.startsWith('https://')) {
+          currentTarget = `http://${targetUrlObj.host}${targetUrlObj.pathname}${targetUrlObj.search}`;
+          return await fetch(currentTarget, {
+            redirect: 'follow',
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ForgeQA/1.0',
+            },
+          });
+        }
+        throw err;
       });
+
       if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        if (resp.status === 404) {
+          // If the specific route was a 404, try probing the origin root URL as fallback
+          if (targetUrlObj.pathname !== '/' && targetUrlObj.pathname !== '') {
+            const rootResp = await fetch(origin, {
+              redirect: 'follow',
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ForgeQA/1.0',
+              },
+            }).catch(() => null);
+
+            if (rootResp && rootResp.ok) {
+              resp = rootResp;
+              currentTarget = origin;
+            } else {
+              throw new Error(`The URL "${currentTarget}" returned 404 Not Found. Please verify that the application or path exists and is running.`);
+            }
+          } else {
+            throw new Error(`The URL "${currentTarget}" returned 404 Not Found. Please verify the URL and ensure the target server is running.`);
+          }
+        } else {
+          throw new Error(`HTTP ${resp.status}: ${resp.statusText || 'Unable to access URL'}`);
+        }
       }
+
       const html = await resp.text();
 
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
       const title = titleMatch ? titleMatch[1].trim() : targetUrlObj.hostname;
 
-      // Extract basic text
+      // Extract headings (h1, h2, h3)
+      const headings = [];
+      const headingRegex = /<h[1-3][^>]*>(.*?)<\/h[1-3]>/gi;
+      let hMatch;
+      while ((hMatch = headingRegex.exec(html)) !== null && headings.length < 15) {
+        const text = hMatch[1].replace(/<[^>]+>/g, '').trim();
+        if (text && !headings.includes(text)) headings.push(text);
+      }
+
+      // Extract buttons
+      const buttons = [];
+      const buttonRegex = /<(?:button|a)[^>]*(?:class="[^"]*(?:btn|button)[^"]*"|role="button")[^>]*>(.*?)<\/(?:button|a)>/gi;
+      let bMatch;
+      while ((bMatch = buttonRegex.exec(html)) !== null && buttons.length < 20) {
+        const bText = bMatch[1].replace(/<[^>]+>/g, '').trim();
+        if (bText && bText.length < 40 && !buttons.includes(bText)) buttons.push(bText);
+      }
+
+      // Extract input fields / forms
+      const forms = [];
+      const inputRegex = /<input[^>]+>/gi;
+      const inputs = [];
+      let inputMatch;
+      while ((inputMatch = inputRegex.exec(html)) !== null && inputs.length < 15) {
+        const tag = inputMatch[0];
+        const nameMatch = tag.match(/name=["']([^"']+)["']/i) || tag.match(/id=["']([^"']+)["']/i);
+        const typeMatch = tag.match(/type=["']([^"']+)["']/i);
+        const placeholderMatch = tag.match(/placeholder=["']([^"']+)["']/i);
+        if (nameMatch || placeholderMatch) {
+          inputs.push({
+            name: nameMatch ? nameMatch[1] : '',
+            type: typeMatch ? typeMatch[1] : 'text',
+            placeholder: placeholderMatch ? placeholderMatch[1] : '',
+            label: placeholderMatch ? placeholderMatch[1] : nameMatch ? nameMatch[1] : '',
+          });
+        }
+      }
+      if (inputs.length > 0) {
+        forms.push({ inputs });
+      }
+
+      // Extract clean readable text
       const cleanHtml = html
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '')
+        .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '')
         .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
         .replace(/\s+/g, ' ')
         .trim();
 
       pages.push({
-        url: targetUrlObj.href,
+        url: currentTarget,
         title,
-        headings: [],
-        buttons: [],
-        forms: [],
-        snippet: cleanHtml.slice(0, 4000),
+        headings,
+        buttons,
+        forms,
+        snippet: cleanHtml.slice(0, 4000) || `Discovered webpage at ${currentTarget}`,
       });
     } catch (fetchErr) {
-      throw new Error(`URL fetch failed: ${fetchErr.message}`);
+      throw new Error(`URL exploration failed: ${fetchErr.message}`);
     }
   }
 

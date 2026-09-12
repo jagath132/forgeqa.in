@@ -1,147 +1,288 @@
-import { Card } from './ui/Card';
-
-const phaseLabels: Record<string, string> = {
-  knowledge: 'Knowledge Retrieval',
-  prompt: 'Prompt Assembly',
-  generating: 'Matrix Synthesis',
-  complete: 'Complete',
-  error: 'Error',
-  connecting: 'Connecting...',
-};
-
-const phaseDescriptions: Record<string, string> = {
-  knowledge: 'Vector search & scoring',
-  prompt: 'Context injection',
-  generating: 'LLM inference & parsing',
-  complete: 'Generation complete',
-  error: 'Generation failed',
-  connecting: 'Establishing stream...',
-};
-
-const stepColors = [
+/* ─── Phase metadata ───────────────────────────────────────────────── */
+const PHASES = [
   {
-    accent: 'var(--accent-cyan)',
-    soft: 'var(--accent-cyan-soft)',
-    border: 'color-mix(in srgb, var(--accent-cyan) 30%, transparent)',
+    key: 'knowledge',
+    label: 'Knowledge Retrieval',
+    sub: 'Vector search & scoring',
+    icon: '⚡',
   },
   {
-    accent: 'var(--accent-violet)',
-    soft: 'var(--accent-violet-soft)',
-    border: 'color-mix(in srgb, var(--accent-violet) 30%, transparent)',
+    key: 'prompt',
+    label: 'Prompt Assembly',
+    sub: 'Context injection',
+    icon: '🧩',
   },
   {
-    accent: 'var(--accent-rose)',
-    soft: 'var(--accent-rose-soft)',
-    border: 'color-mix(in srgb, var(--accent-rose) 30%, transparent)',
+    key: 'generating',
+    label: 'Matrix Synthesis',
+    sub: 'LLM inference & parsing',
+    icon: '✦',
   },
-];
+] as const;
 
-export function GeneratingLoader({
-  phase,
-  streamingText,
-  onCancel: _onCancel,
-}: {
-  phase: string | null;
-  streamingText: string;
-  onCancel?: () => void;
-}) {
-  const currentSteps = ['knowledge', 'prompt', 'generating'];
-  const currentIndex = currentSteps.indexOf(phase ?? '');
+/* ─── Orb spinner ──────────────────────────────────────────────────── */
+function AIOrb() {
+  return (
+    <div style={{ position: 'relative', width: 88, height: 88, flexShrink: 0 }}>
+      <style>{`
+        @keyframes orb-spin-1 { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes orb-spin-2 { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+        @keyframes orb-pulse  { 0%,100% { opacity:0.7; transform:scale(1); } 50% { opacity:1; transform:scale(1.08); } }
+        @keyframes slide-up-fade { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes progress-fill { from { width:0%; } to { width:100%; } }
+        @keyframes blink-dot { 0%,80%,100%{ opacity:0; } 40%{ opacity:1; } }
+      `}</style>
+
+      {/* Outer ring */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '50%',
+          border: '2px solid transparent',
+          borderTopColor: '#818cf8',
+          borderRightColor: '#22d3ee',
+          animation: 'orb-spin-1 2s linear infinite',
+        }}
+      />
+      {/* Middle ring */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 10,
+          borderRadius: '50%',
+          border: '2px solid transparent',
+          borderBottomColor: '#a78bfa',
+          borderLeftColor: '#34d399',
+          animation: 'orb-spin-2 1.4s linear infinite',
+        }}
+      />
+      {/* Core orb */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 20,
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #818cf8 0%, #22d3ee 50%, #a78bfa 100%)',
+          boxShadow: '0 0 30px rgba(129,140,248,0.6), 0 0 60px rgba(34,211,238,0.3)',
+          animation: 'orb-pulse 2s ease-in-out infinite',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span style={{ fontSize: '16px' }}>✦</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Phase stepper ────────────────────────────────────────────────── */
+function PhaseStepper({ currentPhase }: { currentPhase: string | null }) {
+  const currentIndex = PHASES.findIndex((p) => p.key === currentPhase);
 
   return (
-    <Card className="p-8" style={{ borderColor: 'var(--border-default)' }}>
-      <div className="flex flex-col items-center text-center">
-        <div className="relative flex h-14 w-14 items-center justify-center">
-          <div
-            className="absolute inset-0 rounded-full animate-spin"
-            style={{ border: '3px solid var(--accent)', borderTopColor: 'transparent' }}
-          />
-          <span className="text-xs font-bold gradient-text">AI</span>
-        </div>
-        <h2 className="mt-4 text-lg font-bold gradient-text">
-          {phase ? (phaseLabels[phase] ?? 'Generating') : 'Generating Test Cases'}
-        </h2>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-          {phase
-            ? (phaseDescriptions[phase] ?? '')
-            : 'Retrieving vectors, compiling prompt, and requesting the AI model.'}
-        </p>
-      </div>
+    <div style={{ width: '100%', maxWidth: 520, position: 'relative', padding: '0 8px' }}>
+      {/* Track line */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 13,
+          left: '10%',
+          right: '10%',
+          height: '2px',
+          background: 'rgba(99,102,241,0.15)',
+          borderRadius: '2px',
+        }}
+      />
+      {/* Progress fill */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 13,
+          left: '10%',
+          height: '2px',
+          borderRadius: '2px',
+          background: 'linear-gradient(90deg, #818cf8, #22d3ee)',
+          boxShadow: '0 0 8px rgba(34,211,238,0.5)',
+          transition: 'width 0.6s ease',
+          width:
+            currentIndex < 0 ? '0%' : currentIndex === 0 ? '0%' : currentIndex === 1 ? '40%' : '80%',
+        }}
+      />
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        {currentSteps.map((step, index) => {
-          const isActive = index === currentIndex;
-          const isDone = index < currentIndex;
-          const c = stepColors[index];
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
+        {PHASES.map((phase, idx) => {
+          const isActive = idx === currentIndex;
+          const isDone = idx < currentIndex;
+
           return (
             <div
-              key={step}
-              className="rounded-lg p-4 transition-all"
-              style={{
-                background: isActive ? c.soft : 'var(--bg-secondary)',
-                border: `1px solid ${isActive ? c.border : 'var(--border-subtle)'}`,
-                boxShadow: isActive
-                  ? `0 0 15px ${c.accent.replace('var(', '').replace(')', '')}15`
-                  : undefined,
-              }}
+              key={phase.key}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', flex: 1 }}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span
-                  className="text-xs font-semibold uppercase"
-                  style={{ color: isActive ? c.accent : 'var(--text-muted)' }}
-                >
-                  Phase {index + 1}
-                </span>
-                {isActive && (
+              {/* Step dot */}
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  background: isDone
+                    ? 'linear-gradient(135deg, #34d399, #059669)'
+                    : isActive
+                    ? 'linear-gradient(135deg, #818cf8, #22d3ee)'
+                    : 'rgba(30,41,59,0.8)',
+                  border: isDone
+                    ? '2px solid rgba(52,211,153,0.4)'
+                    : isActive
+                    ? '2px solid rgba(129,140,248,0.5)'
+                    : '2px solid rgba(99,102,241,0.2)',
+                  boxShadow: isActive ? '0 0 16px rgba(129,140,248,0.5)' : 'none',
+                  transition: 'all 0.4s ease',
+                  position: 'relative',
+                  zIndex: 1,
+                }}
+              >
+                {isDone ? '✓' : isActive ? (
                   <span
-                    className="flex h-1.5 w-1.5 rounded-full animate-ping"
-                    style={{ background: c.accent }}
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#fff',
+                      animation: 'orb-pulse 1s ease-in-out infinite',
+                    }}
                   />
-                )}
-                {isDone && (
-                  <svg
-                    className="h-4 w-4"
-                    style={{ color: 'var(--accent-emerald)' }}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
+                ) : (
+                  <span style={{ color: 'rgba(148,163,184,0.4)', fontSize: '10px' }}>{idx + 1}</span>
                 )}
               </div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {phaseLabels[step]}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {phaseDescriptions[step]}
-              </p>
+
+              {/* Label */}
+              <div style={{ textAlign: 'center', maxWidth: 110 }}>
+                <p
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: isDone ? '#34d399' : isActive ? '#e2e8f0' : '#475569',
+                    margin: 0,
+                    lineHeight: 1.3,
+                    transition: 'color 0.3s',
+                  }}
+                >
+                  {phase.label}
+                </p>
+                <p
+                  style={{
+                    fontSize: '10px',
+                    color: isActive ? '#64748b' : '#334155',
+                    margin: '2px 0 0',
+                    lineHeight: 1.2,
+                    transition: 'color 0.3s',
+                  }}
+                >
+                  {phase.sub}
+                </p>
+              </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      {streamingText && (
-        <div className="mt-6">
-          <p
-            className="text-xs font-semibold uppercase tracking-wider mb-2"
-            style={{ color: 'var(--accent-cyan)' }}
-          >
-            Live AI Response
-          </p>
-          <div
-            className="rounded-lg p-4 font-mono text-xs leading-relaxed max-h-32 overflow-y-auto"
+/* ─── Main component ───────────────────────────────────────────────── */
+export function GeneratingLoader({
+  phase,
+  streamingText: _streamingText,
+  onCancel: _onCancel,
+}: {
+  phase: string | null;
+  streamingText?: string;
+  onCancel?: () => void;
+}) {
+  const phaseLabel =
+    phase === 'complete'
+      ? 'Generation complete!'
+      : phase === 'error'
+      ? 'Generation failed'
+      : phase === 'connecting'
+      ? 'Connecting to AI...'
+      : 'Generating Test Matrix';
+
+  const phaseSubLabel =
+    phase === 'complete'
+      ? 'All test cases are ready'
+      : phase === 'error'
+      ? 'An error occurred during generation'
+      : phase === 'connecting'
+      ? 'Establishing secure stream connection'
+      : 'ForgeQA AI is synthesizing your test cases';
+
+  return (
+    <div
+      style={{
+        borderRadius: '20px',
+        padding: '36px 32px 32px',
+        background: 'linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(9,14,27,0.99) 100%)',
+        border: '1px solid rgba(99,102,241,0.2)',
+        boxShadow:
+          '0 0 0 1px rgba(255,255,255,0.03), 0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(99,102,241,0.06)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '32px',
+        width: '100%',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Ambient glow backdrop */}
+      <div
+        style={{
+          position: 'absolute',
+          top: -40,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 400,
+          height: 200,
+          background: 'radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ── Hero section: orb + title ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', zIndex: 1 }}>
+        <AIOrb />
+
+        <div style={{ textAlign: 'center' }}>
+          <h2
             style={{
-              background: 'var(--bg-primary)',
-              border: '1px solid color-mix(in srgb, var(--accent-cyan) 20%, transparent)',
-              color: 'var(--accent-cyan)',
+              fontSize: '20px',
+              fontWeight: 700,
+              margin: '0 0 6px',
+              background: 'linear-gradient(135deg, #e2e8f0 0%, #94a3b8 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              letterSpacing: '-0.02em',
             }}
           >
-            <pre className="whitespace-pre-wrap">{streamingText}</pre>
-          </div>
+            {phaseLabel}
+          </h2>
+          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>{phaseSubLabel}</p>
         </div>
+      </div>
+
+      {/* ── Phase stepper ── */}
+      {!['complete', 'error', 'connecting'].includes(phase ?? '') && (
+        <PhaseStepper currentPhase={phase} />
       )}
-    </Card>
+    </div>
   );
 }

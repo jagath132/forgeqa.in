@@ -1,84 +1,62 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  CheckSquare,
+  FileText,
+  History,
+  Cpu,
+  Sparkles,
+  BookOpen,
+  ShieldCheck,
+  Layers,
+} from 'lucide-react';
 import { useAppStore, getProviderLabel } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { MobilePageHeader } from '../components/PageHeader';
 import { FeatureIcon3D } from '../components/ui/Icons3D';
 import { WelcomePopup } from '../components/WelcomePopup';
 
-const metricColors = [
-  {
-    accent: 'var(--color-accent)',
-    soft: 'var(--color-accent-soft)',
-    border: 'color-mix(in srgb, var(--color-accent) 12%, var(--color-border))',
-    icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128H5.228A2 2 0 015 17.119V5a2 2 0 012-2h6',
-  },
-  {
-    accent: 'var(--color-cyan)',
-    soft: 'var(--color-cyan-soft)',
-    border: 'color-mix(in srgb, var(--color-cyan) 12%, var(--color-border))',
-    icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
-  },
-  {
-    accent: 'var(--color-violet)',
-    soft: 'var(--color-violet-soft)',
-    border: 'color-mix(in srgb, var(--color-violet) 12%, var(--color-border))',
-    icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
-  },
-  {
-    accent: 'var(--color-success)',
-    soft: 'var(--color-success-soft)',
-    border: 'color-mix(in srgb, var(--color-success) 12%, var(--color-border))',
-    icon: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z',
-  },
-];
-
 function DashboardMetric({
   label,
   value,
-  compact = false,
-  index = 0,
+  sublabel,
+  icon: Icon,
+  color,
+  bg,
+  border,
 }: {
   label: string;
   value: number | string;
-  compact?: boolean;
-  index?: number;
+  sublabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  bg: string;
+  border: string;
 }) {
-  const c = metricColors[index % metricColors.length];
   return (
     <div
-      className="rounded-xl p-4 transition-all duration-200"
-      style={{ background: c.soft, border: `1px solid ${c.border}` }}
+      className={`p-3.5 rounded-xl bg-white border ${border} shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between min-w-0 overflow-hidden`}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center"
-          style={{ background: `color-mix(in srgb, ${c.accent} 10%, transparent)` }}
-        >
-          <svg
-            className="h-4 w-4"
-            style={{ color: c.accent }}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d={c.icon} />
-          </svg>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`w-7 h-7 rounded-lg ${bg} ${color} flex items-center justify-center shrink-0`}>
+          <Icon className="w-3.5 h-3.5" />
         </div>
-        <p
-          className="text-[11px] font-bold uppercase tracking-wider"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
           {label}
-        </p>
+        </span>
       </div>
-      <p
-        className={`font-bold ${compact ? 'text-base truncate' : 'text-2xl'}`}
-        style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
-      >
-        {value}
-      </p>
+      <div className="mt-2.5 min-w-0">
+        <div
+          className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight truncate"
+          style={{ fontFamily: 'var(--font-display)' }}
+          title={String(value)}
+        >
+          {value}
+        </div>
+        <div className="text-[11px] font-medium text-slate-400 truncate mt-0.5">
+          {sublabel}
+        </div>
+      </div>
     </div>
   );
 }
@@ -182,121 +160,139 @@ export function DashboardPage() {
       <MobilePageHeader pageKey="dashboard" />
       {showWelcome && <WelcomePopup onDismiss={handleWelcomeDismiss} />}
 
-      {/* Hero Card */}
-      <Card className="overflow-hidden !p-0 card-highlight">
-        <div className="grid lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="p-6 sm:p-8 lg:p-10">
-            <span className="badge badge-primary">
-              <svg
-                className="h-3 w-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
+      {/* Hero Card / Command Center */}
+      <Card className="overflow-hidden !p-0 bg-white border border-slate-200/80 shadow-sm rounded-2xl">
+        <div className="grid lg:grid-cols-12 min-w-0">
+          {/* Left Column: Command & Intent */}
+          <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between min-w-0">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 mb-5">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Enterprise QA Workspace</span>
+              </div>
+              <h1
+                className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 leading-[1.15] mb-2.5"
+                style={{ fontFamily: 'var(--font-display)' }}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              Enterprise QA Workspace
-            </span>
-            <h1
-              className="text-3xl sm:text-4xl font-extrabold tracking-tight mt-5 mb-2"
-              style={{
-                fontFamily: 'var(--font-display)',
-                color: 'var(--text-primary)',
-                lineHeight: 1.1,
-              }}
-            >
-              Ship with <span className="gradient-shift">confidence</span>
-            </h1>
-            <h2
-              className="text-lg sm:text-xl font-semibold tracking-tight mb-3"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Turn requirements into test cases, scripts, and traceable QA output.
-            </h2>
-            <p
-              className="text-sm leading-relaxed"
-              style={{ color: 'var(--text-muted)', maxWidth: 480 }}
-            >
-              A focused command center for product teams who need repeatable QA coverage without
-              changing the working generation pipeline already in place.
-            </p>
-            <div className="flex flex-wrap gap-3 mt-7">
+                Ship with{' '}
+                <span className="bg-gradient-to-r from-indigo-600 via-blue-600 to-emerald-500 bg-clip-text text-transparent">
+                  confidence
+                </span>
+              </h1>
+              <h2 className="text-base sm:text-lg font-semibold text-slate-700 mb-2 leading-snug">
+                Turn requirements into test cases, scripts, and traceable QA output.
+              </h2>
+              <p className="text-sm text-slate-500 leading-relaxed max-w-xl">
+                A focused command center for engineering and QA teams who need repeatable, automated
+                test coverage without changing the working generation pipeline already in place.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 mt-8">
               <button
-                className="btn-primary px-6 py-2.5 text-sm"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm hover:shadow transition-all cursor-pointer"
                 onClick={() => navigate('/generator')}
                 type="button"
               >
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                  Start Test Case Generation
-                </span>
+                <Sparkles className="w-4 h-4" />
+                <span>Start Test Case Generation</span>
               </button>
               <button
-                className="btn-secondary px-6 py-2.5 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-semibold shadow-xs transition-all cursor-pointer"
                 onClick={() => navigate('/knowledge')}
                 type="button"
               >
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-                    />
-                  </svg>
-                  Manage Knowledge Base
-                </span>
+                <BookOpen className="w-4 h-4 text-slate-500" />
+                <span>Manage Knowledge Base</span>
               </button>
             </div>
           </div>
 
-          <div
-            className="p-6 sm:p-8 lg:p-10 border-t lg:border-t-0 lg:border-l"
-            style={{ background: 'var(--bg-tertiary)', borderColor: 'var(--border-default)' }}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p
-                  className="text-[11px] font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--text-muted)' }}
+          {/* Right Column: Active Run Telemetry HUD */}
+          <div className="lg:col-span-5 p-6 sm:p-8 lg:p-9 border-t lg:border-t-0 lg:border-l border-slate-200/80 bg-slate-50/50 flex flex-col justify-between min-w-0">
+            <div>
+              <div className="flex items-center justify-between gap-3 mb-3.5 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                    Active Run Telemetry
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 ${
+                    hasConfiguredApiKey
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}
                 >
-                  Active Run
-                </p>
+                  {hasConfiguredApiKey ? 'AI Ready' : 'Key Needed'}
+                </span>
+              </div>
+
+              {/* Active Matrix Summary Box */}
+              <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs mb-3.5 min-w-0">
+                <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-1.5 min-w-0">
+                  <span className="font-semibold text-slate-700 flex items-center gap-1.5 shrink-0">
+                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                    Active Matrix
+                  </span>
+                  {qaResult && (
+                    <span className="text-[11px] font-medium text-slate-400 shrink-0">
+                      {testCaseCount} {testCaseCount === 1 ? 'case' : 'cases'}
+                    </span>
+                  )}
+                </div>
                 <p
-                  className="text-lg font-bold mt-1 truncate"
-                  style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}
+                  className="text-xs sm:text-[13px] font-medium text-slate-800 line-clamp-2 leading-relaxed break-words"
+                  title={qaResult?.summary ?? 'No active matrix'}
                 >
-                  {qaResult?.summary ?? 'No active matrix'}
+                  {qaResult?.summary ??
+                    'No active matrix — start test case generation to populate telemetry.'}
                 </p>
               </div>
-              <span className={`badge ${hasConfiguredApiKey ? 'badge-success' : 'badge-warning'}`}>
-                {hasConfiguredApiKey ? 'AI Ready' : 'Key Needed'}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <DashboardMetric label="Test Cases" value={testCaseCount} index={0} />
-              <DashboardMetric label="Context Files" value={contextCount} index={1} />
-              <DashboardMetric label="History Runs" value={history.length} index={2} />
-              <DashboardMetric label="Provider" value={providerLabel} compact index={3} />
+
+              {/* 2x2 Telemetry Grid */}
+              <div className="grid grid-cols-2 gap-3 min-w-0 w-full">
+                <DashboardMetric
+                  label="Test Cases"
+                  value={testCaseCount}
+                  sublabel="Generated matrix"
+                  icon={CheckSquare}
+                  color="text-indigo-600"
+                  bg="bg-indigo-50"
+                  border="border-indigo-100/80"
+                />
+                <DashboardMetric
+                  label="Context Files"
+                  value={contextCount}
+                  sublabel="RAG knowledge"
+                  icon={FileText}
+                  color="text-cyan-600"
+                  bg="bg-cyan-50"
+                  border="border-cyan-100/80"
+                />
+                <DashboardMetric
+                  label="History Runs"
+                  value={history.length}
+                  sublabel="Total executed"
+                  icon={History}
+                  color="text-violet-600"
+                  bg="bg-violet-50"
+                  border="border-violet-100/80"
+                />
+                <DashboardMetric
+                  label="AI Provider"
+                  value={providerLabel}
+                  sublabel="Active engine"
+                  icon={Cpu}
+                  color="text-emerald-600"
+                  bg="bg-emerald-50"
+                  border="border-emerald-100/80"
+                />
+              </div>
             </div>
           </div>
         </div>

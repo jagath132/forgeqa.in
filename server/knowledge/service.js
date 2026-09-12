@@ -142,8 +142,8 @@ export function createKnowledgeService(store, env = {}) {
       };
     },
 
-    searchChunks(query, limit, userId) {
-      return store.searchChunks(query, limit, userId);
+    searchChunks(query, limit, userId, fileId) {
+      return store.searchChunks(query, limit, userId, fileId);
     },
   };
 }

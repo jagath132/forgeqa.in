@@ -63,13 +63,17 @@ The predefined output table columns are fixed and must be populated for every te
 - Test Steps
 - Expected
 Generate professional QA test cases in table-ready format.
-Include all categories:
-- Positive scenarios
-- Negative scenarios
-- Validation checks
-- Edge cases
-Create only required test cases don't give too many
-Use sequential TC_ID values from TC_001, TC_002 like this 
+Ensure comprehensive, exhaustive test coverage across the entire feature scope. Do NOT limit or truncate the test case count to only a few items.
+Generate as many test cases as necessary to thoroughly validate the functionality (typically 12 to 25+ test cases for a complete feature).
+
+Ensure extensive coverage across all categories:
+- Positive / Happy Path scenarios (primary workflows, multiple valid data combinations)
+- Negative & Failure scenarios (invalid formats, missing required fields, bad payloads, unauthorized actions)
+- Validation & Field Rule checks (boundary lengths, special characters, regex validation, type mismatches)
+- Edge cases & Boundary conditions (concurrency, timeouts, network interruptions, rate limits, empty states)
+- Security & Permission checks (role privileges, token expiry, access violations)
+
+Use sequential TC_ID values starting from TC_001, TC_002, TC_003, etc.
 Prefer project-specific terminology, validations, workflows, and constraints found in the uploaded knowledge context.
 `;
 }
@@ -144,7 +148,7 @@ export async function generateWithGemini({ apiKey, prompt, model }) {
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.1,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
           },
         }),
       }
@@ -196,7 +200,7 @@ export async function generateWithGeminiStream({ apiKey, prompt, model, onToken 
           generationConfig: {
             responseMimeType: 'application/json',
             temperature: 0.1,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
           },
         }),
       }
@@ -241,6 +245,19 @@ export async function generateWithGeminiStream({ apiKey, prompt, model, onToken 
     }
     return;
   }
+}
+
+
+/**
+ * Strips markdown code fences that AI models often add around code output.
+ * Handles: ```javascript, ```typescript, ```python, ``` etc.
+ */
+function stripMarkdownFences(text) {
+  // Remove opening fence with optional language tag (e.g. ```javascript\n)
+  let cleaned = text.replace(/^```[a-zA-Z0-9_+-]*\s*\n?/m, '');
+  // Remove closing fence
+  cleaned = cleaned.replace(/```\s*$/m, '');
+  return cleaned.trim();
 }
 
 export async function generateWithGeminiRaw({ apiKey, prompt, model }) {
@@ -294,5 +311,6 @@ export async function generateWithGeminiRaw({ apiKey, prompt, model }) {
     throw error;
   }
 
-  return text;
+  return stripMarkdownFences(text);
 }
+

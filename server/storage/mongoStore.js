@@ -142,12 +142,12 @@ export function createMongoKnowledgeStore() {
       if (!result.deletedCount) throw new Error('File not found or access denied.');
     },
 
-    async searchChunks(query, limit = 8, userId) {
+    async searchChunks(query = '', limit = 50, userId, fileId = null) {
       const db = getDb();
-      const terms = query
-        .toLowerCase()
-        .split(/\W+/)
-        .filter((t) => t.length > 2);
+      const cleanQuery = (query || '').trim().toLowerCase();
+      const terms = cleanQuery
+        ? cleanQuery.split(/\W+/).filter((t) => t.length > 1)
+        : [];
 
       const userFileIds = await db
         .collection('knowledge_files')
@@ -155,7 +155,13 @@ export function createMongoKnowledgeStore() {
         .toArray()
         .then((docs) => docs.map((d) => d._id.toString()));
 
-      const fileQuery = userId ? { fileId: { $in: userFileIds } } : {};
+      const fileQuery = {};
+      if (fileId) {
+        fileQuery.fileId = fileId;
+      } else if (userId) {
+        fileQuery.fileId = { $in: userFileIds };
+      }
+
       const allChunks = await db.collection('knowledge_chunks').find(fileQuery).toArray();
 
       const filesMap = {};
@@ -168,7 +174,10 @@ export function createMongoKnowledgeStore() {
       const results = allChunks
         .map((chunk) => {
           const text = chunk.chunkText.toLowerCase();
-          const score = terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
+          const score =
+            terms.length === 0
+              ? 1
+              : terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
           const file = filesMap[chunk.fileId] || {};
           return {
             id: chunk._id.toString(),

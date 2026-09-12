@@ -94,20 +94,6 @@ const NAV_ITEMS_MONITOR: NavItem[] = [
     icon: <ShieldIcon3D size={20} />,
     color: 'violet',
   },
-  {
-    key: 'analytics',
-    label: 'Quality Insights',
-    path: '/analytics',
-    icon: <BarChartIcon3D size={20} />,
-    color: 'amber',
-  },
-  {
-    key: 'suites',
-    label: 'Test Collections',
-    path: '/suites',
-    icon: <LayersIcon3D size={20} />,
-    color: 'cyan',
-  },
 ];
 
 const NAV_ITEMS_SYSTEM: NavItem[] = [
