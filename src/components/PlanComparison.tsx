@@ -7,69 +7,94 @@ export interface PlanComparisonProps {
 
 export function PlanComparison({ currentTier = 'free', onSelectPlan }: PlanComparisonProps) {
   const rows = [
-    { name: 'Monthly Price', free: '₹0', pro: '₹1,499 / seat', enterprise: '₹1,499 → ₹699 / seat' },
+    {
+      name: 'Monthly Base Price',
+      free: '₹0',
+      pro: '₹1,499 / seat',
+      enterprise: '₹1,499 → ₹699 / seat',
+    },
     {
       name: 'Workspace Members',
       free: '1 member',
-      pro: 'Up to 10 seats',
-      enterprise: 'Up to 999 seats',
+      pro: 'Up to 60 seats',
+      enterprise: 'Unlimited seats',
     },
-    { name: 'Daily AI Generations', free: '20 / day', pro: '200 / day', enterprise: '2,000 / day' },
+    {
+      name: 'Daily AI Generations',
+      free: '20 / day',
+      pro: '200 / day',
+      enterprise: '2,000+ / day',
+    },
     {
       name: 'Max Test Case Storage',
       free: '500 test cases',
       pro: '5,000 test cases',
-      enterprise: '50,000 test cases',
+      enterprise: '50,000+ test cases',
     },
     {
       name: 'Knowledge Base Uploads',
-      free: '3 files',
-      pro: '20 files',
-      enterprise: 'Unlimited files',
+      free: '3 documents',
+      pro: '20 documents',
+      enterprise: 'Unlimited documents',
     },
     {
       name: 'Multi-AI Provider Selection',
-      free: 'Basic',
+      free: 'Standard',
       pro: 'All 6 Providers',
-      enterprise: 'All 6 Providers',
+      enterprise: 'All 6 Providers + Custom LLM',
     },
     {
       name: 'Automation Script Generator',
       free: '❌',
-      pro: '✅ Playwright, Cypress, Selenium',
-      enterprise: '✅ Full Automation Engine',
+      pro: '✅ Playwright, Cypress, Selenium, Robot',
+      enterprise: '✅ Full Multi-Framework Engine',
     },
     {
       name: 'Regression Testing Suites',
       free: '❌',
-      pro: '✅ Full Access',
-      enterprise: '✅ Unlimited Suites',
+      pro: '✅ Full Suite Runner',
+      enterprise: '✅ Unlimited Suites + Webhooks',
     },
-    { name: 'CI/CD Webhooks & Jenkins', free: '❌', pro: '✅ Included', enterprise: '✅ Included' },
-    { name: 'Volume Seat Discounts', free: 'N/A', pro: 'Standard', enterprise: '✅ Up to 53% Off' },
-    { name: 'SSO & SAML Authentication', free: '❌', pro: '❌', enterprise: '✅ Enterprise SSO' },
+    {
+      name: 'CI/CD Webhooks & GitHub Actions',
+      free: '❌',
+      pro: '✅ Included',
+      enterprise: '✅ Included',
+    },
+    {
+      name: 'Volume Seat Discounts',
+      free: 'N/A',
+      pro: 'Up to 40% Off',
+      enterprise: '✅ Custom Contract',
+    },
+    {
+      name: 'SSO & SAML Authentication',
+      free: '❌',
+      pro: '❌',
+      enterprise: '✅ Okta, Azure AD, Google',
+    },
     {
       name: 'Audit Logs & Governance',
       free: '❌',
-      pro: '✅ Basic Audit',
-      enterprise: '✅ Full Audit Trail',
+      pro: '✅ Basic Audit Log',
+      enterprise: '✅ Comprehensive SOC2 Trail',
     },
     {
-      name: 'Support',
-      free: 'Community',
-      pro: 'Priority Email',
-      enterprise: 'Dedicated Manager & SLA',
+      name: 'Support Level',
+      free: 'Community Forums',
+      pro: 'Priority Email (< 4h)',
+      enterprise: 'Dedicated TAM & 99.9% SLA',
     },
   ];
 
   const renderCellContent = (content: string) => {
     if (content.includes('✅')) {
-      const text = content.replace('✅ ', '').replace('✅', '');
+      const text = content.replace('✅ ', '').replace('✅', '').trim();
       return (
-        <span className="flex items-center justify-center gap-2 text-slate-200">
-          <span className="bg-emerald-500 text-white rounded-full p-0.5 inline-flex shadow">
+        <span className="inline-flex items-center justify-center gap-1.5 text-slate-800 text-xs font-medium">
+          <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
             <svg
-              className="w-3 h-3"
+              className="w-2.5 h-2.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -83,47 +108,56 @@ export function PlanComparison({ currentTier = 'free', onSelectPlan }: PlanCompa
       );
     }
     if (content.includes('❌')) {
-      return <span className="flex items-center justify-center text-slate-500 font-black">✕</span>;
+      return (
+        <span className="inline-flex items-center justify-center text-slate-300 font-bold text-sm">
+          —
+        </span>
+      );
     }
-    return <span>{content}</span>;
+    return <span className="font-mono text-xs text-slate-700">{content}</span>;
   };
 
   return (
-    <div className="overflow-x-auto rounded-xl bg-[#1e293b] shadow-md border border-slate-700">
+    <div className="overflow-x-auto rounded-2xl bg-white shadow-sm border border-slate-200/90">
       <table className="w-full text-left border-collapse text-xs sm:text-sm">
         <thead>
-          <tr className="border-b border-slate-700/50">
-            <th className="p-4 text-slate-400 font-semibold w-1/4 align-top">Features & Limits</th>
-            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-[#1e293b] align-top">
-              <div className="font-bold text-lg text-white">Free</div>
-              <div className="text-[10px] text-slate-400 font-mono mt-1">₹0 / mo</div>
+          <tr className="border-b border-slate-200 bg-slate-50/80">
+            <th className="p-4.5 text-slate-600 font-bold text-xs uppercase tracking-wider w-1/4">
+              Features & Limits
             </th>
-            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-slate-800/80 align-top">
-              <div className="font-bold text-lg text-blue-400">Pro</div>
-              <div className="text-[10px] text-slate-400 font-mono mt-1">₹1,499 / seat / mo</div>
+            <th className="p-4.5 text-center w-1/4 border-l border-slate-200">
+              <div className="font-bold text-base text-slate-800">Free Starter</div>
+              <div className="text-xs text-slate-500 font-mono mt-0.5">₹0 / month</div>
             </th>
-            <th className="p-4 text-center w-1/4 border-l border-slate-700/50 bg-[#1e293b] align-top">
-              <div className="font-bold text-lg text-amber-400">Enterprise</div>
-              <div className="text-[10px] text-slate-400 font-mono mt-1">₹699–₹1,499 / seat</div>
+            <th className="p-4.5 text-center w-1/4 border-l border-slate-200 bg-indigo-50/40 relative">
+              <div className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider mb-1">
+                Featured
+              </div>
+              <div className="font-bold text-base text-indigo-700">ForgeQA Pro</div>
+              <div className="text-xs text-indigo-600 font-mono mt-0.5">₹1,499 / seat / mo</div>
+            </th>
+            <th className="p-4.5 text-center w-1/4 border-l border-slate-200 bg-amber-50/30">
+              <div className="font-bold text-base text-amber-900">Enterprise</div>
+              <div className="text-xs text-amber-700 font-mono mt-0.5">Volume Custom</div>
             </th>
           </tr>
         </thead>
-        <tbody className="text-xs">
+        <tbody className="divide-y divide-slate-100 text-xs">
           {rows.map((row, index) => (
             <tr
               key={row.name}
-              className={`border-b border-slate-700/50 ${
-                index % 2 === 0 ? 'bg-slate-800/30' : 'bg-transparent'
+              className={`transition-colors hover:bg-slate-50/70 ${
+                index % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
               }`}
             >
-              <td className="p-4 font-medium text-slate-300">{row.name}</td>
-              <td className="p-4 text-center text-slate-400 font-mono border-l border-slate-700/50">
+              <td className="p-4 font-semibold text-slate-800 text-xs">{row.name}</td>
+              <td className="p-4 text-center border-l border-slate-100">
                 {renderCellContent(row.free)}
               </td>
-              <td className="p-4 text-center text-blue-300 font-mono border-l border-slate-700/50 bg-slate-800/30 font-medium">
+              <td className="p-4 text-center border-l border-slate-100 bg-indigo-50/20 font-medium">
                 {renderCellContent(row.pro)}
               </td>
-              <td className="p-4 text-center text-amber-300 font-mono border-l border-slate-700/50 font-medium">
+              <td className="p-4 text-center border-l border-slate-100 bg-amber-50/10 font-medium">
                 {renderCellContent(row.enterprise)}
               </td>
             </tr>

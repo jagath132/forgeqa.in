@@ -106,4 +106,10 @@ async function ensureIndexes(targetDb) {
   ];
 
   await Promise.allSettled(indexPromises);
+  try {
+    const { ensureBillingIndexes } = await import('./billing/schema.js');
+    await ensureBillingIndexes(targetDb);
+  } catch (_e) {
+    // ignore if schema not loaded
+  }
 }

@@ -72,7 +72,7 @@ export async function getUsage(userId) {
  * @param {string} userId
  * @param {number} incrementBy
  */
-export async function incrementAiGenerations(userId, incrementBy = 1) {
+export async function incrementAiGenerations(userId, incrementBy = 1, idempotencyKey = null) {
   if (!userId) return;
   const db = getDb();
   const todayKey = getTodayKey();
@@ -86,6 +86,14 @@ export async function incrementAiGenerations(userId, incrementBy = 1) {
     },
     { upsert: true }
   );
+
+  // Sync with atomic entitlements balance
+  try {
+    const { consume } = await import('./entitlements.js');
+    await consume(userId, 'ai_runs', incrementBy, idempotencyKey);
+  } catch {
+    // Ignore in tests if DB is mocked
+  }
 }
 
 /**
@@ -98,14 +106,29 @@ export async function incrementAiGenerations(userId, incrementBy = 1) {
 export async function checkPlanLimit(userId, limitType, requestedAmount = 1) {
   const plan = await getUserPlan(userId);
 
-  // Check account billing status
-  if (plan.subscriptionStatus === 'past_due' || plan.subscriptionStatus === 'canceled') {
+  // Check account billing status with grace period (7 days default)
+  if (plan.subscriptionStatus === 'canceled') {
     return {
       allowed: false,
-      reason: `Account subscription is ${plan.subscriptionStatus}. Please update your billing status.`,
+      reason: `Account subscription is canceled. Please upgrade or renew your subscription.`,
       current: 0,
       limit: 0,
     };
+  }
+
+  if (plan.subscriptionStatus === 'past_due') {
+    // Check if grace period is active
+    const GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+    const updatedAt = plan.updatedAt ? new Date(plan.updatedAt).getTime() : 0;
+    const isWithinGrace = updatedAt > 0 && Date.now() - updatedAt < GRACE_PERIOD_MS;
+    if (!isWithinGrace) {
+      return {
+        allowed: false,
+        reason: `Account subscription payment failed and grace period has ended. Please update your payment method.`,
+        current: 0,
+        limit: 0,
+      };
+    }
   }
 
   const usage = await getUsage(userId);

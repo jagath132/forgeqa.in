@@ -16,6 +16,9 @@ import { SettingsPage } from './pages/SettingsPage';
 
 import { RegressionPage } from './pages/RegressionPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PricingPage } from './pages/PricingPage';
+import { CheckoutSuccessPage } from './pages/CheckoutSuccessPage';
+import { CheckoutCanceledPage } from './pages/CheckoutCanceledPage';
 import { NavBar } from './components/NavBar';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
@@ -44,6 +47,7 @@ function AppLayout() {
       '/test-scripts': 'Test Scripts — ForgeQA',
       '/knowledge': 'Knowledge Base — ForgeQA',
       '/settings': 'Settings — ForgeQA',
+      '/billing': 'Billing & Subscription — ForgeQA',
       '/analytics': 'Analytics — ForgeQA',
       '/regression': 'Regression — ForgeQA',
     };
@@ -65,6 +69,10 @@ function AppLayout() {
               <Route path="/test-scripts" element={<TestScripts />} />
               <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/billing" element={<SettingsPage defaultSection="billing" />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/billing/success" element={<CheckoutSuccessPage />} />
+              <Route path="/billing/canceled" element={<CheckoutCanceledPage />} />
               <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
               <Route path="/license-manager" element={<Navigate to="/dashboard" replace />} />
               <Route path="/ai-settings" element={<Navigate to="/settings" replace />} />

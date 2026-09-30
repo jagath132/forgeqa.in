@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
-import { generateTestScript } from '../lib/testScriptApi';
-import type { TestingFramework, ScriptLanguage, TestScriptRequest } from '../lib/api';
+import { generateTestScript, generateFrameworkProject } from '../lib/testScriptApi';
+import type {
+  TestingFramework,
+  ScriptLanguage,
+  TestScriptRequest,
+  FrameworkProjectResponse,
+} from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { MobilePageHeader } from '../components/PageHeader';
 import { DesktopOnlyGuard } from '../components/DesktopOnlyGuard';
 import { TestScriptCodeViewer } from '../components/TestScriptCodeViewer';
+import { Layers, Boxes, FileCode, Sparkles, CheckCircle2, FolderArchive, Zap } from 'lucide-react';
 
 const frameworkOptions: TestingFramework[] = ['playwright', 'cypress', 'selenium', 'puppeteer'];
 
@@ -86,7 +92,28 @@ export function TestScripts() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [generationMode, setGenerationMode] = useState<'framework' | 'single'>('framework');
+  const [frameworkProject, setFrameworkProject] = useState<FrameworkProjectResponse | null>(() => {
+    try {
+      const stored = localStorage.getItem('forgeqa_framework_project');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [projectName, setProjectName] = useState('forge-playwright-framework');
   const scriptSectionRef = useRef<HTMLDivElement>(null);
+
+  // Persist frameworkProject to localStorage
+  useEffect(() => {
+    try {
+      if (frameworkProject) {
+        localStorage.setItem('forgeqa_framework_project', JSON.stringify(frameworkProject));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [frameworkProject]);
 
   // Sync framework & language when scriptResult changes
   useEffect(() => {
@@ -114,8 +141,7 @@ export function TestScripts() {
 
   const isReadyToGenerate =
     !!provider &&
-    !!framework &&
-    !!language &&
+    (generationMode === 'framework' || (!!framework && !!language)) &&
     testCases.length > 0 &&
     selectedIds.length > 0 &&
     targetUrl.trim().length > 0;
@@ -131,19 +157,60 @@ export function TestScripts() {
     }
     setError('');
     setIsLoading(true);
-    if (!framework || !language) return;
-    const payload: TestScriptRequest = {
-      testCaseIds: selectedTestCases.map((tc) => tc.tcId),
-      testCases: selectedTestCases,
-      framework: framework as TestingFramework,
-      language: language as ScriptLanguage,
-      provider,
-      targetUrl,
-      options: { headless, viewport: { width, height } },
-    };
+
     try {
-      const response = await generateTestScript(payload);
-      addSavedScript(response.data, targetUrl);
+      if (generationMode === 'framework') {
+        const response = await generateFrameworkProject({
+          testCaseIds: selectedTestCases.map((tc) => tc.tcId),
+          testCases: selectedTestCases,
+          framework: (framework || 'playwright') as TestingFramework,
+          language: (language || 'typescript') as ScriptLanguage,
+          provider,
+          targetUrl,
+          options: {
+            projectName: projectName.trim() || `forge-${framework || 'playwright'}-framework`,
+            headless,
+            viewport: { width, height },
+          },
+        });
+        setFrameworkProject(response.data);
+        const mainFile =
+          response.data.files.find(
+            (f) =>
+              f.path.includes('.spec.') ||
+              f.path.includes('.cy.') ||
+              f.path.includes('test_') ||
+              f.path.includes('Test.java') ||
+              f.path.includes('Tests.cs')
+          ) || response.data.files[0];
+        if (mainFile) {
+          addSavedScript(
+            {
+              script: mainFile.content,
+              framework: (framework || 'playwright') as TestingFramework,
+              language: (language || 'typescript') as ScriptLanguage,
+              fileName: mainFile.path,
+              testCases: selectedTestCases,
+            },
+            targetUrl
+          );
+        }
+      } else {
+        if (!framework || !language) return;
+        const payload: TestScriptRequest = {
+          testCaseIds: selectedTestCases.map((tc) => tc.tcId),
+          testCases: selectedTestCases,
+          framework: framework as TestingFramework,
+          language: language as ScriptLanguage,
+          provider,
+          targetUrl,
+          options: { headless, viewport: { width, height } },
+        };
+        const response = await generateTestScript(payload);
+        setFrameworkProject(null);
+        addSavedScript(response.data, targetUrl);
+      }
+
       setTimeout(() => {
         scriptSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
@@ -223,6 +290,7 @@ export function TestScripts() {
     } else {
       setScriptResult(null);
     }
+    setFrameworkProject(null);
     setIsCopied(false);
   }
 
@@ -243,6 +311,109 @@ export function TestScripts() {
               </p>
             </div>
             <span className="badge badge-success">Engine Configured</span>
+          </div>
+
+          {/* Mode Switcher Banner */}
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl border border-indigo-100/90 bg-gradient-to-r from-indigo-50/60 via-white to-sky-50/40 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200/60">
+                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                  Architecture Mode
+                </span>
+                {generationMode === 'framework' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Full Enterprise Suite
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/70">
+                    <Zap className="w-3 h-3 text-sky-600" />
+                    Isolated Spec Run
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+                  {generationMode === 'framework' ? (
+                    <>
+                      <span>
+                        Enterprise{' '}
+                        {framework
+                          ? getFrameworkLabel(framework as TestingFramework)
+                          : 'Multi-Framework'}{' '}
+                        Suite
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-white text-indigo-600 border border-indigo-200 shadow-2xs">
+                        {language ? getLanguageLabel(language as ScriptLanguage) : 'Modular'} POM
+                      </span>
+                    </>
+                  ) : (
+                    <span>Single Isolated Spec File</span>
+                  )}
+                </h3>
+
+                <div className="text-xs text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
+                  {generationMode === 'framework' ? (
+                    <>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                        <Layers className="w-3.5 h-3.5 text-indigo-500" /> Page Object Model
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                        <Boxes className="w-3.5 h-3.5 text-sky-500" /> CI/CD Automation
+                      </span>
+                      <span className="text-slate-300">•</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                        <FolderArchive className="w-3.5 h-3.5 text-emerald-500" /> Complete Zip
+                        Suite
+                      </span>
+                    </>
+                  ) : (
+                    <span>
+                      Generates a self-contained, standalone test script for rapid debugging and
+                      quick isolated validation.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100/90 border border-slate-200 shadow-inner self-stretch sm:self-auto justify-stretch sm:justify-start">
+              <button
+                type="button"
+                onClick={() => {
+                  setGenerationMode('framework');
+                  if (!framework) setFramework('playwright');
+                  if (!language) setLanguage('typescript');
+                }}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  generationMode === 'framework'
+                    ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <Boxes
+                  className={`w-3.5 h-3.5 ${generationMode === 'framework' ? 'text-indigo-600' : 'text-slate-400'}`}
+                />
+                <span>2026 Production Framework</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGenerationMode('single')}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                  generationMode === 'single'
+                    ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                }`}
+              >
+                <FileCode
+                  className={`w-3.5 h-3.5 ${generationMode === 'single' ? 'text-indigo-600' : 'text-slate-400'}`}
+                />
+                <span>Single Script</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -692,9 +863,12 @@ export function TestScripts() {
           {/* Redesigned IDE-Grade Code Viewer in full-width glory */}
           <TestScriptCodeViewer
             scriptResult={scriptResult}
+            frameworkProject={frameworkProject}
             isLoading={isLoading}
-            framework={framework}
-            language={language}
+            framework={
+              framework || (frameworkProject?.framework as TestingFramework) || 'playwright'
+            }
+            language={language || (frameworkProject?.language as ScriptLanguage) || 'typescript'}
             onClear={clearScript}
             onCopy={copyToClipboard}
             onDownload={downloadScript}

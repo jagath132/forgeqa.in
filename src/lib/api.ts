@@ -138,6 +138,62 @@ export type TestScriptResponse = {
   testCases: TestCase[];
 };
 
+export type FrameworkFile = {
+  path: string;
+  content: string;
+  language: string;
+};
+
+export type FrameworkProjectResponse = {
+  projectName: string;
+  framework: TestingFramework;
+  language: ScriptLanguage;
+  targetUrl: string;
+  testCasesCount: number;
+  files: FrameworkFile[];
+};
+
+export type GenerateFrameworkRequest = {
+  testCaseIds: string[];
+  testCases: TestCase[];
+  framework?: TestingFramework;
+  language?: ScriptLanguage;
+  provider?: AiProvider;
+  targetUrl: string;
+  apiKey?: string;
+  model?: string;
+  options?: {
+    projectName?: string;
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+  };
+};
+
+export type AiDiagnosisRequest = {
+  errorLog: string;
+  failedLocator?: string;
+  targetUrl?: string;
+  testCaseSummary?: string;
+  provider?: AiProvider;
+  apiKey?: string;
+  model?: string;
+};
+
+export type AiDiagnosisResponse = {
+  rootCause: string;
+  category:
+    | 'LOCATOR_MISMATCH'
+    | 'TIMED_OUT'
+    | 'FLAKY_NETWORK'
+    | 'APPLICATION_BUG'
+    | 'ASSERTION_FAILURE';
+  isFlaky: boolean;
+  confidenceScore: number;
+  healedLocator?: string;
+  suggestedFix: string;
+  preventionAdvice: string;
+};
+
 export type TeamMember = {
   id: string;
   email: string;
@@ -158,8 +214,14 @@ export type RegressionStatus = 'pending' | 'running' | 'passed' | 'failed' | 'er
 export type RegressionResult = {
   testCaseId: string;
   passed: boolean;
+  riskLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
+  durationMs?: number;
+  browser?: string;
   actualOutput?: string;
   errorMessage?: string;
+  failedLocator?: string;
+  errorLog?: string;
+  traceUrl?: string;
   screenshot?: string;
 };
 export type RegressionRun = {
