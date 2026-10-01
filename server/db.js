@@ -103,6 +103,9 @@ async function ensureIndexes(targetDb) {
       .collection('pending_registrations')
       .createIndex({ createdAt: 1 }, { expireAfterSeconds: 86400 }),
     targetDb.collection('pending_registrations').createIndex({ status: 1 }),
+    targetDb.collection('ai_model_alerts').createIndex({ userId: 1, dismissed: 1 }),
+    targetDb.collection('ai_model_alerts').createIndex({ dedupeKey: 1 }),
+    targetDb.collection('ai_model_alerts').createIndex({ createdAt: -1 }),
   ];
 
   await Promise.allSettled(indexPromises);

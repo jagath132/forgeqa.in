@@ -6,7 +6,6 @@ import {
   PlugZap,
   Settings,
   Search,
-  Bell,
   ChevronDown,
   Sparkles,
   FileCode2,
@@ -17,6 +16,7 @@ import {
   X,
   Plus,
 } from 'lucide-react';
+import { ModelAlertBell, ModelAlertBanner } from '../ModelAlertNotification';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -204,15 +204,8 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Topbar Actions (Notifications + User Profile) */}
         <div className="flex items-center gap-4">
-          {/* Notification Bell with Red Dot */}
-          <button
-            type="button"
-            className="relative w-8 h-8 rounded-lg flex items-center justify-center text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
-            title="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#EF4444] ring-2 ring-white" />
-          </button>
+          {/* AI Model Alert Bell */}
+          <ModelAlertBell />
 
           {/* Vertical Separator */}
           <div className="h-5 w-[1px] bg-[#E2E8F0]" />
@@ -312,6 +305,9 @@ export function AppShell({ children }: AppShellProps) {
           <div className="max-w-[1360px] mx-auto">{children}</div>
         </main>
       </div>
+
+      {/* Global AI model deprecation toast notifications */}
+      <ModelAlertBanner />
     </div>
   );
 }

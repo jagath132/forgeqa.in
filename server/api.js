@@ -41,6 +41,13 @@ import {
   logAudit,
 } from './auth/index.js';
 import { sendSupportEmail } from './email/index.js';
+import {
+  getAlertsForUser,
+  dismissAlert,
+  dismissAllAlerts,
+  checkUserProviderModel,
+} from './ai/modelHealthCheck.js';
+import { MODEL_REGISTRY, getRegistryDefault } from './ai/modelRegistry.js';
 
 const ALLOWED_EXTENSIONS = [
   '.apk',
@@ -170,12 +177,21 @@ function getDefaultModel(provider) {
     case 'opencode':
       return 'gpt-4o-mini';
     case 'groq':
-      return 'llama-3.1-8b-instant';
+      return 'llama-3.3-70b-versatile';
     case 'claude':
       return 'claude-3-5-sonnet-latest';
     default:
       return undefined;
   }
+}
+
+function resolveModel(provider, model) {
+  if (provider === 'groq') {
+    if (!model || model === 'llama-3.1-8b-instant') {
+      return 'llama-3.3-70b-versatile';
+    }
+  }
+  return model || getDefaultModel(provider);
 }
 
 async function resolveApiKey(provider, requestApiKey, env, userId) {
@@ -685,7 +701,7 @@ export function createApiMiddleware(env = {}) {
         }
 
         const chunks = await knowledge.searchChunks(requirement, 4, user.id);
-        const defaultModel = model || getDefaultModel(provider);
+        const defaultModel = resolveModel(provider, model);
         let result;
 
         if (provider === 'gemini') {
@@ -772,7 +788,7 @@ export function createApiMiddleware(env = {}) {
         sendSSE('phase', { phase: 'prompt', message: 'Building RAG prompt...' });
 
         const prompt = buildQaPrompt(requirement, chunks);
-        const defaultModel = model || getDefaultModel(provider);
+        const defaultModel = resolveModel(provider, model);
 
         sendSSE('phase', { phase: 'generating', message: 'Requesting AI model...' });
 
@@ -890,7 +906,7 @@ export function createApiMiddleware(env = {}) {
           targetUrl,
           options,
           testCases: selectedTestCases,
-          model: model || getDefaultModel(provider),
+          model: resolveModel(provider, model),
         });
 
         sendJson(res, 200, result);
@@ -947,7 +963,7 @@ export function createApiMiddleware(env = {}) {
           targetUrl: targetUrl || 'https://example.com',
           options,
           testCases: selectedTestCases,
-          model: model || getDefaultModel(provider),
+          model: resolveModel(provider, model),
         });
 
         sendJson(res, 200, result);
@@ -989,7 +1005,7 @@ export function createApiMiddleware(env = {}) {
           failedLocator,
           targetUrl,
           testCaseSummary,
-          model: model || getDefaultModel(provider),
+          model: resolveModel(provider, model),
         });
 
         sendJson(res, 200, diagnosis);
@@ -1049,7 +1065,7 @@ export function createApiMiddleware(env = {}) {
         });
 
         const prompt = buildPrdPromptFromText({ productName, moduleName, details });
-        const defaultModel = model || getDefaultModel(targetProvider);
+        const defaultModel = resolveModel(targetProvider, model);
 
         sendSSE('phase', {
           phase: 'generating',
@@ -1144,7 +1160,7 @@ export function createApiMiddleware(env = {}) {
           });
 
           const prompt = buildPrdPromptFromCrawl(crawlReport);
-          const defaultModel = model || getDefaultModel(targetProvider);
+          const defaultModel = resolveModel(targetProvider, model);
 
           sendSSE('phase', {
             phase: 'generating',
@@ -1262,7 +1278,7 @@ export function createApiMiddleware(env = {}) {
           requirement,
           existingTestCases: testCases,
           platform: platform || 'web',
-          model: model || getDefaultModel(provider),
+          model: resolveModel(provider, model),
         });
         sendJson(res, 200, { testCases: result?.testCases || [], summary: result?.summary || '' });
         return;
@@ -1303,7 +1319,7 @@ export function createApiMiddleware(env = {}) {
           framework: fw,
           language: lang,
           targetUrl: targetUrl || 'http://localhost:3000',
-          model: model || getDefaultModel(provider),
+          model: resolveModel(provider, model),
         });
         sendJson(res, 200, { scripts: [result] });
         return;
@@ -1558,6 +1574,64 @@ export function createApiMiddleware(env = {}) {
           console.warn('Failed to send enterprise inquiry email:', emailErr.message);
         }
         sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // ── AI Model Alert endpoints ────────────────────────────────────────────
+
+      // GET /api/ai/model-alerts — returns unseen deprecation alerts for current user
+      if (url.pathname === '/api/ai/model-alerts' && req.method === 'GET') {
+        const alerts = await getAlertsForUser(user.id);
+        sendJson(res, 200, { alerts });
+        return;
+      }
+
+      // POST /api/ai/model-alerts/:id/dismiss — dismiss one alert
+      if (/^\/api\/ai\/model-alerts\/[^/]+\/dismiss$/.test(url.pathname) && req.method === 'POST') {
+        const alertId = url.pathname.split('/')[4];
+        await dismissAlert(user.id, alertId);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // POST /api/ai/model-alerts/dismiss-all
+      if (url.pathname === '/api/ai/model-alerts/dismiss-all' && req.method === 'POST') {
+        await dismissAllAlerts(user.id);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      // GET /api/ai/model-registry — full registry for frontend model pickers
+      if (url.pathname === '/api/ai/model-registry' && req.method === 'GET') {
+        sendJson(res, 200, { registry: MODEL_REGISTRY });
+        return;
+      }
+
+      // POST /api/ai/check-model — live-probe the user's current provider + model
+      // Body: { provider, model } — both optional, defaults from registry
+      if (url.pathname === '/api/ai/check-model' && req.method === 'POST') {
+        const rawBody = await readRequestBody(req);
+        const { provider: reqProvider, model: reqModel } = JSON.parse(rawBody || '{}');
+        const provider = reqProvider || user.activeProvider;
+        if (!provider) {
+          sendJson(res, 400, { error: 'No provider specified or configured.' });
+          return;
+        }
+        const model = reqModel || getRegistryDefault(provider);
+        let encryptedKey = null;
+        try {
+          encryptedKey = await authStore.getEncryptedApiKey(user.id, provider);
+        } catch {
+          // no key stored — registry-only check
+        }
+        const newAlerts = await checkUserProviderModel(user.id, {
+          provider,
+          model,
+          encryptedKey,
+          liveProbe: true,
+        });
+        const alerts = await getAlertsForUser(user.id);
+        sendJson(res, 200, { alerts, newAlerts });
         return;
       }
 
