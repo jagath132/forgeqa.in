@@ -43,10 +43,12 @@ async function callAi({ apiKey, prompt, provider = 'gemini', model }) {
       provider,
     });
   } else if (provider === 'groq') {
+    const groqModel =
+      !model || model === 'llama-3.1-8b-instant' ? 'llama-3.3-70b-versatile' : model;
     return await generateWithOpenAI({
       apiKey,
       prompt,
-      model: model || 'llama-3.1-8b-instant',
+      model: groqModel,
       endpoint: 'https://api.groq.com/openai/v1/chat/completions',
       provider,
     });

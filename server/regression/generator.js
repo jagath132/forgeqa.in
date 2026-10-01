@@ -27,7 +27,17 @@ export async function generateRegressionTestCases({
         : provider === 'groq'
           ? 'https://api.groq.com/openai/v1/chat/completions'
           : 'https://api.openai.com/v1/chat/completions';
-    const responseText = await generateWithOpenAI({ apiKey, prompt, model, endpoint, provider });
+    const targetModel =
+      provider === 'groq' && (!model || model === 'llama-3.1-8b-instant')
+        ? 'llama-3.3-70b-versatile'
+        : model;
+    const responseText = await generateWithOpenAI({
+      apiKey,
+      prompt,
+      model: targetModel,
+      endpoint,
+      provider,
+    });
     result = parseSafeJson(responseText);
   } else {
     throw new Error(`${provider} support is not implemented yet.`);

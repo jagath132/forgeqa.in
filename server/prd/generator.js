@@ -206,12 +206,13 @@ export async function generatePrdStream({ apiKey, provider = 'gemini', model, pr
         : 'https://api.openai.com/v1/chat/completions';
 
   const defaultModel =
-    model ||
-    (provider === 'groq'
-      ? 'llama-3.1-8b-instant'
-      : provider === 'openrouter'
-        ? 'google/gemini-2.0-flash-exp:free'
-        : 'gpt-4o-mini');
+    model && model !== 'llama-3.1-8b-instant'
+      ? model
+      : provider === 'groq'
+        ? 'llama-3.3-70b-versatile'
+        : provider === 'openrouter'
+          ? 'google/gemini-2.0-flash-exp:free'
+          : 'gpt-4o-mini';
 
   return generateWithOpenAIStream({
     apiKey,
