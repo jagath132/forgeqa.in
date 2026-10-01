@@ -10,6 +10,7 @@ import {
   generateWithGeminiStream,
   parseSafeJson,
 } from './ai/gemini.js';
+import { generateWithOpenAI, generateWithOpenAIStream } from './ai/openai.js';
 import {
   generateTestScript,
   generateFrameworkProject,
