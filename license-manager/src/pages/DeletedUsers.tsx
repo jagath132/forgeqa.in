@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import { Search, UserX, Undo2, Trash2, Check, AlertCircle } from 'lucide-react';
 
 interface DeletedUser {
@@ -15,6 +16,7 @@ export function DeletedUsersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const confirm = useConfirm();
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -40,9 +42,12 @@ export function DeletedUsersPage() {
 
   async function handleRestore(u: DeletedUser) {
     if (
-      !confirm(
-        `Restore ${u.email}? The account will be recreated — they'll need to use "Forgot password" to set a new password.`
-      )
+      !(await confirm({
+        title: 'Restore account',
+        message: `Restore ${u.email}? The account will be recreated — they'll need to use "Forgot password" to set a new password.`,
+        confirmLabel: 'Restore',
+        danger: false,
+      }))
     )
       return;
     setBusyId(u.id);
@@ -57,7 +62,14 @@ export function DeletedUsersPage() {
   }
 
   async function handlePurge(u: DeletedUser) {
-    if (!confirm(`Permanently purge the record for ${u.email}? This cannot be undone.`)) return;
+    if (
+      !(await confirm({
+        title: 'Purge record',
+        message: `Permanently purge the record for ${u.email}? This cannot be undone.`,
+        confirmLabel: 'Purge',
+      }))
+    )
+      return;
     setBusyId(u.id);
     try {
       await api.delete(`/api/admin/deleted-users/${u.id}`);

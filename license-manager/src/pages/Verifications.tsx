@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, type PendingRegistration } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   RefreshCw,
   Info,
@@ -28,6 +29,7 @@ export function VerificationsPage() {
   const [filter, setFilter] = useState<'pending_verification' | 'all'>('pending_verification');
   const [selectedItem, setSelectedItem] = useState<PendingRegistration | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const confirm = useConfirm();
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -83,9 +85,11 @@ export function VerificationsPage() {
 
   async function handleDelete(item: PendingRegistration) {
     if (
-      !confirm(
-        `Delete registration record for ${item.email}? This removes it from the queue permanently.`
-      )
+      !(await confirm({
+        title: 'Delete registration',
+        message: `Delete registration record for ${item.email}? This removes it from the queue permanently.`,
+        confirmLabel: 'Delete',
+      }))
     )
       return;
     setActionLoading(item.pendingId);

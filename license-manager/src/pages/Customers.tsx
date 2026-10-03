@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Customer, type EmailLog } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import { Search, X, Loader2, Plus, Check, AlertCircle, PenSquare, Trash2 } from 'lucide-react';
 
 export function CustomersPage() {
@@ -26,6 +27,7 @@ export function CustomersPage() {
   const [editRole, setEditRole] = useState('Member');
   const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const confirm = useConfirm();
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -133,9 +135,11 @@ export function CustomersPage() {
     if (!detailCustomer) return;
     if (!canManage) return;
     if (
-      !confirm(
-        `Delete customer ${detailCustomer.email}? Their keys will be released. This cannot be undone.`
-      )
+      !(await confirm({
+        title: 'Delete customer',
+        message: `Delete customer ${detailCustomer.email}? Their keys will be released. This cannot be undone.`,
+        confirmLabel: 'Delete',
+      }))
     )
       return;
     setSaving(true);

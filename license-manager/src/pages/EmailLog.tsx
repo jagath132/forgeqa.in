@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { api } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   Download,
   Search,
@@ -91,6 +92,7 @@ export function EmailLogPage() {
   const [composeKey, setComposeKey] = useState('');
   const [composeName, setComposeName] = useState('');
   const [sending, setSending] = useState(false);
+  const confirm = useConfirm();
   const [drawerEntry, setDrawerEntry] = useState<EmailEntry | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -178,7 +180,14 @@ export function EmailLogPage() {
   };
 
   const handleDelete = async (entry: EmailEntry) => {
-    if (!confirm(`Delete the log entry for ${entry.to} (${entry.subject})?`)) return;
+    if (
+      !(await confirm({
+        title: 'Delete log entry',
+        message: `Delete the log entry for ${entry.to} (${entry.subject})?`,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     setDeleting(entry.id);
     try {
       await api.delete(`/api/admin/email/logs/${entry.id}`);

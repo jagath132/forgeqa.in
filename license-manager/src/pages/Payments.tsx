@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Transaction } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   CreditCard,
   DollarSign,
@@ -30,6 +31,7 @@ export function PaymentsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const confirm = useConfirm();
 
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -107,7 +109,14 @@ export function PaymentsPage() {
   }
 
   async function handleDelete(tx: Transaction) {
-    if (!confirm(`Delete transaction ${tx.transactionId}? This cannot be undone.`)) return;
+    if (
+      !(await confirm({
+        title: 'Delete transaction',
+        message: `Delete transaction ${tx.transactionId}? This cannot be undone.`,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     try {
       await api.delete(`/api/admin/transactions/${tx.id}`);
       showToast('success', 'Transaction deleted');

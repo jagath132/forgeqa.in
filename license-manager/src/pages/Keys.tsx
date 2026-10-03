@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { api, type ProductKey } from '../lib/api';
+import { useConfirm } from '../components/ConfirmDialog';
 import {
   Plus,
   X,
@@ -28,6 +29,7 @@ export function KeysPage() {
   const [selectedKey, setSelectedKey] = useState<ProductKey | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [detailKey, setDetailKey] = useState<ProductKey | null>(null);
+  const confirm = useConfirm();
 
   const showToast = useCallback((type: 'success' | 'error', message: string) => {
     setToast({ type, message });
@@ -72,7 +74,14 @@ export function KeysPage() {
   }
 
   async function handleRevoke(key: string) {
-    if (!confirm(`Revoke key ${key}?`)) return;
+    if (
+      !(await confirm({
+        title: 'Revoke key',
+        message: `Revoke key ${key}? It will no longer be usable.`,
+        confirmLabel: 'Revoke',
+      }))
+    )
+      return;
     try {
       await api.post('/api/admin/keys/revoke', { key });
       await loadKeys();
@@ -83,7 +92,14 @@ export function KeysPage() {
   }
 
   async function handleDelete(key: ProductKey) {
-    if (!confirm(`Delete key ${key.key} permanently? This cannot be undone.`)) return;
+    if (
+      !(await confirm({
+        title: 'Delete key',
+        message: `Delete key ${key.key} permanently? This cannot be undone.`,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return;
     try {
       await api.delete(`/api/admin/keys/${key.id}`);
       setDetailKey(null);
