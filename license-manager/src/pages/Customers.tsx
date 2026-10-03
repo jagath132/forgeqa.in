@@ -1,18 +1,40 @@
-import { useEffect, useState } from "react";
-import { api, type Customer, type EmailLog } from "../lib/api";
-import { Search, X, Loader2 } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { api, type Customer, type EmailLog } from '../lib/api';
+import { Search, X, Loader2, Plus, Check, AlertCircle, PenSquare, Trash2 } from 'lucide-react';
 
 export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "approved" | "rejected">("all");
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [customerEmailLogs, setCustomerEmailLogs] = useState<EmailLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [drawerTab, setDrawerTab] = useState<'details' | 'edit'>('details');
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Create form state
+  const [newEmail, setNewEmail] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newRole, setNewRole] = useState('Member');
+  const [newNotes, setNewNotes] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  // Edit form state
+  const [editName, setEditName] = useState('');
+  const [editRole, setEditRole] = useState('Member');
+  const [editNotes, setEditNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const fetchCustomers = () => {
-    api.get<{ customers: Customer[] }>("/api/admin/customers")
+    api
+      .get<{ customers: Customer[] }>('/api/admin/customers')
       .then((r) => setCustomers(r.data.customers))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -26,35 +48,138 @@ export function CustomersPage() {
 
   async function openDetail(c: Customer) {
     setDetailCustomer(c);
+    setDrawerTab('details');
+    setEditName(c.name || '');
+    setEditRole(c.role || 'Member');
+    setEditNotes(c.notes || '');
     setLoadingDetail(true);
     setCustomerEmailLogs([]);
     try {
-      const res = await api.get<{ logs: EmailLog[] }>("/api/admin/email/logs");
+      const res = await api.get<{ logs: EmailLog[] }>('/api/admin/email/logs');
       setCustomerEmailLogs(res.data.logs.filter((l) => l.to === c.email));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setLoadingDetail(false);
   }
 
+  async function handleCreate() {
+    if (!newEmail.trim()) {
+      showToast('error', 'Email is required');
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await api.post<{ customer: Customer; tempPassword?: string }>(
+        '/api/admin/customers',
+        {
+          email: newEmail.trim(),
+          name: newName.trim() || undefined,
+          role: newRole,
+          notes: newNotes.trim() || undefined,
+        }
+      );
+      setShowCreate(false);
+      setNewEmail('');
+      setNewName('');
+      setNewRole('Member');
+      setNewNotes('');
+      showToast(
+        'success',
+        res.data.tempPassword
+          ? `Created ${res.data.customer.email} — temp password: ${res.data.tempPassword}`
+          : `Customer ${res.data.customer.email} created`
+      );
+      fetchCustomers();
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Failed to create customer');
+    }
+    setCreating(false);
+  }
+
+  async function handleSaveEdit() {
+    if (!detailCustomer) return;
+    if (!canManage) return;
+    setSaving(true);
+    try {
+      await api.put(`/api/admin/customers/${detailCustomer.id}`, {
+        name: editName,
+        role: editRole,
+        notes: editNotes,
+      });
+      showToast('success', 'Customer updated');
+      setDrawerTab('details');
+      const updated = {
+        ...detailCustomer,
+        name: editName || null,
+        role: editRole,
+        notes: editNotes || null,
+      };
+      setDetailCustomer(updated);
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === updated.id
+            ? { ...c, name: updated.name, role: updated.role, notes: updated.notes }
+            : c
+        )
+      );
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Update failed');
+    }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!detailCustomer) return;
+    if (!canManage) return;
+    if (
+      !confirm(
+        `Delete customer ${detailCustomer.email}? Their keys will be released. This cannot be undone.`
+      )
+    )
+      return;
+    setSaving(true);
+    try {
+      await api.delete(`/api/admin/customers/${detailCustomer.id}`);
+      showToast('success', 'Customer deleted');
+      setDetailCustomer(null);
+      fetchCustomers();
+    } catch (err: any) {
+      showToast('error', err?.response?.data?.error || 'Delete failed');
+    }
+    setSaving(false);
+  }
+
   const statusCounts = {
-    approved: customers.filter((c) => c.status === "approved").length,
-    rejected: customers.filter((c) => c.status === "rejected").length,
+    approved: customers.filter((c) => c.status === 'approved').length,
+    rejected: customers.filter((c) => c.status === 'rejected').length,
   };
 
-  const filtered = (search || statusFilter !== "all"
-    ? customers.filter((c) => {
-        if (statusFilter !== "all" && c.status !== statusFilter) return false;
-        if (search && !c.email.toLowerCase().includes(search.toLowerCase())) return false;
-        return true;
-      })
-    : customers);
+  // Rejected registrations are virtual records (id like "rejected_<email>"), not real user docs.
+  const canManage = !!detailCustomer && /^[0-9a-f]{24}$/i.test(detailCustomer.id);
+
+  const filtered =
+    search || statusFilter !== 'all'
+      ? customers.filter((c) => {
+          if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+          if (search && !c.email.toLowerCase().includes(search.toLowerCase())) return false;
+          return true;
+        })
+      : customers;
 
   return (
     <div>
       <div className="section-header">
         <h3>Customers</h3>
-        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-          {customers.length > 0 ? `${customers.length} total` : ""}
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            {customers.length > 0 ? `${customers.length} total` : ''}
+          </span>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+            <Plus size={14} strokeWidth={2.5} />
+            Add Customer
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -71,13 +196,22 @@ export function CustomersPage() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <div className="pill-group">
-          <button className={`pill${statusFilter === "all" ? " active" : ""}`} onClick={() => setStatusFilter("all")}>
+          <button
+            className={`pill${statusFilter === 'all' ? ' active' : ''}`}
+            onClick={() => setStatusFilter('all')}
+          >
             All <span className="pill-count">{customers.length}</span>
           </button>
-          <button className={`pill${statusFilter === "approved" ? " active" : ""}`} onClick={() => setStatusFilter("approved")}>
+          <button
+            className={`pill${statusFilter === 'approved' ? ' active' : ''}`}
+            onClick={() => setStatusFilter('approved')}
+          >
             Approved <span className="pill-count">{statusCounts.approved}</span>
           </button>
-          <button className={`pill${statusFilter === "rejected" ? " active" : ""}`} onClick={() => setStatusFilter("rejected")}>
+          <button
+            className={`pill${statusFilter === 'rejected' ? ' active' : ''}`}
+            onClick={() => setStatusFilter('rejected')}
+          >
             Rejected <span className="pill-count">{statusCounts.rejected}</span>
           </button>
         </div>
@@ -85,49 +219,99 @@ export function CustomersPage() {
 
       <div className="card" style={{ padding: 0 }}>
         {loading ? (
-          <div className="empty-state"><p>Loading customers...</p></div>
+          <div className="empty-state">
+            <p>Loading customers...</p>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
-            <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+            <svg
+              className="empty-state-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
               <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" />
             </svg>
-            <h3>{search ? "No customers match your search" : "No customers found"}</h3>
-            <p>{search ? "Try a different search term." : "Customers will appear here when they register with a product key."}</p>
+            <h3>{search ? 'No customers match your search' : 'No customers found'}</h3>
+            <p>
+              {search
+                ? 'Try a different search term.'
+                : 'Customers will appear here when they register with a product key.'}
+            </p>
           </div>
         ) : (
           <div className="table-container">
             <table>
               <thead>
-                  <tr>
-                    <th>Email</th>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Product Key</th>
-                    <th>Key Status</th>
-                    <th>Registered</th>
-                    <th style={{ width: 80 }}></th>
-                  </tr>
+                <tr>
+                  <th>Email</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Product Key</th>
+                  <th>Key Status</th>
+                  <th>Registered</th>
+                  <th style={{ width: 80 }}></th>
+                </tr>
               </thead>
               <tbody>
                 {filtered.map((c) => (
-                  <tr key={c.id} style={{ cursor: "pointer", opacity: c.status === "rejected" ? 0.6 : 1 }} onClick={() => openDetail(c)}>
+                  <tr
+                    key={c.id}
+                    style={{ cursor: 'pointer', opacity: c.status === 'rejected' ? 0.6 : 1 }}
+                    onClick={() => openDetail(c)}
+                  >
                     <td>{c.email}</td>
-                    <td style={{ color: c.name ? "var(--color-text-primary)" : "var(--color-text-muted)", fontSize: 13 }}>
-                      {c.name || "-"}
+                    <td
+                      style={{
+                        color: c.name ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
+                        fontSize: 13,
+                      }}
+                    >
+                      {c.name || '-'}
                     </td>
-                    <td><span className={`badge ${c.role === "admin" ? "badge-used" : "badge-available"}`}>{c.role}</span></td>
-                    <td><span className={`badge ${c.status === "rejected" ? "badge-expired" : "badge-used"}`} style={{ fontSize: 10 }}>{c.status}</span></td>
-                    <td><span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{c.productKey || <span style={{ color: "var(--color-text-muted)" }}>-</span>}</span></td>
+                    <td>
+                      <span
+                        className={`badge ${c.role === 'admin' ? 'badge-used' : 'badge-available'}`}
+                      >
+                        {c.role}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${c.status === 'rejected' ? 'badge-expired' : 'badge-used'}`}
+                        style={{ fontSize: 10 }}
+                      >
+                        {c.status}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>
+                        {c.productKey || (
+                          <span style={{ color: 'var(--color-text-muted)' }}>-</span>
+                        )}
+                      </span>
+                    </td>
                     <td>
                       {c.keyStatus ? (
                         <span className={`badge badge-${c.keyStatus}`}>{c.keyStatus}</span>
-                      ) : <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>-</span>}
+                      ) : (
+                        <span style={{ color: 'var(--color-text-muted)', fontSize: 12 }}>-</span>
+                      )}
                     </td>
-                    <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {new Date(c.createdAt).toLocaleDateString()}
+                    </td>
                     <td>
-                      <button className="btn btn-secondary" style={{ fontSize: 11, padding: "4px 10px" }}
-                        onClick={(e) => { e.stopPropagation(); openDetail(c); }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ fontSize: 11, padding: '4px 10px' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDetail(c);
+                        }}
+                      >
                         View
                       </button>
                     </td>
@@ -149,40 +333,91 @@ export function CustomersPage() {
                 <X size={18} strokeWidth={2} />
               </button>
             </div>
+            <div className="modal-tabs" style={{ padding: '0 24px' }}>
+              <button
+                className={`modal-tab${drawerTab === 'details' ? ' active' : ''}`}
+                onClick={() => setDrawerTab('details')}
+              >
+                Customer Details
+              </button>
+              <button
+                className={`modal-tab${drawerTab === 'edit' ? ' active' : ''}`}
+                disabled={!canManage}
+                onClick={() => canManage && setDrawerTab('edit')}
+                title={canManage ? undefined : "Rejected registrations can't be edited"}
+              >
+                Edit Customer
+              </button>
+            </div>
             <div className="drawer-body">
               <div className="customer-profile-header">
                 <div className="customer-profile-avatar">
                   {detailCustomer.email.charAt(0).toUpperCase()}
                 </div>
                 <div className="customer-profile-info">
-                  <div className="name">{detailCustomer.name || "—"}</div>
+                  <div className="name">{detailCustomer.name || '—'}</div>
                   <div className="email">{detailCustomer.email}</div>
                 </div>
               </div>
 
-              <div className="customer-info-grid">
+              <div
+                className="customer-info-grid"
+                style={drawerTab === 'edit' ? { display: 'none' } : undefined}
+              >
                 <span className="lbl">Role / Status</span>
                 <span className="val">
                   {detailCustomer.rejected ? (
-                    <span className="badge badge-expired" style={{ fontSize: 10 }}>Rejected</span>
+                    <span className="badge badge-expired" style={{ fontSize: 10 }}>
+                      Rejected
+                    </span>
                   ) : (
-                    <span className={`badge ${detailCustomer.role === "admin" ? "badge-used" : "badge-available"}`} style={{ fontSize: 10 }}>{detailCustomer.role}</span>
+                    <span
+                      className={`badge ${detailCustomer.role === 'admin' ? 'badge-used' : 'badge-available'}`}
+                      style={{ fontSize: 10 }}
+                    >
+                      {detailCustomer.role}
+                    </span>
                   )}
                 </span>
 
                 <span className="lbl">Key</span>
-                <span className="val text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{detailCustomer.productKey || "-"}</span>
+                <span className="val text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>
+                  {detailCustomer.productKey || '-'}
+                </span>
 
                 <span className="lbl">Key Status</span>
-                <span className="val">{detailCustomer.keyStatus ? <span className={`badge ${detailCustomer.rejected ? "badge-expired" : `badge-${detailCustomer.keyStatus}`}`} style={{ fontSize: 10 }}>{detailCustomer.keyStatus}</span> : "-"}</span>
+                <span className="val">
+                  {detailCustomer.keyStatus ? (
+                    <span
+                      className={`badge ${detailCustomer.rejected ? 'badge-expired' : `badge-${detailCustomer.keyStatus}`}`}
+                      style={{ fontSize: 10 }}
+                    >
+                      {detailCustomer.keyStatus}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
+                </span>
 
                 <span className="lbl">Registered</span>
-                <span className="val">{new Date(detailCustomer.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+                <span className="val">
+                  {new Date(detailCustomer.createdAt).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
 
                 {detailCustomer.rejected && detailCustomer.rejectedAt && (
                   <>
                     <span className="lbl">Rejected</span>
-                    <span className="val">{new Date(detailCustomer.rejectedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</span>
+                    <span className="val">
+                      {new Date(detailCustomer.rejectedAt).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
                   </>
                 )}
 
@@ -201,20 +436,92 @@ export function CustomersPage() {
                 )}
 
                 <span className="lbl">Notes</span>
-                <span className="val" style={{ color: detailCustomer.notes ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>{detailCustomer.notes || "-"}</span>
+                <span
+                  className="val"
+                  style={{
+                    color: detailCustomer.notes
+                      ? 'var(--color-text-primary)'
+                      : 'var(--color-text-muted)',
+                  }}
+                >
+                  {detailCustomer.notes || '-'}
+                </span>
               </div>
 
-              {detailCustomer.keys.length > 0 && (
+              {drawerTab === 'edit' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="form-group">
+                    <label>Name</label>
+                    <input
+                      className="form-input"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Customer name..."
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Role</label>
+                    <select
+                      className="form-input"
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                    >
+                      <option value="Member">Member</option>
+                      <option value="Admin">Admin</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Notes</label>
+                    <textarea
+                      className="form-input"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="Internal notes about this customer..."
+                      rows={3}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      justifyContent: 'flex-end',
+                      borderTop: '1px solid var(--color-border-light)',
+                      paddingTop: 16,
+                    }}
+                  >
+                    <button className="btn btn-danger" onClick={handleDelete} disabled={saving}>
+                      <Trash2 size={14} strokeWidth={2} />
+                      Delete
+                    </button>
+                    <button className="btn btn-primary" onClick={handleSaveEdit} disabled={saving}>
+                      {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {drawerTab === 'details' && detailCustomer.keys.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <div className="section-title" style={{ marginBottom: 10 }}>All Keys ({detailCustomer.keys.length})</div>
+                  <div className="section-title" style={{ marginBottom: 10 }}>
+                    All Keys ({detailCustomer.keys.length})
+                  </div>
                   <div className="customer-history">
                     {detailCustomer.keys.map((k) => (
                       <div key={k.id} className="customer-history-item">
-                        <div className={`customer-history-dot ${k.status === "used" ? "success" : "accent"}`} />
+                        <div
+                          className={`customer-history-dot ${k.status === 'used' ? 'success' : 'accent'}`}
+                        />
                         <div className="customer-history-content">
                           <div className="desc">
-                            <span className={`badge badge-${k.status}`} style={{ fontSize: 9, marginRight: 6 }}>{k.status}</span>
-                            <span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>{k.key}</span>
+                            <span
+                              className={`badge badge-${k.status}`}
+                              style={{ fontSize: 9, marginRight: 6 }}
+                            >
+                              {k.status}
+                            </span>
+                            <span className="text-mono" style={{ fontSize: 12, letterSpacing: 1 }}>
+                              {k.key}
+                            </span>
                           </div>
                           <div className="time">{new Date(k.createdAt).toLocaleDateString()}</div>
                         </div>
@@ -225,32 +532,149 @@ export function CustomersPage() {
               )}
 
               {loadingDetail ? (
-                <div style={{ textAlign: "center", padding: 20 }}>
-                  <Loader2 size={20} className="lm-spin" strokeWidth={2} style={{ margin: "0 auto" }} />
+                <div style={{ textAlign: 'center', padding: 20 }}>
+                  <Loader2
+                    size={20}
+                    className="lm-spin"
+                    strokeWidth={2}
+                    style={{ margin: '0 auto' }}
+                  />
                 </div>
               ) : customerEmailLogs.length > 0 ? (
                 <div>
-                  <div className="section-title" style={{ marginBottom: 10 }}>Email History ({customerEmailLogs.length})</div>
+                  <div className="section-title" style={{ marginBottom: 10 }}>
+                    Email History ({customerEmailLogs.length})
+                  </div>
                   <div className="customer-history">
                     {customerEmailLogs.map((log) => (
                       <div key={log.id} className="customer-history-item">
-                        <div className={`customer-history-dot ${log.status === "sent" ? "success" : "accent"}`} />
+                        <div
+                          className={`customer-history-dot ${log.status === 'sent' ? 'success' : 'accent'}`}
+                        />
                         <div className="customer-history-content">
                           <div className="desc">
-                            <span className={`badge ${log.status === "sent" ? "badge-available" : "badge-expired"}`} style={{ fontSize: 9, marginRight: 6 }}>{log.status}</span>
+                            <span
+                              className={`badge ${log.status === 'sent' ? 'badge-available' : 'badge-expired'}`}
+                              style={{ fontSize: 9, marginRight: 6 }}
+                            >
+                              {log.status}
+                            </span>
                             {log.subject}
                           </div>
                           <div className="time">{new Date(log.sentAt).toLocaleString()}</div>
-                          {log.error && <div className="time" style={{ color: "var(--color-danger)" }}>{log.error}</div>}
+                          {log.error && (
+                            <div className="time" style={{ color: 'var(--color-danger)' }}>
+                              {log.error}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : null}
+
+              {drawerTab === 'details' && canManage && (
+                <div className="action-row" style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => setDrawerTab('edit')}>
+                    <PenSquare size={12} strokeWidth={2} />
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={handleDelete}
+                    disabled={saving}
+                  >
+                    <Trash2 size={12} strokeWidth={2} />
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </>
+      )}
+
+      {showCreate && (
+        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h3>Add Customer</h3>
+              <button className="modal-close" onClick={() => setShowCreate(false)}>
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <div
+              className="modal-body"
+              style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+            >
+              <div className="form-group">
+                <label>Email *</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  className="form-input"
+                  placeholder="Customer name..."
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select
+                  className="form-input"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                >
+                  <option value="Member">Member</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Notes</label>
+                <textarea
+                  className="form-input"
+                  placeholder="Internal notes..."
+                  rows={3}
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                If no password is set, the customer can sign in after using “Forgot password”.
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleCreate} disabled={creating}>
+                {creating ? 'Creating...' : 'Create Customer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="toast-container">
+          <div className={`toast toast-${toast.type}`}>
+            {toast.type === 'success' ? (
+              <Check size={18} strokeWidth={2} />
+            ) : (
+              <AlertCircle size={18} strokeWidth={2} />
+            )}
+            {toast.message}
+          </div>
+        </div>
       )}
     </div>
   );

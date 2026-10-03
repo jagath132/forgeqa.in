@@ -1,7 +1,7 @@
-import axios from "axios";
+import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: "",
+  baseURL: '',
   withCredentials: true,
 });
 
@@ -13,7 +13,7 @@ export type Admin = {
 export type ProductKey = {
   id: string;
   key: string;
-  status: "available" | "used" | "expired";
+  status: 'available' | 'used' | 'expired';
   customerEmail: string | null;
   registeredEmail: string | null;
   usedBy: string | null;
@@ -59,6 +59,8 @@ export type Transaction = {
   status: string;
   provider: string;
   productKey: string | null;
+  notes?: string | null;
+  manualEntry?: boolean;
   timestamp: string;
 };
 
@@ -67,7 +69,7 @@ export type PendingRegistration = {
   pendingId: string;
   name: string | null;
   email: string;
-  plan: "free" | "pro" | "enterprise" | null;
+  plan: 'free' | 'pro' | 'enterprise' | null;
   paymentStatus: string;
   status: string;
   transactionId: string | null;
@@ -104,9 +106,9 @@ export type KeyStats = {
 };
 
 export function setAuthToken(token: string) {
-  api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 }
 
 export function clearAuthToken() {
-  delete api.defaults.headers.common["Authorization"];
+  delete api.defaults.headers.common['Authorization'];
 }
