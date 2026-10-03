@@ -11,6 +11,7 @@ import {
 import { buildFrameworkScaffold, buildPlaywrightScaffold } from './frameworkScaffold.js';
 import { generateWithGeminiRaw } from '../ai/gemini.js';
 import { generateWithOpenAI } from '../ai/openai.js';
+import { resolveDeprecated, getRegistryDefault } from '../ai/modelRegistry.js';
 
 const defaultViewport = { width: 1280, height: 720 };
 const defaultOptions = {
@@ -43,8 +44,8 @@ async function callAi({ apiKey, prompt, provider = 'gemini', model }) {
       provider,
     });
   } else if (provider === 'groq') {
-    const groqModel =
-      !model || model === 'llama-3.1-8b-instant' ? 'llama-3.3-70b-versatile' : model;
+    const baseModel = model || getRegistryDefault('groq');
+    const groqModel = resolveDeprecated('groq', baseModel) ?? baseModel;
     return await generateWithOpenAI({
       apiKey,
       prompt,

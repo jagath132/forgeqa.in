@@ -47,7 +47,8 @@ import {
   dismissAllAlerts,
   checkUserProviderModel,
 } from './ai/modelHealthCheck.js';
-import { MODEL_REGISTRY, getRegistryDefault } from './ai/modelRegistry.js';
+import { MODEL_REGISTRY, getRegistryDefault, resolveDeprecated } from './ai/modelRegistry.js';
+import { resolveLiveModel } from './ai/modelSync.js';
 
 const ALLOWED_EXTENSIONS = [
   '.apk',
@@ -170,28 +171,36 @@ const providerEnvKeyMap = {
   groq: 'GROQ_API_KEY',
 };
 
-function getDefaultModel(provider) {
-  switch (provider) {
-    case 'openai':
-    case 'openrouter':
-    case 'opencode':
-      return 'gpt-4o-mini';
-    case 'groq':
-      return 'llama-3.3-70b-versatile';
-    case 'claude':
-      return 'claude-3-5-sonnet-latest';
-    default:
-      return undefined;
-  }
-}
+/**
+ * Resolves the model to use for a request.
+ *
+ * Resolution order (fastest → most authoritative):
+ *  1. Synchronous: if the model is marked deprecated in the static registry,
+ *     instantly redirect to its replacement (no DB needed).
+ *  2. Async: delegate to resolveLiveModel() which checks the live model list
+ *     fetched from the provider's API and stored in MongoDB.
+ *     - If the model is still live → use it.
+ *     - If it was removed → auto-pick the best available replacement.
+ *  3. Static fallback if the DB isn't ready yet.
+ *
+ * Result: any model change by any provider is handled automatically with
+ * zero code changes — just wait for the next 24-hour sync.
+ */
+async function resolveModel(provider, model) {
+  const effective = model || getRegistryDefault(provider);
+  if (!effective) return undefined;
 
-function resolveModel(provider, model) {
-  if (provider === 'groq') {
-    if (!model || model === 'llama-3.1-8b-instant') {
-      return 'llama-3.3-70b-versatile';
-    }
+  // Fast path: static registry says it's deprecated → redirect immediately
+  const staticReplacement = resolveDeprecated(provider, effective);
+  if (staticReplacement) {
+    console.warn(
+      `[ModelRegistry] "${effective}" is deprecated for "${provider}". Redirecting to "${staticReplacement}".`
+    );
+    return staticReplacement;
   }
-  return model || getDefaultModel(provider);
+
+  // Slow path: check live availability from the last sync
+  return resolveLiveModel(provider, effective);
 }
 
 async function resolveApiKey(provider, requestApiKey, env, userId) {

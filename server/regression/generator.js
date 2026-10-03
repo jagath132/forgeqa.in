@@ -1,6 +1,7 @@
 import { buildRegressionPrompt } from './prompts.js';
 import { generateWithGemini, parseSafeJson } from '../ai/gemini.js';
 import { generateWithOpenAI } from '../ai/openai.js';
+import { resolveDeprecated, getRegistryDefault } from '../ai/modelRegistry.js';
 
 export async function generateRegressionTestCases({
   apiKey,
@@ -27,10 +28,8 @@ export async function generateRegressionTestCases({
         : provider === 'groq'
           ? 'https://api.groq.com/openai/v1/chat/completions'
           : 'https://api.openai.com/v1/chat/completions';
-    const targetModel =
-      provider === 'groq' && (!model || model === 'llama-3.1-8b-instant')
-        ? 'llama-3.3-70b-versatile'
-        : model;
+    const baseModel = model || getRegistryDefault(provider);
+    const targetModel = resolveDeprecated(provider, baseModel) ?? baseModel;
     const responseText = await generateWithOpenAI({
       apiKey,
       prompt,

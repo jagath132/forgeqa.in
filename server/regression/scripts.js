@@ -1,6 +1,7 @@
 import { buildRegressionScriptPrompt } from './prompts.js';
 import { generateWithGeminiRaw } from '../ai/gemini.js';
 import { generateWithOpenAI } from '../ai/openai.js';
+import { resolveDeprecated, getRegistryDefault } from '../ai/modelRegistry.js';
 
 export async function generateRegressionScripts({
   apiKey,
@@ -40,8 +41,8 @@ export async function generateRegressionScripts({
       provider,
     });
   } else if (provider === 'groq') {
-    const groqModel =
-      !model || model === 'llama-3.1-8b-instant' ? 'llama-3.3-70b-versatile' : model;
+    const baseModel = model || getRegistryDefault('groq');
+    const groqModel = resolveDeprecated('groq', baseModel) ?? baseModel;
     script = await generateWithOpenAI({
       apiKey,
       prompt,

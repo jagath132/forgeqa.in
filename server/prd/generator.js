@@ -1,5 +1,6 @@
 import { generateWithGeminiRaw, generateWithGeminiStream } from '../ai/gemini.js';
 import { generateWithOpenAI, generateWithOpenAIStream } from '../ai/openai.js';
+import { resolveDeprecated, getRegistryDefault } from '../ai/modelRegistry.js';
 
 export function buildPrdPromptFromText({ productName, moduleName, details }) {
   const name = productName ? productName.trim() : 'Software Application';
@@ -205,14 +206,8 @@ export async function generatePrdStream({ apiKey, provider = 'gemini', model, pr
         ? 'https://api.groq.com/openai/v1/chat/completions'
         : 'https://api.openai.com/v1/chat/completions';
 
-  const defaultModel =
-    model && model !== 'llama-3.1-8b-instant'
-      ? model
-      : provider === 'groq'
-        ? 'llama-3.3-70b-versatile'
-        : provider === 'openrouter'
-          ? 'google/gemini-2.0-flash-exp:free'
-          : 'gpt-4o-mini';
+  const baseModel = model || getRegistryDefault(provider);
+  const defaultModel = resolveDeprecated(provider, baseModel) ?? baseModel;
 
   return generateWithOpenAIStream({
     apiKey,

@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runModelHealthCheck } from './ai/modelHealthCheck.js';
+import { syncAllProviders } from './ai/modelSync.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -97,15 +98,27 @@ async function main() {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`ForgeQA production server running on http://0.0.0.0:${PORT}`);
 
+    // Sync live model lists from all providers on startup (non-blocking)
+    setTimeout(() => {
+      syncAllProviders().catch((err) =>
+        console.warn('[ModelSync] Startup sync failed:', err.message)
+      );
+    }, 3000);
+
     // Run model health check on startup (registry-only, no live probes to avoid cold-start latency)
     setTimeout(() => {
       runModelHealthCheck({ liveProbe: false }).catch((err) =>
         console.warn('[ModelHealthCheck] Startup check failed:', err.message)
       );
-    }, 5000);
+    }, 8000);
 
-    // Re-run every 24 hours with a live probe to catch undocumented deprecations
+    // Re-run both every 24 hours
     const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+      syncAllProviders().catch((err) =>
+        console.warn('[ModelSync] Scheduled sync failed:', err.message)
+      );
+    }, TWENTY_FOUR_HOURS);
     setInterval(() => {
       runModelHealthCheck({ liveProbe: true }).catch((err) =>
         console.warn('[ModelHealthCheck] Scheduled check failed:', err.message)

@@ -106,6 +106,8 @@ async function ensureIndexes(targetDb) {
     targetDb.collection('ai_model_alerts').createIndex({ userId: 1, dismissed: 1 }),
     targetDb.collection('ai_model_alerts').createIndex({ dedupeKey: 1 }),
     targetDb.collection('ai_model_alerts').createIndex({ createdAt: -1 }),
+    // Live model sync cache (one doc per provider, upserted on each sync)
+    targetDb.collection('ai_model_sync').createIndex({ provider: 1 }, { unique: true }),
   ];
 
   await Promise.allSettled(indexPromises);
