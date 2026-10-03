@@ -19,8 +19,13 @@ import {
   parseCookies,
   getAuthToken,
 } from './service.js';
-import { validateProductKey, claimProductKey, isValidKeyFormat } from './productKeys.js';
-import { sendPasswordResetEmail, sendSupportEmail } from '../email/index.js';
+import {
+  validateProductKey,
+  claimProductKey,
+  isValidKeyFormat,
+  generateProductKeys,
+} from './productKeys.js';
+import { sendPasswordResetEmail, sendSupportEmail, sendProductKeyEmail } from '../email/index.js';
 import {
   checkRateLimit,
   checkAccountLockout,
@@ -135,6 +140,16 @@ async function handleLogin(req, res, body) {
     // Constant-time protection against user enumeration (async, non-blocking)
     await hashPassword(password, 'dummysalt12345678', DEFAULT_PBKDF2_ITERATIONS);
     recordFailedAttempt(lockoutKey);
+    // If this email belonged to a deleted account, say so explicitly — otherwise
+    // the user can't tell "deleted" apart from "typo in password".
+    const deletedAccount = await getDb().collection('deleted_users').findOne({ email: cleanEmail });
+    if (deletedAccount) {
+      sendJson(res, 401, {
+        error: 'User is not registered. This account has been deleted — please register again.',
+        accountDeleted: true,
+      });
+      return;
+    }
     sendJson(res, 401, { error: 'Invalid email or password.' });
     return;
   }
@@ -549,38 +564,39 @@ async function handleSelectPlan(req, res, body) {
 
   const isFree = planDoc.price === 0;
   if (isFree) {
-    let userDoc = await authStore.findUserByEmail(pending.email);
-    if (!userDoc) {
-      userDoc = await authStore.createUserFromHash({
-        email: pending.email,
-        passwordHash: pending.passwordHash,
-        salt: pending.salt,
-        name: pending.name,
-        subscriptionTier: 'free',
-      });
+    // Free plans must activate a product key like every other plan: do NOT
+    // create the account or issue a session here. Generate + email a key and
+    // let complete-registration create the account once the key is used.
+    const reusableKey = await db
+      .collection('product_keys')
+      .findOne({ customerEmail: pending.email, status: 'available' });
+    const productKey =
+      reusableKey?.key ||
+      (
+        await generateProductKeys(1, {
+          customerEmail: pending.email,
+          notes: `${plan} plan registration`,
+        })
+      )[0];
+    try {
+      const emailed = await sendProductKeyEmail(pending.email, productKey, pending.name || '');
+      if (!emailed) {
+        console.warn(
+          `Product key email could not be delivered to ${pending.email}; key returned in registration response.`
+        );
+      }
+    } catch (err) {
+      console.warn('Product key email failed:', err.message);
     }
 
     await db
       .collection('pending_registrations')
-      .updateOne({ pendingId }, { $set: { paymentStatus: 'completed', status: 'completed' } });
+      .updateOne(
+        { pendingId },
+        { $set: { paymentStatus: 'completed', status: 'ready', productKey } }
+      );
 
-    const token = generateToken(userDoc);
-    const refreshToken = await generateRefreshToken(userDoc);
-    setAuthCookie(res, token, refreshToken);
-
-    sendJson(res, 200, {
-      status: 'completed',
-      token,
-      user: {
-        id: userDoc.id || userDoc._id.toString(),
-        email: userDoc.email,
-        name: userDoc.name || null,
-        role: userDoc.role || 'Member',
-        subscriptionTier: 'free',
-        createdAt: userDoc.createdAt,
-        has_seen_welcome: false,
-      },
-    });
+    sendJson(res, 200, { status: 'ready', productKey, email: pending.email });
     return;
   }
 

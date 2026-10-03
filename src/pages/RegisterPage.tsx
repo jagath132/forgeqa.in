@@ -328,16 +328,23 @@ export function RegisterPage() {
     setError('');
     setIsLoading(true);
     try {
-      const res = await api.post<{ status: string; user?: any; token?: string }>(
-        '/api/auth/select-plan',
-        {
-          pendingId,
-          plan: planId,
-        }
-      );
+      const res = await api.post<{
+        status: string;
+        user?: any;
+        token?: string;
+        productKey?: string;
+      }>('/api/auth/select-plan', {
+        pendingId,
+        plan: planId,
+      });
       if (res.data.status === 'completed' && res.data.user) {
         setUser(res.data.user);
         navigate('/dashboard?welcome=true');
+      } else if (res.data.status === 'ready') {
+        // Free plan: a product key was generated and emailed — the account is
+        // only created after the key is activated below.
+        if (res.data.productKey) setProductKey(res.data.productKey);
+        setStep('verify_key');
       } else if (res.data.status === 'pending_verification') {
         setStep('pending_verification');
       } else {

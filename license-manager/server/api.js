@@ -506,6 +506,14 @@ export function createApiMiddleware(env) {
           return;
         }
         await db.collection('users').deleteOne({ _id: new ObjectId(id) });
+        // Tombstone so login can tell "this account was deleted" apart from a
+        // wrong password, and so the Deleted Users module can restore it.
+        await db.collection('deleted_users').insertOne({
+          originalId: user._id.toString(),
+          email: user.email,
+          name: user.name || null,
+          deletedAt: new Date().toISOString(),
+        });
         await db
           .collection('product_keys')
           .updateMany(
@@ -922,19 +930,17 @@ export function createApiMiddleware(env) {
         const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${productKey}`;
         await sendProductKeyEmail(pending.email, productKey, pending.name || '', completeUrl);
         // Update the pending registration status to "ready" with the key
-        await db
-          .collection('pending_registrations')
-          .updateOne(
-            { pendingId },
-            {
-              $set: {
-                status: 'ready',
-                productKey,
-                approvedAt: new Date().toISOString(),
-                approvedBy: admin.email,
-              },
-            }
-          );
+        await db.collection('pending_registrations').updateOne(
+          { pendingId },
+          {
+            $set: {
+              status: 'ready',
+              productKey,
+              approvedAt: new Date().toISOString(),
+              approvedBy: admin.email,
+            },
+          }
+        );
         await logAudit({
           adminId: admin.id,
           adminEmail: admin.email,
@@ -998,19 +1004,17 @@ export function createApiMiddleware(env) {
           console.warn('Rejection email failed:', emailErr.message);
         }
         // Delete or mark as rejected
-        await db
-          .collection('pending_registrations')
-          .updateOne(
-            { pendingId },
-            {
-              $set: {
-                status: 'rejected',
-                rejectedAt: new Date().toISOString(),
-                rejectedBy: admin.email,
-                rejectionReason: reason || null,
-              },
-            }
-          );
+        await db.collection('pending_registrations').updateOne(
+          { pendingId },
+          {
+            $set: {
+              status: 'rejected',
+              rejectedAt: new Date().toISOString(),
+              rejectedBy: admin.email,
+              rejectionReason: reason || null,
+            },
+          }
+        );
         await logAudit({
           adminId: admin.id,
           adminEmail: admin.email,
