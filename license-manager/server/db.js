@@ -46,27 +46,51 @@ function getDbName() {
   return process.env.MONGO_DB_NAME || 'forgekey';
 }
 
-let client = null;
-let db = null;
+// Use a global cache so the MongoClient is reused across Vercel serverless
+// warm invocations (the module may be re-evaluated between cold starts, but
+// the global object persists within the same instance).
+const globalWithMongo = globalThis;
+if (!globalWithMongo.__mongoCache) {
+  globalWithMongo.__mongoCache = { client: null, db: null };
+}
 
 export async function connectDb() {
-  if (db) return db;
+  const cache = globalWithMongo.__mongoCache;
+  // Return cached db if the connection is still alive
+  if (cache.db) {
+    try {
+      await cache.client.db('admin').command({ ping: 1 });
+      return cache.db;
+    } catch {
+      // Connection dropped — fall through to reconnect
+      cache.client = null;
+      cache.db = null;
+    }
+  }
+
   const mongoUri = getMongoUri();
   const dbName = getDbName();
+
   if (!process.env.MONGO_URI && process.env.NODE_ENV === 'production') {
     console.error(
       '⚠️  MONGO_URI env var not set — falling back to localhost:27017 (will fail in production)'
     );
   }
   console.log(
-    `[db] Connecting to MongoDB: ${mongoUri.replace(/\/\/.*@/, '//***@')} / db="${dbName}"`
+    `[db] Connecting to MongoDB: ${mongoUri.replace(/\/\/[^@]*@/, '//***@')} / db="${dbName}"`
   );
-  client = new MongoClient(mongoUri);
-  await client.connect();
-  db = client.db(dbName);
-  await ensureIndexes(db);
-  await seedDefaultPlans(db);
-  return db;
+
+  cache.client = new MongoClient(mongoUri, {
+    // Recommended for serverless: short socket timeout so stale connections
+    // are detected quickly rather than hanging a Vercel function.
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  });
+  await cache.client.connect();
+  cache.db = cache.client.db(dbName);
+  await ensureIndexes(cache.db);
+  await seedDefaultPlans(cache.db);
+  return cache.db;
 }
 
 async function seedDefaultPlans(db) {
@@ -156,6 +180,7 @@ async function seedDefaultPlans(db) {
 }
 
 export function getDb() {
+  const db = globalThis.__mongoCache?.db;
   if (!db) throw new Error('Database not connected.');
   return db;
 }
