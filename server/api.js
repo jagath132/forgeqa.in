@@ -239,113 +239,149 @@ export function createApiMiddleware(env = {}) {
 
   let store;
   let knowledge;
-  let dbReady = connectDb()
-    .then(async () => {
-      store = createKnowledgeStore();
-      knowledge = createKnowledgeService(store, env);
-      const { seedPlans } = await import('./billing/plans.js');
-      await seedPlans();
 
-      const plansDb = getDb();
-      const defaults = [
-        {
-          id: 'free',
-          name: 'Free',
-          price: 0,
-          currency: 'inr',
-          period: 'monthly',
-          description: 'Get started with essential testing tools at no cost.',
-          features: [
-            '100 test cases/month',
-            '1 AI provider',
-            'Basic reporting',
-            'Community support',
-            '1 user',
-          ],
-          popular: false,
-          active: true,
-          sortOrder: 1,
-          maxUsers: 1,
-          maxTestCases: 100,
-          aiProviders: 1,
-          advancedExport: false,
-          regressionTesting: false,
-          prioritySupport: false,
-          customIntegrations: false,
-          onPremise: false,
-        },
-        {
-          id: 'pro',
-          name: 'Pro',
-          price: 99900,
-          currency: 'inr',
-          period: 'monthly',
-          description: 'For teams that need advanced testing and analytics.',
-          features: [
-            'Unlimited test cases',
-            '5 AI providers',
-            'Advanced reporting & export',
-            'Regression testing',
-            'Email support',
-            'Up to 10 users',
-          ],
-          popular: true,
-          active: true,
-          sortOrder: 2,
-          maxUsers: 10,
-          maxTestCases: null,
-          aiProviders: 5,
-          advancedExport: true,
-          regressionTesting: true,
-          prioritySupport: false,
-          customIntegrations: false,
-          onPremise: false,
-        },
-        {
-          id: 'enterprise',
-          name: 'Enterprise',
-          price: 0,
-          currency: 'inr',
-          period: 'monthly',
-          description: 'Custom solutions for large organizations. Contact us for pricing.',
-          features: [
-            'Everything in Pro',
-            'Unlimited users',
-            'All AI providers',
-            'Custom integrations',
-            'On-premise deployment',
-            'Priority support',
-            'Dedicated account manager',
-            'SLA guarantee',
-          ],
-          popular: false,
-          active: true,
-          sortOrder: 3,
-          maxUsers: null,
-          maxTestCases: null,
-          aiProviders: null,
-          advancedExport: true,
-          regressionTesting: true,
-          prioritySupport: true,
-          customIntegrations: true,
-          onPremise: true,
-        },
-      ];
-      for (const plan of defaults) {
-        await plansDb.collection('plans').updateOne(
-          { id: plan.id },
-          {
-            $set: { ...plan, updatedAt: new Date().toISOString() },
-            $setOnInsert: { createdAt: new Date().toISOString() },
-          },
-          { upsert: true }
-        );
-      }
-    })
-    .catch((err) => {
-      console.error('Failed to connect to MongoDB:', err);
-      throw err;
-    });
+  // Readiness must be self-healing: a failed connect attempt resets the cached
+  // promise so the next request retries, instead of latching a rejected
+  // promise and answering 503 "Database not connected" until restart.
+  let dbReady = null;
+  let lastDbError = null;
+  let nextDbAttemptAt = 0;
+  const DB_RETRY_COOLDOWN_MS = 2000;
+
+  function getDbReady() {
+    if (dbReady) return dbReady;
+    if (lastDbError && Date.now() < nextDbAttemptAt) {
+      // Fail fast while cooling down so a down database isn't hammered.
+      return Promise.reject(lastDbError);
+    }
+    nextDbAttemptAt = Date.now() + DB_RETRY_COOLDOWN_MS;
+
+    dbReady = connectDb()
+      .then(async () => {
+        // Connection is live — stop failing fast with the stale error.
+        lastDbError = null;
+        try {
+          store = createKnowledgeStore();
+          knowledge = createKnowledgeService(store, env);
+          const { seedPlans } = await import('./billing/plans.js');
+          await seedPlans();
+
+          const plansDb = getDb();
+          const defaults = [
+            {
+              id: 'free',
+              name: 'Free',
+              price: 0,
+              currency: 'inr',
+              period: 'monthly',
+              description: 'Get started with essential testing tools at no cost.',
+              features: [
+                '100 test cases/month',
+                '1 AI provider',
+                'Basic reporting',
+                'Community support',
+                '1 user',
+              ],
+              popular: false,
+              active: true,
+              sortOrder: 1,
+              maxUsers: 1,
+              maxTestCases: 100,
+              aiProviders: 1,
+              advancedExport: false,
+              regressionTesting: false,
+              prioritySupport: false,
+              customIntegrations: false,
+              onPremise: false,
+            },
+            {
+              id: 'pro',
+              name: 'Pro',
+              price: 99900,
+              currency: 'inr',
+              period: 'monthly',
+              description: 'For teams that need advanced testing and analytics.',
+              features: [
+                'Unlimited test cases',
+                '5 AI providers',
+                'Advanced reporting & export',
+                'Regression testing',
+                'Email support',
+                'Up to 10 users',
+              ],
+              popular: true,
+              active: true,
+              sortOrder: 2,
+              maxUsers: 10,
+              maxTestCases: null,
+              aiProviders: 5,
+              advancedExport: true,
+              regressionTesting: true,
+              prioritySupport: false,
+              customIntegrations: false,
+              onPremise: false,
+            },
+            {
+              id: 'enterprise',
+              name: 'Enterprise',
+              price: 0,
+              currency: 'inr',
+              period: 'monthly',
+              description: 'Custom solutions for large organizations. Contact us for pricing.',
+              features: [
+                'Everything in Pro',
+                'Unlimited users',
+                'All AI providers',
+                'Custom integrations',
+                'On-premise deployment',
+                'Priority support',
+                'Dedicated account manager',
+                'SLA guarantee',
+              ],
+              popular: false,
+              active: true,
+              sortOrder: 3,
+              maxUsers: null,
+              maxTestCases: null,
+              aiProviders: null,
+              advancedExport: true,
+              regressionTesting: true,
+              prioritySupport: true,
+              customIntegrations: true,
+              onPremise: true,
+            },
+          ];
+          for (const plan of defaults) {
+            await plansDb.collection('plans').updateOne(
+              { id: plan.id },
+              {
+                $set: { ...plan, updatedAt: new Date().toISOString() },
+                $setOnInsert: { createdAt: new Date().toISOString() },
+              },
+              { upsert: true }
+            );
+          }
+        } catch (setupErr) {
+          // Setup/seeding must not mark the database unavailable: the connection
+          // is live, so serve requests and retry the setup on the next request.
+          dbReady = null;
+          console.error('Post-connect setup failed (will retry):', setupErr.message || setupErr);
+        }
+      })
+      .catch((err) => {
+        dbReady = null;
+        lastDbError = err;
+        console.error('Failed to connect to MongoDB:', err.message || err);
+        throw err;
+      });
+
+    return dbReady;
+  }
+
+  // Start connecting immediately: startup background jobs (model sync, health
+  // check) call getDb() before the first request arrives. If this attempt
+  // fails, getDbReady() retries on the next request.
+  getDbReady().catch(() => {});
 
   return async function apiMiddleware(req, res, next) {
     const url = parseUrl(req);
@@ -370,9 +406,10 @@ export function createApiMiddleware(env = {}) {
     }
 
     try {
-      await dbReady;
+      await getDbReady();
     } catch (dbError) {
-      console.error('MongoDB not ready:', dbError);
+      console.error('MongoDB not ready:', dbError.message || dbError);
+      res.setHeader('Retry-After', '5');
       sendJson(res, 503, { error: 'Database not connected. Please try again.' });
       return;
     }

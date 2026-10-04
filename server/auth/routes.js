@@ -104,7 +104,10 @@ async function handleLogin(req, res, body) {
 
   const cleanEmail = email.trim().toLowerCase();
   const lockoutKey = `login:${cleanEmail}`;
-  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  const clientIp =
+    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    '127.0.0.1';
 
   // Run rate limit, lockout check, and user lookup in parallel
   const [rateLimitAllowed, isLocked, userRecord] = await Promise.all([
@@ -167,10 +170,6 @@ async function handleLogin(req, res, body) {
     match = false;
   }
 
-  const clientIp =
-    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    '127.0.0.1';
   const userAgent = req.headers['user-agent'] || 'Unknown';
   const device = extractDeviceName(userAgent);
 

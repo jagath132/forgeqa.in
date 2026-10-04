@@ -178,9 +178,31 @@ export const SEED_PLANS = [
  * plans, customers, subscriptions, invoices, usage_events, usage_balances, webhook_events
  */
 export async function ensureBillingIndexes(targetDb) {
+  // Legacy plan documents seeded by server/api.js carry no `code` field, and
+  // MongoDB indexes a missing field as null — so a plain unique
+  // {code, interval} index rejects every legacy plan after the first one
+  // (null == null), which aborts plan seeding. Scope the uniqueness check to
+  // documents that actually have a billing code.
+  const plansCol = targetDb.collection('plans');
+  try {
+    const existingCodeIndex = (await plansCol.indexes()).find(
+      (idx) => idx.key?.code === 1 && idx.key?.interval === 1
+    );
+    if (existingCodeIndex && !existingCodeIndex.partialFilterExpression) {
+      await plansCol.dropIndex(existingCodeIndex.name);
+    }
+    if (!existingCodeIndex || !existingCodeIndex.partialFilterExpression) {
+      await plansCol.createIndex(
+        { code: 1, interval: 1 },
+        { unique: true, partialFilterExpression: { code: { $exists: true } } }
+      );
+    }
+  } catch (err) {
+    console.warn('Could not reconcile plans code/interval index:', err.message);
+  }
+
   const indexPromises = [
     // plans
-    targetDb.collection('plans').createIndex({ code: 1, interval: 1 }, { unique: true }),
     targetDb.collection('plans').createIndex({ id: 1 }, { unique: true, sparse: true }),
     targetDb.collection('plans').createIndex({ is_active: 1 }),
 

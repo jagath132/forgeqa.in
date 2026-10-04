@@ -35,13 +35,21 @@ let indexesEnsured = false;
 
 export async function connectDb() {
   if (db) return db;
-  client = new MongoClient(MONGO_URI, {
+  const nextClient = new MongoClient(MONGO_URI, {
     maxPoolSize: 20,
     minPoolSize: 2,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 30000,
   });
-  await client.connect();
+  try {
+    await nextClient.connect();
+  } catch (err) {
+    // Don't leak a half-open client on a failed attempt — the next call
+    // builds a fresh one.
+    await nextClient.close().catch(() => {});
+    throw err;
+  }
+  client = nextClient;
   db = client.db(DB_NAME);
   if (!indexesEnsured) {
     await ensureIndexes(db);
