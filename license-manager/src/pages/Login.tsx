@@ -1,6 +1,18 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useAdminStore } from '../store/useAdminStore';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { api } from '../lib/api';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  ArrowRight,
+  AlertCircle,
+  Loader2,
+  Sparkles,
+  CheckCircle2,
+} from 'lucide-react';
 import { AnvilFLogoMark } from '../components/ForgeQALogo';
 import '../index.css';
 
@@ -9,12 +21,34 @@ function Spinner() {
 }
 
 export function LoginPage({ onBack }: { onBack?: () => void }) {
-  const { login, error: storeError } = useAdminStore();
+  const { login, setupAdmin, error: storeError } = useAdminStore();
+  const [isSetupMode, setIsSetupMode] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .get<{ hasAdmin: boolean }>('/api/admin/setup-status')
+      .then((res) => {
+        if (mounted) {
+          setIsSetupMode(!res.data.hasAdmin);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setIsSetupMode(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const error = localError || storeError;
 
@@ -32,11 +66,26 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
       return;
     }
 
+    if (isSetupMode) {
+      if (password.length < 8) {
+        setLocalError('Password must be at least 8 characters long.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setLocalError('Passwords do not match.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      await login(email, password);
+      if (isSetupMode) {
+        await setupAdmin(trimmed, password);
+      } else {
+        await login(trimmed, password);
+      }
     } catch (err: any) {
-      setLocalError(err.message);
+      setLocalError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -64,8 +113,30 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
               ForgeQA <span style={{ color: '#06B6D4' }}>License Manager</span>
             </h1>
             <p className="lk-login-desc">
-              Sign in to manage product keys, plans, and customer accounts.
+              {isSetupMode
+                ? 'Dynamic First-Time Setup: create your primary administrator account.'
+                : 'Sign in to manage product keys, plans, and customer accounts.'}
             </p>
+            {isSetupMode && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 12px',
+                  borderRadius: 9999,
+                  background: 'rgba(6, 182, 212, 0.12)',
+                  border: '1px solid rgba(6, 182, 212, 0.3)',
+                  color: '#06B6D4',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  marginTop: 10,
+                }}
+              >
+                <Sparkles size={14} />
+                Dynamic Admin Initialization
+              </div>
+            )}
           </div>
 
           {error && (
@@ -78,7 +149,7 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
           <form onSubmit={handleSubmit} className="lk-login-form">
             <div className="lk-login-field">
               <label className="lk-login-label" htmlFor="login-email">
-                Email
+                {isSetupMode ? 'Administrator Email' : 'Email'}
               </label>
               <div className="lk-login-input-wrap">
                 <span className="lk-login-input-icon">
@@ -91,7 +162,7 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@company.com"
+                  placeholder={isSetupMode ? 'admin@yourcompany.com' : 'admin@company.com'}
                   autoComplete="email"
                   spellCheck={false}
                 />
@@ -100,7 +171,7 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
 
             <div className="lk-login-field">
               <label className="lk-login-label" htmlFor="login-password">
-                Password
+                {isSetupMode ? 'Choose Password' : 'Password'}
               </label>
               <div className="lk-login-input-wrap">
                 <span className="lk-login-input-icon">
@@ -113,8 +184,10 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
+                  placeholder={
+                    isSetupMode ? 'Create a strong password (min 8 chars)' : 'Enter your password'
+                  }
+                  autoComplete={isSetupMode ? 'new-password' : 'current-password'}
                 />
                 <button
                   type="button"
@@ -131,11 +204,51 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
               </div>
             </div>
 
+            {isSetupMode && (
+              <div className="lk-login-field">
+                <label className="lk-login-label" htmlFor="confirm-password">
+                  Confirm Password
+                </label>
+                <div className="lk-login-input-wrap">
+                  <span className="lk-login-input-icon">
+                    <Lock size={18} strokeWidth={1.8} />
+                  </span>
+                  <input
+                    id="confirm-password"
+                    className="lk-login-input"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repeat chosen password"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="lk-login-toggle-vis"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={18} strokeWidth={1.8} />
+                    ) : (
+                      <Eye size={18} strokeWidth={1.8} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button className="lk-login-submit" type="submit" disabled={loading}>
               {loading ? (
                 <>
                   <Spinner />
-                  Signing in...
+                  {isSetupMode ? 'Configuring Account...' : 'Signing in...'}
+                </>
+              ) : isSetupMode ? (
+                <>
+                  Initialize Admin Account
+                  <ArrowRight size={16} strokeWidth={2.2} />
                 </>
               ) : (
                 <>
@@ -148,7 +261,7 @@ export function LoginPage({ onBack }: { onBack?: () => void }) {
 
           <div className="lk-login-footer">
             <span>ForgeQA License Manager</span>
-            <span className="lk-login-version">v0.1.0</span>
+            <span className="lk-login-version">Dynamic Auth v0.2.0</span>
           </div>
         </div>
       </div>

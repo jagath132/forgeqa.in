@@ -11,6 +11,7 @@ import { PaymentsPage } from './pages/Payments';
 import { VerificationsPage } from './pages/Verifications';
 import { PlansPage } from './pages/Plans';
 import { DeletedUsersPage } from './pages/DeletedUsers';
+import { SettingsPage } from './pages/Settings';
 import { AnvilFLogoMark } from './components/ForgeQALogo';
 import {
   LayoutDashboard,
@@ -21,6 +22,7 @@ import {
   Mail,
   CreditCard,
   UserX,
+  Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -34,7 +36,8 @@ export type Page =
   | 'email'
   | 'payments'
   | 'verifications'
-  | 'deleted-users';
+  | 'deleted-users'
+  | 'settings';
 
 const NAV_ITEMS: { key: Page; label: string; icon: React.ElementType }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -45,6 +48,7 @@ const NAV_ITEMS: { key: Page; label: string; icon: React.ElementType }[] = [
   { key: 'email', label: 'Email Log', icon: Mail },
   { key: 'payments', label: 'Transactions', icon: CreditCard },
   { key: 'deleted-users', label: 'Deleted Users', icon: UserX },
+  { key: 'settings', label: 'Settings & Security', icon: Settings },
 ];
 
 export function App() {
@@ -104,6 +108,9 @@ export function App() {
       </div>
       <div style={{ display: currentPage === 'deleted-users' ? 'contents' : 'none' }}>
         <DeletedUsersPage />
+      </div>
+      <div style={{ display: currentPage === 'settings' ? 'contents' : 'none' }}>
+        <SettingsPage />
       </div>
     </>
   );
@@ -204,7 +211,12 @@ export function App() {
 
         <div className="sidebar-footer">
           {admin && (
-            <div className="sidebar-admin">
+            <div
+              className="sidebar-admin"
+              onClick={() => setCurrentPage('settings')}
+              style={{ cursor: 'pointer' }}
+              title="Manage Dynamic Admin Credentials"
+            >
               <div className="sidebar-admin-avatar">{getInitials(admin.email)}</div>
               <div className="sidebar-admin-info">
                 <div className="name">Admin</div>

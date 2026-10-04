@@ -57,9 +57,24 @@ export function createApiMiddleware(env) {
     }
   }
 
-  let dbReady = connectDb().then(async () => {
-    await adminStore.seedDefaultAdmin();
-  });
+  // dbReady is reset on failure so the next request retries the connection
+  // instead of permanently returning 503 from a stale rejected promise.
+  let dbReady = null;
+
+  function getDbReady() {
+    if (!dbReady) {
+      dbReady = connectDb()
+        .then(async () => {
+          await adminStore.seedDefaultAdmin();
+        })
+        .catch((err) => {
+          // Reset so the next request will try again
+          dbReady = null;
+          throw err;
+        });
+    }
+    return dbReady;
+  }
 
   return async function apiMiddleware(req, res, next) {
     const url = parseUrl(req);
@@ -84,7 +99,7 @@ export function createApiMiddleware(env) {
     }
 
     try {
-      await dbReady;
+      await getDbReady();
     } catch (dbError) {
       console.error('MongoDB not ready:', dbError);
       sendJson(res, 503, { error: 'Database not connected. Please try again.' });

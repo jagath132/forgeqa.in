@@ -167,8 +167,31 @@ async function handleLogin(req, res, body) {
     match = false;
   }
 
+  const clientIp =
+    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    '127.0.0.1';
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const device = extractDeviceName(userAgent);
+
   if (!match) {
     recordFailedAttempt(lockoutKey);
+    // Store failed login attempt in MongoDB
+    getDb()
+      .collection('user_logins')
+      .insertOne({
+        userId: userRecord ? userRecord._id.toString() : null,
+        email: cleanEmail,
+        status: 'failed',
+        failureReason: 'Invalid credentials',
+        ip: clientIp,
+        userAgent,
+        device,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date(),
+      })
+      .catch(() => {});
+
     sendJson(res, 401, { error: 'Invalid email or password.' });
     return;
   }
@@ -191,6 +214,36 @@ async function handleLogin(req, res, body) {
   }
 
   const userId = userRecord._id.toString();
+
+  // Store successful user login in MongoDB
+  getDb()
+    .collection('user_logins')
+    .insertOne({
+      userId,
+      email: userRecord.email,
+      status: 'success',
+      ip: clientIp,
+      userAgent,
+      device,
+      timestamp: new Date().toISOString(),
+      createdAt: new Date(),
+    })
+    .catch(() => {});
+
+  getDb()
+    .collection('users')
+    .updateOne(
+      { _id: userRecord._id },
+      {
+        $set: {
+          lastLogin: new Date().toISOString(),
+          lastLoginIp: clientIp,
+          lastLoginUserAgent: userAgent,
+        },
+        $inc: { loginCount: 1 },
+      }
+    )
+    .catch(() => {});
 
   const token = generateToken(userRecord);
   const refreshToken = await generateRefreshToken(userRecord);
