@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
-import { connectDb, getDb } from './db.js';
+import { connectDb, getDb, isMongoUriConfigured } from './db.js';
 import { createKnowledgeService } from './knowledge/service.js';
 import { createKnowledgeStore } from './storage/index.js';
 import {
@@ -408,9 +408,28 @@ export function createApiMiddleware(env = {}) {
     try {
       await getDbReady();
     } catch (dbError) {
-      console.error('MongoDB not ready:', dbError.message || dbError);
+      const uriConfigured = isMongoUriConfigured();
+      console.error(
+        'MongoDB not ready:',
+        dbError.message || dbError,
+        '| MONGO_URI configured:',
+        uriConfigured
+      );
       res.setHeader('Retry-After', '5');
-      sendJson(res, 503, { error: 'Database not connected. Please try again.' });
+      if (!uriConfigured) {
+        // Be explicit: without a database URL no retry can ever succeed, so
+        // say what to fix instead of pretending it is transient.
+        sendJson(res, 503, {
+          error:
+            'Server configuration error: the database URL (MONGO_URI) is not set on this server.',
+          code: 'db_not_configured',
+        });
+      } else {
+        sendJson(res, 503, {
+          error: 'Database not connected. Please try again.',
+          code: 'db_unreachable',
+        });
+      }
       return;
     }
 

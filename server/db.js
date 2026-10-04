@@ -27,7 +27,21 @@ function getMongoUri() {
 }
 
 const MONGO_URI = getMongoUri();
+// Whether a database URL was actually provided (env var or .env file) — used
+// to tell "not configured" apart from "configured but unreachable".
+const MONGO_URI_CONFIGURED = Boolean(process.env.MONGO_URI);
 const DB_NAME = process.env.MONGO_DB_NAME || 'forgeqa';
+
+export function isMongoUriConfigured() {
+  return MONGO_URI_CONFIGURED;
+}
+
+if (!MONGO_URI_CONFIGURED && (process.env.VERCEL || process.env.NODE_ENV === 'production')) {
+  console.error(
+    '[DB] MONGO_URI is not set — falling back to mongodb://localhost:27017, which cannot work here. ' +
+      'Set MONGO_URI in the deployment environment (Vercel: Project Settings → Environment Variables).'
+  );
+}
 
 let client = null;
 let db = null;
