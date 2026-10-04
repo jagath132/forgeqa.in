@@ -29,7 +29,7 @@ export async function claimProductKey(key, userId, userEmail) {
         status: 'used',
         usedBy: userId,
         usedAt: new Date().toISOString(),
-        registeredEmail: userEmail,
+        registeredEmail: userEmail.toLowerCase().trim(),
       },
     }
   );

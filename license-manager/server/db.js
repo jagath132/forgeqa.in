@@ -43,7 +43,8 @@ function getMongoUri() {
   return process.env.MONGO_URI || 'mongodb://localhost:27017';
 }
 function getDbName() {
-  return process.env.MONGO_DB_NAME || 'forgekey';
+  // The customer and product-key records are shared with the ForgeQA app.
+  return process.env.MONGO_DB_NAME || 'forgeqa';
 }
 
 // Use a global cache so the MongoClient is reused across Vercel serverless

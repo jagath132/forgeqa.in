@@ -648,7 +648,7 @@ async function handleSelectPlan(req, res, body) {
         { $set: { paymentStatus: 'completed', status: 'ready', productKey } }
       );
 
-    sendJson(res, 200, { status: 'ready', productKey, email: pending.email });
+    sendJson(res, 200, { status: 'ready', email: pending.email });
     return;
   }
 
@@ -717,9 +717,7 @@ async function handleRegistrationStatus(req, res, body, url) {
     // If not found in pending, check if a user is already created!
     const user = await db.collection('users').findOne({ email: email.toLowerCase().trim() });
     if (user) {
-      // User is already registered and complete!
-      const keyDoc = await db.collection('product_keys').findOne({ usedBy: user._id.toString() });
-      sendJson(res, 200, { status: 'completed', productKey: keyDoc?.key || null });
+      sendJson(res, 200, { status: 'completed' });
       return;
     }
     sendJson(res, 404, { error: 'No registration in progress found.' });
@@ -729,7 +727,6 @@ async function handleRegistrationStatus(req, res, body, url) {
   sendJson(res, 200, {
     status: pending.status, // "pending", "pending_verification", "ready"
     paymentStatus: pending.paymentStatus,
-    productKey: pending.productKey || null,
   });
 }
 
