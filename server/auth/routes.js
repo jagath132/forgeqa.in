@@ -19,13 +19,8 @@ import {
   parseCookies,
   getAuthToken,
 } from './service.js';
-import {
-  validateProductKey,
-  claimProductKey,
-  isValidKeyFormat,
-  generateProductKeys,
-} from './productKeys.js';
-import { sendPasswordResetEmail, sendSupportEmail, sendProductKeyEmail } from '../email/index.js';
+import { validateProductKey, claimProductKey, isValidKeyFormat } from './productKeys.js';
+import { sendPasswordResetEmail, sendSupportEmail } from '../email/index.js';
 import {
   checkRateLimit,
   checkAccountLockout,
@@ -610,47 +605,32 @@ async function handleSelectPlan(req, res, body) {
     return;
   }
 
+  const isFree = planDoc.price === 0;
+  if (isFree) {
+    if (['ready', 'completed'].includes(pending.status)) {
+      sendJson(res, 200, { status: pending.status });
+      return;
+    }
+    await db.collection('pending_registrations').updateOne(
+      { pendingId },
+      {
+        $set: {
+          plan,
+          paymentProvider: null,
+          paymentStatus: 'not_required',
+          status: 'pending_verification',
+          productKey: null,
+        },
+      }
+    );
+
+    sendJson(res, 200, { status: 'pending_verification', email: pending.email });
+    return;
+  }
+
   await db
     .collection('pending_registrations')
     .updateOne({ pendingId }, { $set: { plan, paymentProvider: provider || null } });
-
-  const isFree = planDoc.price === 0;
-  if (isFree) {
-    // Free plans must activate a product key like every other plan: do NOT
-    // create the account or issue a session here. Generate + email a key and
-    // let complete-registration create the account once the key is used.
-    const reusableKey = await db
-      .collection('product_keys')
-      .findOne({ customerEmail: pending.email, status: 'available' });
-    const productKey =
-      reusableKey?.key ||
-      (
-        await generateProductKeys(1, {
-          customerEmail: pending.email,
-          notes: `${plan} plan registration`,
-        })
-      )[0];
-    try {
-      const emailed = await sendProductKeyEmail(pending.email, productKey, pending.name || '');
-      if (!emailed) {
-        console.warn(
-          `Product key email could not be delivered to ${pending.email}; key returned in registration response.`
-        );
-      }
-    } catch (err) {
-      console.warn('Product key email failed:', err.message);
-    }
-
-    await db
-      .collection('pending_registrations')
-      .updateOne(
-        { pendingId },
-        { $set: { paymentStatus: 'completed', status: 'ready', productKey } }
-      );
-
-    sendJson(res, 200, { status: 'ready', email: pending.email });
-    return;
-  }
 
   await db
     .collection('pending_registrations')
@@ -827,7 +807,13 @@ async function handleCompleteRegistration(req, res, body) {
     return;
   }
 
-  const existingUser = await authStore.findUserByEmail(email);
+  const cleanEmail = email.toLowerCase().trim();
+  if (validKey.customerEmail && validKey.customerEmail.toLowerCase().trim() !== cleanEmail) {
+    sendJson(res, 400, { error: 'This product key was issued to a different email address.' });
+    return;
+  }
+
+  const existingUser = await authStore.findUserByEmail(cleanEmail);
   if (existingUser) {
     sendJson(res, 409, {
       error: 'An account with this email already exists. Try signing in instead.',
@@ -836,9 +822,20 @@ async function handleCompleteRegistration(req, res, body) {
   }
 
   const db = getDb();
-  const pending = await db
-    .collection('pending_registrations')
-    .findOne({ email: email.toLowerCase().trim() });
+  const pending = await db.collection('pending_registrations').findOne({ email: cleanEmail });
+
+  if (pending && pending.status !== 'ready') {
+    sendJson(res, 403, { error: 'Your registration must be approved before you can activate it.' });
+    return;
+  }
+  if (pending && validKey.customerEmail?.toLowerCase().trim() !== cleanEmail) {
+    sendJson(res, 400, { error: 'This product key was not issued to your registration email.' });
+    return;
+  }
+  if (pending && pending.productKey?.toUpperCase() !== productKey.toUpperCase()) {
+    sendJson(res, 400, { error: 'This product key is not assigned to your registration.' });
+    return;
+  }
 
   let user;
   if (pending) {
@@ -852,7 +849,7 @@ async function handleCompleteRegistration(req, res, body) {
     await db
       .collection('pending_registrations')
       .updateOne(
-        { email: email.toLowerCase().trim() },
+        { email: cleanEmail, status: 'ready', productKey: productKey.toUpperCase() },
         { $set: { status: 'completed', completedAt: new Date().toISOString() } }
       );
   } else {
@@ -860,7 +857,7 @@ async function handleCompleteRegistration(req, res, body) {
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const passwordHash = await hashPassword(randomPassword, salt, DEFAULT_PBKDF2_ITERATIONS);
     user = await authStore.createUserFromHash({
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       passwordHash,
       salt,
       name: null,

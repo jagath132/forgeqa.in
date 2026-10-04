@@ -139,7 +139,8 @@ export function createApiMiddleware(env) {
           });
           const key = keys[0];
           const { sendProductKeyEmail } = await import('./email/service.js');
-          const appUrl = process.env.app_forgeqa_in_APP_URL || 'http://127.0.0.1:5173';
+          const appUrl =
+            process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
           const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(email)}&key=${key}`;
           await sendProductKeyEmail(email, key, name || '', completeUrl);
           sendJson(res, 200, { key, email });
@@ -197,7 +198,8 @@ export function createApiMiddleware(env) {
           return;
         }
         try {
-          const appUrl = process.env.app_forgeqa_in_APP_URL || 'http://127.0.0.1:5173';
+          const appUrl =
+            process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
           const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(to)}&key=${productKey}`;
           await sendProductKeyEmail(to, productKey, customerName, completeUrl);
           await logAudit({
@@ -941,7 +943,8 @@ export function createApiMiddleware(env) {
         });
         const productKey = keys[0];
         // Email the key to the user
-        const appUrl = process.env.app_forgeqa_in_APP_URL || 'http://127.0.0.1:5173';
+        const appUrl =
+          process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
         const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${productKey}`;
         await sendProductKeyEmail(pending.email, productKey, pending.name || '', completeUrl);
         // Update the pending registration status to "ready" with the key

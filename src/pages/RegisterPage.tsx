@@ -1084,14 +1084,16 @@ export function RegisterPage() {
 
               <div className="space-y-2">
                 <h3 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
-                  Verification pending
+                  Check your email after approval
                 </h3>
                 <p
                   className="text-xs max-w-xs mx-auto leading-relaxed"
                   style={{ color: 'var(--graphite)' }}
                 >
-                  Your request has been submitted. We will verify your account and email a product
-                  key to <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
+                  Your free-plan registration request has been sent to the ForgeQA License Manager.
+                  Once an administrator approves it, we will email a product key and a link to
+                  complete registration to <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
+                  Check your inbox and spam folder.
                 </p>
               </div>
 
@@ -1108,13 +1110,6 @@ export function RegisterPage() {
               </div>
 
               <div className="flex flex-col gap-2.5 pt-2">
-                <button
-                  onClick={() => setStep('verify_key')}
-                  className="w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer"
-                  style={{ background: 'var(--ink)', color: 'var(--paper)', border: 'none' }}
-                >
-                  I Already Have a Product Key
-                </button>
                 <button
                   onClick={() => navigate('/auth')}
                   className="w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer"
