@@ -14,7 +14,6 @@ import {
   EyeOff,
   Loader2,
   RefreshCw,
-  Clock,
   Sparkles,
 } from 'lucide-react';
 
@@ -24,18 +23,6 @@ interface AdminAccount {
   createdAt: string;
   lastLogin: string | null;
   loginCount?: number;
-}
-
-interface AdminLoginRecord {
-  id: string;
-  adminId: string | null;
-  email: string;
-  ip: string;
-  userAgent: string;
-  device?: { browser: string; os: string; isMobile: boolean };
-  status: 'success' | 'failed';
-  failureReason?: string | null;
-  timestamp: string;
 }
 
 export function SettingsPage() {
@@ -68,10 +55,6 @@ export function SettingsPage() {
   const [adminActionError, setAdminActionError] = useState('');
   const [adminActionSuccess, setAdminActionSuccess] = useState('');
 
-  // MongoDB Login History state
-  const [logins, setLogins] = useState<AdminLoginRecord[]>([]);
-  const [loginsLoading, setLoginsLoading] = useState(true);
-
   async function loadAdmins() {
     setAdminsLoading(true);
     try {
@@ -84,21 +67,8 @@ export function SettingsPage() {
     }
   }
 
-  async function loadLogins() {
-    setLoginsLoading(true);
-    try {
-      const res = await api.get<{ logins: AdminLoginRecord[] }>('/api/admin/logins?limit=25');
-      setLogins(res.data.logins);
-    } catch {
-      // ignore
-    } finally {
-      setLoginsLoading(false);
-    }
-  }
-
   useEffect(() => {
     loadAdmins();
-    loadLogins();
   }, []);
 
   async function handleEmailChange(e: FormEvent) {
@@ -937,173 +907,6 @@ export function SettingsPage() {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* MongoDB Live Login Activity & Audit Logs */}
-      <div
-        style={{
-          marginTop: 28,
-          background: 'var(--color-surface, #1e222d)',
-          borderRadius: 12,
-          border: '1px solid var(--color-border, #2d3342)',
-          padding: 24,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <Clock size={18} style={{ color: 'var(--color-accent)' }} />
-              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: 'var(--color-text)' }}>
-                Live MongoDB Login Activity & Security Audit
-              </h3>
-            </div>
-            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-              All dynamic login attempts, IP addresses, client devices, and status saved permanently
-              in <code>admin_logins</code> & <code>audit_logs</code>
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={loadLogins}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 8,
-              border: '1px solid var(--color-border, #333)',
-              background: 'transparent',
-              color: 'var(--color-text-muted)',
-              fontSize: 13,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <RefreshCw size={14} className={loginsLoading ? 'animate-spin' : ''} />
-            Refresh Logins
-          </button>
-        </div>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}
-          >
-            <thead>
-              <tr
-                style={{
-                  borderBottom: '1px solid var(--color-border, #2d3342)',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>Timestamp (MongoDB)</th>
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>Login Email</th>
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>Status</th>
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>IP Address</th>
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>Device / Browser</th>
-                <th style={{ padding: '12px 14px', fontWeight: 600 }}>Details / Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logins.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{
-                      padding: '24px',
-                      textAlign: 'center',
-                      color: 'var(--color-text-muted)',
-                    }}
-                  >
-                    {loginsLoading
-                      ? 'Loading records from MongoDB...'
-                      : 'No login records found in database.'}
-                  </td>
-                </tr>
-              ) : (
-                logins.map((entry) => {
-                  const isSuccess = entry.status === 'success';
-                  return (
-                    <tr
-                      key={entry.id}
-                      style={{
-                        borderBottom: '1px solid var(--color-border, rgba(255,255,255,0.05))',
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: 'var(--color-text-muted)',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: 'var(--color-text)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {entry.email}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            padding: '3px 8px',
-                            borderRadius: 9999,
-                            background: isSuccess
-                              ? 'rgba(16, 185, 129, 0.15)'
-                              : 'rgba(239, 68, 68, 0.15)',
-                            color: isSuccess ? '#10B981' : '#EF4444',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          {isSuccess ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                          {entry.status}
-                        </span>
-                      </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: 'var(--color-text-muted)',
-                          fontFamily: 'monospace',
-                        }}
-                      >
-                        {entry.ip}
-                      </td>
-                      <td style={{ padding: '12px 14px', color: 'var(--color-text-muted)' }}>
-                        {entry.device
-                          ? `${entry.device.browser} on ${entry.device.os}`
-                          : 'Standard Client'}
-                      </td>
-                      <td
-                        style={{
-                          padding: '12px 14px',
-                          color: isSuccess ? 'var(--color-text-muted)' : '#EF4444',
-                        }}
-                      >
-                        {entry.failureReason || 'Authorized login session'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
             </tbody>
           </table>
         </div>
