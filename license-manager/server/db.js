@@ -2,33 +2,68 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
 
-if (!process.env.MONGO_URI && typeof process.loadEnvFile === 'function') {
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
-    try {
-      process.loadEnvFile(envPath);
-    } catch {
-      // ignore
+function loadEnvFile() {
+  // Try Node 20.12+ built-in first
+  if (typeof process.loadEnvFile === 'function') {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      try {
+        process.loadEnvFile(envPath);
+      } catch {
+        /* ignore */
+      }
     }
+    return;
+  }
+  // Fallback: manual parse so dotenv isn't required as a hard dep here
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed
+      .slice(eqIdx + 1)
+      .trim()
+      .replace(/^["']|["']$/g, '');
+    if (key && process.env[key] === undefined) process.env[key] = val;
   }
 }
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
-const DB_NAME = process.env.MONGO_DB_NAME || 'forgekey';
+// Load .env eagerly so DB_NAME and MONGO_URI are always resolved correctly,
+// even when this module is imported before the caller sets up process.env.
+if (!process.env.MONGO_URI) loadEnvFile();
+
+// Resolved lazily inside connectDb() so hot-reloads and env propagation order
+// don't cause the wrong database name to be captured at import time.
+function getMongoUri() {
+  return process.env.MONGO_URI || 'mongodb://localhost:27017';
+}
+function getDbName() {
+  return process.env.MONGO_DB_NAME || 'forgekey';
+}
 
 let client = null;
 let db = null;
 
 export async function connectDb() {
   if (db) return db;
+  const mongoUri = getMongoUri();
+  const dbName = getDbName();
   if (!process.env.MONGO_URI && process.env.NODE_ENV === 'production') {
     console.error(
       '⚠️  MONGO_URI env var not set — falling back to localhost:27017 (will fail in production)'
     );
   }
-  client = new MongoClient(MONGO_URI);
+  console.log(
+    `[db] Connecting to MongoDB: ${mongoUri.replace(/\/\/.*@/, '//***@')} / db="${dbName}"`
+  );
+  client = new MongoClient(mongoUri);
   await client.connect();
-  db = client.db(DB_NAME);
+  db = client.db(dbName);
   await ensureIndexes(db);
   await seedDefaultPlans(db);
   return db;
