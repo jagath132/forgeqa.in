@@ -40,8 +40,17 @@ if (!process.env.MONGO_URI) loadEnvFile();
 // Resolved lazily inside connectDb() so hot-reloads and env propagation order
 // don't cause the wrong database name to be captured at import time.
 function getMongoUri() {
-  return process.env.MONGO_URI || 'mongodb://localhost:27017';
+  if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    throw new Error('MONGO_URI is not configured for the License Manager deployment.');
+  }
+  return 'mongodb://localhost:27017';
 }
+
+export function isMongoUriConfigured() {
+  return Boolean(process.env.MONGO_URI);
+}
+
 function getDbName() {
   // The customer and product-key records are shared with the ForgeQA app.
   return process.env.MONGO_DB_NAME || 'forgeqa';
@@ -72,11 +81,6 @@ export async function connectDb() {
   const mongoUri = getMongoUri();
   const dbName = getDbName();
 
-  if (!process.env.MONGO_URI && process.env.NODE_ENV === 'production') {
-    console.error(
-      '⚠️  MONGO_URI env var not set — falling back to localhost:27017 (will fail in production)'
-    );
-  }
   console.log(
     `[db] Connecting to MongoDB: ${mongoUri.replace(/\/\/[^@]*@/, '//***@')} / db="${dbName}"`
   );

@@ -1,4 +1,4 @@
-import { connectDb } from './db.js';
+import { connectDb, isMongoUriConfigured } from './db.js';
 import {
   adminStore,
   authenticateToken,
@@ -101,8 +101,29 @@ export function createApiMiddleware(env) {
     try {
       await getDbReady();
     } catch (dbError) {
-      console.error('MongoDB not ready:', dbError);
-      sendJson(res, 503, { error: 'Database not connected. Please try again.' });
+      const configured = isMongoUriConfigured();
+      console.error('MongoDB not ready:', {
+        name: dbError.name,
+        code: dbError.code,
+        message: dbError.message,
+        mongoUriConfigured: configured,
+        databaseName: process.env.MONGO_DB_NAME || 'forgeqa',
+      });
+      sendJson(
+        res,
+        503,
+        configured
+          ? {
+              error:
+                'MongoDB is unreachable. Check the License Manager MONGO_URI, MongoDB network access rules, and database credentials.',
+              code: 'mongo_unreachable',
+            }
+          : {
+              error:
+                'The License Manager is missing its MONGO_URI environment variable. Configure it in the deployment settings.',
+              code: 'mongo_uri_not_configured',
+            }
+      );
       return;
     }
 
