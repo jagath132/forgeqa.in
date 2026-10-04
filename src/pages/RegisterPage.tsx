@@ -259,10 +259,10 @@ export function RegisterPage() {
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await api.get<{ status: string; productKey: string | null }>(
+        const res = await api.get<{ status: string }>(
           `/api/auth/registration-status?email=${encodeURIComponent(email)}`
         );
-        if (res.data.status === 'ready' && res.data.productKey) {
+        if (res.data.status === 'ready') {
           setStep('verify_key');
           if (pollIntervalRef.current) {
             clearInterval(pollIntervalRef.current);
@@ -332,7 +332,6 @@ export function RegisterPage() {
         status: string;
         user?: any;
         token?: string;
-        productKey?: string;
       }>('/api/auth/select-plan', {
         pendingId,
         plan: planId,
@@ -341,9 +340,7 @@ export function RegisterPage() {
         setUser(res.data.user);
         navigate('/dashboard?welcome=true');
       } else if (res.data.status === 'ready') {
-        // Free plan: a product key was generated and emailed — the account is
-        // only created after the key is activated below.
-        if (res.data.productKey) setProductKey(res.data.productKey);
+        // Free plan keys are delivered by email and must be entered by the user.
         setStep('verify_key');
       } else if (res.data.status === 'pending_verification') {
         setStep('pending_verification');
