@@ -180,6 +180,7 @@ export function RegisterPage() {
   const [enterpriseSubmitted, setEnterpriseSubmitted] = useState(false);
   const [enterpriseEmail2, setEnterpriseEmail2] = useState('');
   const [keyActivated, setKeyActivated] = useState(false);
+  const isFreePlan = plans.some((plan) => plan.id === selectedPlan && plan.price === 0);
 
   const resetEnterpriseForm = useCallback(() => {
     setShowEnterpriseForm(false);
@@ -249,6 +250,13 @@ export function RegisterPage() {
   }, []);
 
   useEffect(() => {
+    if (step !== 'pending_verification' || !isFreePlan) return;
+
+    const redirectTimer = setTimeout(() => navigate('/auth'), 10000);
+    return () => clearTimeout(redirectTimer);
+  }, [step, isFreePlan, navigate]);
+
+  useEffect(() => {
     if (step !== 'pending_verification' || !email) {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -256,6 +264,8 @@ export function RegisterPage() {
       }
       return;
     }
+
+    if (isFreePlan) return;
 
     pollIntervalRef.current = setInterval(async () => {
       try {
@@ -277,7 +287,7 @@ export function RegisterPage() {
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [step, email]);
+  }, [step, email, isFreePlan]);
 
   const getPasswordStrength = (pass: string) => {
     let score = 0;
@@ -406,11 +416,6 @@ export function RegisterPage() {
     }
     return groups.join('-');
   };
-
-  const isFreePlan = (() => {
-    const planObj = plans.find((p) => p.id === selectedPlan);
-    return planObj ? planObj.price === 0 : false;
-  })();
 
   const visibleSteps = (() => {
     if (isFreePlan) return ['info', 'plan', 'pending_verification', 'verify_key'] as Step[];
@@ -1068,32 +1073,73 @@ export function RegisterPage() {
 
           {/* STEP 4: PENDING VERIFICATION */}
           {step === 'pending_verification' && (
-            <div className="text-center space-y-6 py-6 animate-fade-in">
+            <div
+              className="text-center space-y-6 py-6 animate-fade-in"
+              role="status"
+              aria-live="polite"
+            >
               <div className="flex justify-center">
-                <div
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: '50%',
-                    border: '3px solid var(--mist)',
-                    borderTopColor: 'var(--signal-green)',
-                    animation: 'spin 1.2s cubic-bezier(0.6, 0, 0.4, 1) infinite',
-                  }}
-                />
+                {isFreePlan ? (
+                  <div
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: '50%',
+                      display: 'grid',
+                      placeItems: 'center',
+                      border: '3px solid var(--signal-green)',
+                      color: 'var(--signal-green)',
+                    }}
+                  >
+                    <svg
+                      aria-hidden="true"
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m5 12 4 4L19 6" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: '50%',
+                      border: '3px solid var(--mist)',
+                      borderTopColor: 'var(--signal-green)',
+                      animation: 'spin 1.2s cubic-bezier(0.6, 0, 0.4, 1) infinite',
+                    }}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-lg font-bold" style={{ color: 'var(--ink)' }}>
-                  Check your email after approval
+                  {isFreePlan ? 'Registration request received!' : 'Verification pending'}
                 </h3>
                 <p
                   className="text-xs max-w-xs mx-auto leading-relaxed"
                   style={{ color: 'var(--graphite)' }}
                 >
-                  Your free-plan registration request has been sent to the ForgeQA License Manager.
-                  Once an administrator approves it, we will email a product key and a link to
-                  complete registration to <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
-                  Check your inbox and spam folder.
+                  {isFreePlan ? (
+                    <>
+                      Thanks for choosing the Free plan. Your request is awaiting approval. Once
+                      it’s approved, we’ll email your product key and a link to complete
+                      registration to <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
+                      Please check your inbox and spam folder.
+                    </>
+                  ) : (
+                    <>
+                      Your request has been submitted. We will verify your account and email a
+                      product key to <strong style={{ color: 'var(--ink)' }}>{email}</strong>.
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -1102,25 +1148,33 @@ export function RegisterPage() {
                 style={{
                   background: 'rgba(47,214,117,0.06)',
                   border: '1px solid rgba(47,214,117,0.15)',
-                  color: 'var(--signal-green)',
+                  color: isFreePlan ? 'var(--graphite)' : 'var(--signal-green)',
                 }}
               >
-                <span className="h-2 w-2 rounded-full bg-current animate-ping" />
-                Auto-checking every 4s
+                {isFreePlan ? (
+                  'You’ll be redirected to sign in in 10 seconds.'
+                ) : (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-current animate-ping" />
+                    Auto-checking every 4s
+                  </>
+                )}
               </div>
 
               <div className="flex flex-col gap-2.5 pt-2">
-                <button
-                  onClick={() => navigate('/auth')}
-                  className="w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer"
-                  style={{
-                    background: 'transparent',
-                    color: 'var(--graphite)',
-                    border: '1px solid var(--mist)',
-                  }}
-                >
-                  Back to Sign In
-                </button>
+                {!isFreePlan && (
+                  <button
+                    onClick={() => navigate('/auth')}
+                    className="w-full py-2.5 text-sm font-semibold rounded-lg transition-all cursor-pointer"
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--graphite)',
+                      border: '1px solid var(--mist)',
+                    }}
+                  >
+                    Back to Sign In
+                  </button>
+                )}
               </div>
             </div>
           )}
