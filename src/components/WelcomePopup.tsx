@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { markWelcomeSeen } from '../lib/api';
 
 export function WelcomePopup({ onDismiss }: { onDismiss: () => void }) {
@@ -14,9 +15,9 @@ export function WelcomePopup({ onDismiss }: { onDismiss: () => void }) {
     setTimeout(onDismiss, 300);
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4"
       role="dialog"
       aria-modal="true"
     >
@@ -26,7 +27,7 @@ export function WelcomePopup({ onDismiss }: { onDismiss: () => void }) {
         onClick={handleDismiss}
       />
       <div
-        className={`relative w-full max-w-sm card p-8 text-center ${closing ? 'animate-fade-in' : 'animate-slide-up'}`}
+        className={`relative my-auto w-full max-w-sm card p-8 text-center ${closing ? 'animate-fade-in' : 'animate-slide-up'}`}
         style={{ opacity: closing ? 0 : 1, transition: 'opacity 0.3s' }}
       >
         <div
@@ -64,6 +65,7 @@ export function WelcomePopup({ onDismiss }: { onDismiss: () => void }) {
           Get Started
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
