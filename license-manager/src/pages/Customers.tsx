@@ -7,7 +7,9 @@ export function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'approved' | 'pending_verification' | 'rejected'
+  >('all');
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [customerEmailLogs, setCustomerEmailLogs] = useState<EmailLog[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -156,10 +158,11 @@ export function CustomersPage() {
 
   const statusCounts = {
     approved: customers.filter((c) => c.status === 'approved').length,
+    pending: customers.filter((c) => c.status === 'pending_verification').length,
     rejected: customers.filter((c) => c.status === 'rejected').length,
   };
 
-  // Rejected registrations are virtual records (id like "rejected_<email>"), not real user docs.
+  // Registration records are virtual entries, not real user documents.
   const canManage = !!detailCustomer && /^[0-9a-f]{24}$/i.test(detailCustomer.id);
 
   const filtered =
@@ -213,6 +216,12 @@ export function CustomersPage() {
             Approved <span className="pill-count">{statusCounts.approved}</span>
           </button>
           <button
+            className={`pill${statusFilter === 'pending_verification' ? ' active' : ''}`}
+            onClick={() => setStatusFilter('pending_verification')}
+          >
+            Pending <span className="pill-count">{statusCounts.pending}</span>
+          </button>
+          <button
             className={`pill${statusFilter === 'rejected' ? ' active' : ''}`}
             onClick={() => setStatusFilter('rejected')}
           >
@@ -241,7 +250,7 @@ export function CustomersPage() {
             <p>
               {search
                 ? 'Try a different search term.'
-                : 'Customers will appear here when they register with a product key.'}
+                : 'Registrations awaiting approval and customers who complete registration with a product key will appear here.'}
             </p>
           </div>
         ) : (
@@ -284,7 +293,13 @@ export function CustomersPage() {
                     </td>
                     <td>
                       <span
-                        className={`badge ${c.status === 'rejected' ? 'badge-expired' : 'badge-used'}`}
+                        className={`badge ${
+                          c.status === 'rejected'
+                            ? 'badge-expired'
+                            : c.status === 'pending_verification'
+                              ? 'badge-warning'
+                              : 'badge-used'
+                        }`}
                         style={{ fontSize: 10 }}
                       >
                         {c.status}
@@ -348,7 +363,7 @@ export function CustomersPage() {
                 className={`modal-tab${drawerTab === 'edit' ? ' active' : ''}`}
                 disabled={!canManage}
                 onClick={() => canManage && setDrawerTab('edit')}
-                title={canManage ? undefined : "Rejected registrations can't be edited"}
+                title={canManage ? undefined : "Registration records can't be edited"}
               >
                 Edit Customer
               </button>
