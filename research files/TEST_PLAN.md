@@ -53,7 +53,7 @@ Focuses on validating individual React components, custom hooks, and Zustand sto
 | **TC-UI-01** | `TestScriptCodeViewer` | Render empty state when no script exists | Displays exact text `Terminal Buffer Empty` and guidance button |
 | **TC-UI-02** | `TestScriptCodeViewer` | Dynamic framework selection (Playwright, Cypress, Selenium, Puppeteer) | Header badge, file extension, feature pills, and CI/CD YAML update dynamically |
 | **TC-UI-03** | `TestScriptCodeViewer` | Language state selection (TypeScript, JavaScript, Python, Java, C#) | Status bar displays `SELECT LANGUAGE` when unselected and active language when set |
-| **TC-UI-04** | `TestScriptCodeViewer` | Interactive Sandbox Runner simulation | Dry-run logs render line-by-line with timestamps and status indicators |
+| **TC-UI-04** | `TestScriptCodeViewer` | Static script preview without a configured executor | Logs detected tests as not run and never reports fabricated pass/fail or locator-verification results |
 | **TC-UI-05** | `NavBar` & `Sidebar` | Navigation routing & active state styling | Active route highlights correctly and mobile drawer toggles smoothly |
 | **TC-UI-06** | `ConfirmDialog` | Confirmation modal trigger & callback execution | Prompts user before destructive actions and fires `onConfirm` |
 | **TC-UI-07** | `PageHeader` & `MobileHeader` | Responsive viewport adaptivity | Renders desktop breadcrumbs on large screens and mobile headers on small screens |
@@ -117,12 +117,12 @@ Flow 2: Test Case Generation & Automation Export Journey
    - Server parses and chunks document -> Displays chunk count & readiness status.
    - User returns to `/generator` and generates context-aware test cases based on the uploaded document.
 
-4. **Flow 4: Regression Pipeline Execution**
+4. **Flow 4: Regression Pipeline Execution Status**
    - User navigates to `/regression`.
    - Clicks **Upload Build Artifact** -> Uploads `app-v1.2.0.apk` or web package.
    - Sets target URL and platform to **Web**.
    - Clicks **Run Regression Build**.
-   - Execution runner simulates real-time step execution, recording pass/fail output and duration.
+   - If no test executor is configured, the API returns an explicit unavailable response and records no test results.
 
 ---
 

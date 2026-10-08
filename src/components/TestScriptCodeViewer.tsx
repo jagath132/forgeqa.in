@@ -25,7 +25,6 @@ function getFrameworkMeta(fw?: string, lang?: string) {
         badgeBg: 'bg-emerald-950/80 text-emerald-400 border-emerald-800/50',
         dotColor: 'bg-emerald-400',
         defaultExt: normLang === 'typescript' ? 'spec.cy.ts' : 'spec.cy.js',
-        runnerName: 'Cypress Test Runner Engine',
         ciCmd: `npx cypress run`,
       };
     case 'selenium':
@@ -41,7 +40,6 @@ function getFrameworkMeta(fw?: string, lang?: string) {
               : normLang === 'csharp'
                 ? 'TestCase.cs'
                 : 'test_suite.js',
-        runnerName: 'Selenium WebDriver Core Engine',
         ciCmd: normLang === 'python' ? 'pytest' : normLang === 'java' ? 'mvn test' : 'npm test',
       };
     case 'puppeteer':
@@ -50,7 +48,6 @@ function getFrameworkMeta(fw?: string, lang?: string) {
         badgeBg: 'bg-amber-950/80 text-amber-400 border-amber-800/50',
         dotColor: 'bg-amber-400',
         defaultExt: normLang === 'typescript' ? 'test.e2e.ts' : 'test.e2e.js',
-        runnerName: 'Puppeteer Headless Browser Engine',
         ciCmd: 'node test.e2e.js',
       };
     case 'playwright':
@@ -59,7 +56,6 @@ function getFrameworkMeta(fw?: string, lang?: string) {
         badgeBg: 'bg-cyan-950/80 text-cyan-400 border-cyan-800/50',
         dotColor: 'bg-cyan-400',
         defaultExt: normLang === 'python' ? 'test_script.py' : 'output.ts',
-        runnerName: 'Playwright Multi-Browser Engine',
         ciCmd: 'npx playwright test',
       };
     default:
@@ -68,7 +64,6 @@ function getFrameworkMeta(fw?: string, lang?: string) {
         badgeBg: 'bg-slate-800 text-slate-300 border-slate-700',
         dotColor: 'bg-slate-400',
         defaultExt: 'output.ts',
-        runnerName: 'Automation Engine',
         ciCmd: 'npm test',
       };
   }
@@ -856,9 +851,9 @@ jobs:
 
     setIsSimulating(true);
     setSimLogs([
-      { text: `[SYSTEM] Initializing ForgeQA Sandbox Runner...`, type: 'info' },
+      { text: `[SYSTEM] Starting ForgeQA static script preview...`, type: 'info' },
       {
-        text: `[CONFIG] Framework: ${fwMeta.label.toUpperCase()} | Engine: ${fwMeta.runnerName}`,
+        text: `[CONFIG] Framework: ${fwMeta.label.toUpperCase()} | Execution adapter: not configured`,
         type: 'dim',
       },
       {
@@ -884,7 +879,7 @@ jobs:
       setSimLogs((prev) => [
         ...prev,
         {
-          text: `[EXEC] Loading target environment: ${analysis.targetUrl}...`,
+          text: `[INFO] Target URL in script: ${analysis.targetUrl} (not contacted in static preview).`,
           type: 'info',
         },
         {
@@ -895,13 +890,14 @@ jobs:
 
       // If syntax errors found, display and stop
       if (analysis.syntaxErrors.length > 0) {
-        analysis.syntaxErrors.forEach((err) => {
-          setSimLogs((prev) => [...prev, { text: `[FAIL] Syntax Error: ${err}`, type: 'error' }]);
-        });
         setSimLogs((prev) => [
           ...prev,
+          ...analysis.syntaxErrors.map((err) => ({
+            text: `[FAIL] Static syntax check: ${err}`,
+            type: 'error' as const,
+          })),
           {
-            text: `[RESULT] ❌ Execution Aborted: Test script contains syntax errors.`,
+            text: `[RESULT] Static preview failed: ${analysis.tests.length} test(s) not run; no tests were executed.`,
             type: 'error',
           },
         ]);
@@ -916,14 +912,14 @@ jobs:
         });
       }
 
-      // Stage 2: Step through detected test blocks
+      // Stage 2: Report detected test blocks without claiming they were executed.
       let currentDelay = 400;
       analysis.tests.forEach((test, idx) => {
         schedule(() => {
           setSimLogs((prev) => [
             ...prev,
             {
-              text: `[RUN] (${idx + 1}/${analysis.tests.length}) ⏳ "${test.name}"...`,
+              text: `[ANALYSIS] (${idx + 1}/${analysis.tests.length}) Detected test: "${test.name}".`,
               type: 'info',
             },
           ]);
@@ -932,40 +928,36 @@ jobs:
             test.locators.slice(0, 2).forEach((loc) => {
               setSimLogs((prev) => [
                 ...prev,
-                { text: `  ↳ [LOCATOR] Verified active: ${loc}`, type: 'dim' },
+                {
+                  text: `  ↳ [LOCATOR] Found in source (not runtime-verified): ${loc}`,
+                  type: 'dim',
+                },
               ]);
             });
           }
-        }, currentDelay);
-
-        currentDelay += 400;
-
-        schedule(() => {
           setSimLogs((prev) => [
             ...prev,
-            { text: `[PASS] ✓ Test "${test.name}" completed successfully.`, type: 'pass' },
+            {
+              text: `[NOT RUN] "${test.name}" — static preview only; no test executor is configured.`,
+              type: 'warn',
+            },
           ]);
         }, currentDelay);
 
-        currentDelay += 200;
+        currentDelay += 400;
       });
 
       // Stage 3: Summary results
       schedule(() => {
-        const totalDuration = ((currentDelay + 300) / 1000).toFixed(2);
         setSimLogs((prev) => [
           ...prev,
           {
-            text: `[PASS] Navigation & locator verification confirmed (${analysis.totalLocators} active selectors, 0 errors).`,
-            type: 'pass',
+            text: `[INFO] ${analysis.totalLocators} locator(s) found in source; none were checked against the target page.`,
+            type: 'dim',
           },
           {
-            text: `[PASS] Self-healing selectors verified: 100% locators active.`,
-            type: 'pass',
-          },
-          {
-            text: `[RESULT] ✅ Test Suite Completed: ${analysis.tests.length}/${analysis.tests.length} tests passed in ${totalDuration}s.`,
-            type: 'pass',
+            text: `[RESULT] Static preview complete: 0 passed, 0 failed, ${analysis.tests.length} not run. No tests were executed.`,
+            type: 'warn',
           },
         ]);
         setIsSimulating(false);
@@ -1100,7 +1092,7 @@ jobs:
                 d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
               />
             </svg>
-            <span>Sandbox Dry-Run</span>
+            <span>Static Preview</span>
           </button>
         </div>
 
@@ -1394,10 +1386,10 @@ jobs:
               <div className="flex items-center justify-between bg-slate-900/70 p-3 rounded-xl border border-slate-800">
                 <div>
                   <h4 className="text-xs font-bold text-slate-200">
-                    ForgeQA Interactive Test Sandbox
+                    Static Test Script Preview
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span>Dry-run test executions locally in headless browser memory</span>
+                    <span>Static script analysis only; no browser or tests are executed</span>
                     {currentFileName && (
                       <span className="font-mono text-[10px] text-cyan-300 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/50">
                         {currentFileName}
@@ -1468,7 +1460,7 @@ jobs:
                             d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
                           />
                         </svg>
-                        <span>Simulate Dry Run</span>
+                        <span>Run Static Preview</span>
                       </>
                     )}
                   </button>
@@ -1478,8 +1470,8 @@ jobs:
               <div className="flex-1 bg-slate-950 p-4 rounded-xl border border-slate-800/80 font-mono text-xs space-y-2 overflow-auto min-h-[220px]">
                 {simLogs.length === 0 ? (
                   <div className="text-slate-500 italic text-center py-10">
-                    Click &ldquo;Simulate Dry Run&rdquo; to execute the test suite against a
-                    simulated Playwright worker instance.
+                    Click &ldquo;Run Static Preview&rdquo; to inspect the generated script. This
+                    does not execute tests or contact the target URL.
                   </div>
                 ) : (
                   <>

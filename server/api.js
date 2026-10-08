@@ -31,7 +31,7 @@ import {
   saveWebhook,
   getWebhooks,
 } from './regression/builds.js';
-import { createRun, listRuns, getRun, updateRun } from './regression/runs.js';
+import { createRun, listRuns, getRun } from './regression/runs.js';
 import {
   authStore,
   authenticateToken,
@@ -1432,52 +1432,9 @@ export function createApiMiddleware(env = {}) {
           sendJson(res, 404, { error: 'Run not found.' });
           return;
         }
-        await updateRun(runId, { status: 'running' }, user.id);
-        const results = run.testCases.map((tc, idx) => {
-          const summaryLower = (tc.summary || '').toLowerCase();
-          const isNegative =
-            summaryLower.includes('fail') ||
-            summaryLower.includes('invalid') ||
-            summaryLower.includes('error') ||
-            summaryLower.includes('boundary') ||
-            (run.testCases.length > 2 && idx === run.testCases.length - 1);
-
-          const categoryLower = (tc.category || '').toLowerCase();
-          const isHighRisk =
-            categoryLower.includes('auth') ||
-            categoryLower.includes('payment') ||
-            categoryLower.includes('security') ||
-            summaryLower.includes('payment') ||
-            summaryLower.includes('login');
-
-          const passed = !isNegative;
-          const durationMs = Math.floor(650 + Math.random() * 1200);
-
-          return {
-            testCaseId: tc.tcId,
-            passed,
-            riskLevel: isHighRisk ? 'HIGH' : isNegative ? 'MEDIUM' : 'LOW',
-            durationMs,
-            browser: 'chromium',
-            actualOutput: passed
-              ? `✓ Executed via Playwright in ${durationMs}ms: assertions passed.`
-              : `✕ Playwright Execution Failed: Timed out waiting for element locator.`,
-            failedLocator: passed ? null : "page.locator('button#action-submit')",
-            errorLog: passed
-              ? null
-              : `Playwright Test Execution Failure in ${tc.tcId}:\nTimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n  - waiting for locator('button#action-submit')\n  - locator resolved to <button class="btn disabled" id="action-submit">Submit</button>\n  - element is not visible or disabled\n  at workflow.spec.ts:42:24\n  at AppWorkflowPage.submit (pages/AppPages.ts:18:14)`,
-            traceUrl: `test-results/${tc.tcId}-trace.zip`,
-          };
+        sendJson(res, 501, {
+          error: 'Regression test execution is not configured. No tests were run and no results were recorded.',
         });
-
-        const overallStatus = results.every((r) => r.passed) ? 'passed' : 'failed';
-        await updateRun(
-          runId,
-          { status: overallStatus, results, completedAt: new Date().toISOString() },
-          user.id
-        );
-        const updated = await getRun(user.id, runId);
-        sendJson(res, 200, updated);
         return;
       }
 

@@ -45,10 +45,18 @@ export function RegressionRunner() {
     setProgress([]);
     try {
       const res = await fetch(`/api/regression/runs/${currentRun.id}/execute`, { method: 'POST' });
-      const data = await res.json();
+      const data: { error?: string; status?: string; results?: RegressionResult[] } =
+        await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Execution failed with status ${res.status}.`);
+      }
+      const results = data.results;
+      if (typeof data.status !== 'string' || !Array.isArray(results)) {
+        throw new Error('Execution response did not include a valid status and test results.');
+      }
       setProgress((p) => [
         ...p,
-        `Run completed: ${data.status} (${data.results.filter((r: { passed: boolean }) => r.passed).length}/${data.results.length} passed)`,
+        `Run completed: ${data.status} (${results.filter((result) => result.passed).length}/${results.length} passed)`,
       ]);
     } catch (err) {
       setProgress((p) => [
@@ -64,9 +72,11 @@ export function RegressionRunner() {
     const testCase = currentRun?.testCases.find((tc) => tc.tcId === r.testCaseId);
     setActiveErrorLog(
       r.errorLog ||
-        `Playwright Error in ${r.testCaseId}:\n${r.errorMessage || r.actualOutput || 'Execution timed out waiting for element.'}`
+        r.errorMessage ||
+        r.actualOutput ||
+        `No error diagnostics were recorded for ${r.testCaseId}.`
     );
-    setActiveLocator(r.failedLocator || "page.locator('button#action-submit')");
+    setActiveLocator(r.failedLocator || '');
     setActiveSummary(testCase ? `${testCase.tcId}: ${testCase.summary}` : r.testCaseId);
     setDiagnosticsOpen(true);
   };
@@ -93,8 +103,8 @@ export function RegressionRunner() {
             >
               Execution Runner
             </p>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/40">
-              ⚡ Playwright Engine
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-800/40">
+              Runner not configured
             </span>
           </div>
           <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
@@ -172,7 +182,7 @@ export function RegressionRunner() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          <span>Executing test cases across Playwright headless workers...</span>
+          <span>Waiting for the configured test executor to return results...</span>
         </div>
       )}
 
