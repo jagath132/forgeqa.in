@@ -1,28 +1,19 @@
-import React, { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { UsageMeter } from '../components/UsageMeter';
-import { PlanComparison } from '../components/PlanComparison';
-import { SeatSelector } from '../components/SeatSelector';
-import { BillingDashboard } from '../components/BillingDashboard';
 import { getProfile, saveProfile, getProductKey, api, type AiProvider } from '../lib/api';
 
-type Section = 'profile' | 'billing' | 'integrations';
+type Section = 'profile' | 'integrations';
 
 const sections: { id: Section; label: string; icon: string }[] = [
   {
     id: 'profile',
     label: 'Profile & Security',
     icon: 'M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z',
-  },
-  {
-    id: 'billing',
-    label: 'Billing',
-    icon: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z',
   },
   {
     id: 'integrations',
@@ -69,7 +60,7 @@ function getInitials(name: string, fallback = 'U') {
   return name.substring(0, 2).toUpperCase();
 }
 
-export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
+export function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAppStore((s: any) => s.user);
@@ -79,24 +70,17 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
   const logout = useAppStore((s: any) => s.logout);
 
   const searchParams = new URLSearchParams(location.search);
-  const sectionParam = searchParams.get('section') as Section | null;
+  const sectionParam = searchParams.get('section');
 
-  const [activeSection, setActiveSection] = useState<Section>(() => {
-    if (defaultSection) return defaultSection;
-    if (location.pathname === '/billing') return 'billing';
-    if (sectionParam && ['profile', 'billing', 'integrations'].includes(sectionParam)) {
-      return sectionParam;
-    }
-    return 'profile';
-  });
+  const [activeSection, setActiveSection] = useState<Section>(() =>
+    sectionParam === 'integrations' ? 'integrations' : 'profile'
+  );
 
   useEffect(() => {
-    if (location.pathname === '/billing') {
-      setActiveSection('billing');
-    } else if (sectionParam && ['profile', 'billing', 'integrations'].includes(sectionParam)) {
+    if (sectionParam === 'profile' || sectionParam === 'integrations') {
       setActiveSection(sectionParam);
     }
-  }, [location.pathname, location.search, sectionParam]);
+  }, [sectionParam]);
 
   /* ── Profile state ── */
   const [localName, setLocalName] = useState(profileName);
@@ -131,24 +115,7 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
     setActiveProviderLocal(activeProvider || storeProvider || null);
   }, [activeProvider, storeProvider]);
 
-  /* ── Billing & Usage state ── */
-  const [billingPlan, setBillingPlan] = useState<any>(null);
-  const [usageMetrics, setUsageMetrics] = useState<{
-    aiGenerationsToday: number;
-    totalTestCases: number;
-    totalFiles: number;
-    teamMembers: number;
-  }>({
-    aiGenerationsToday: 0,
-    totalTestCases: 0,
-    totalFiles: 0,
-    teamMembers: 1,
-  });
-  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
-  const [billingLoading, setBillingLoading] = useState(false);
-
-  /* ── Interactive Billing Features State ── */
-  const [selectedSeats, setSelectedSeats] = useState<number>(5);
+  /* ── Legacy billing dialogs ── */
   const [showRedeemKeyModal, setShowRedeemKeyModal] = useState(false);
   const [redeemKeyInput, setRedeemKeyInput] = useState('');
   const [redeemKeyStatus, setRedeemKeyStatus] = useState<{
@@ -156,19 +123,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
     msg: string;
   } | null>(null);
   const [redeemKeyLoading, setRedeemKeyLoading] = useState(false);
-
-  const [savedCard, setSavedCard] = useState<{
-    cardHolder: string;
-    cardNumber: string;
-    expDate: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem('nextest_billing_card');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
 
   const [showPaymentCardModal, setShowPaymentCardModal] = useState(false);
   const [paymentForm, setPaymentForm] = useState({
@@ -179,20 +133,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
   });
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-
-  const [savedTaxInfo, setSavedTaxInfo] = useState<{
-    companyName: string;
-    gstin: string;
-    address: string;
-    invoiceEmail: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem('nextest_billing_tax');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
 
   const [showTaxInfoModal, setShowTaxInfoModal] = useState(false);
   const [taxForm, setTaxForm] = useState({
@@ -206,7 +146,7 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
 
   /* ── Upgrade / Enquiry modals ── */
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradePlan, setUpgradePlan] = useState<any>(null);
+  const [upgradePlan] = useState<any>(null);
   const [upgradeBilling, setUpgradeBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [upgradeProcessing, setUpgradeProcessing] = useState(false);
   const [upgradeSuccess, setUpgradeSuccess] = useState(false);
@@ -228,26 +168,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
     }, 10000);
     return () => clearTimeout(timer);
   }, [enquirySent]);
-
-  const loadBillingData = useCallback(async () => {
-    setBillingLoading(true);
-    try {
-      const [usageRes, plansRes] = await Promise.all([
-        api.get('/api/billing/usage'),
-        api.get('/api/plans'),
-      ]);
-      if (usageRes.data?.plan) setBillingPlan(usageRes.data.plan);
-      if (usageRes.data?.usage) setUsageMetrics(usageRes.data.usage);
-      if (plansRes.data?.plans) setAvailablePlans(plansRes.data.plans);
-    } catch {
-      /* ignore */
-    }
-    setBillingLoading(false);
-  }, [activeSection]);
-
-  useEffect(() => {
-    loadBillingData();
-  }, [loadBillingData]);
 
   useEffect(() => {
     if (!user) return;
@@ -332,15 +252,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
   }, [supportSent]);
 
   /* ── Upgrade handler ── */
-  const refreshBilling = useCallback(async () => {
-    try {
-      const res = await api.get('/api/user/billing');
-      if (res.data?.plan) setBillingPlan(res.data.plan);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   async function handleUpgradeSubmit() {
     if (!upgradePlan || upgradeProcessing) return;
     setUpgradeProcessing(true);
@@ -351,7 +262,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
       try {
         await api.post('/api/user/billing/upgrade', { tier: 'free' });
         setUpgradeSuccess(true);
-        await refreshBilling();
       } catch {
         openConfirm('Upgrade Failed', 'Something went wrong. Please try again.', () => {}, 'Close');
       } finally {
@@ -399,7 +309,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
           msg: res.data?.message || 'Product key activated successfully!',
         });
         setProductKey({ key: redeemKeyInput.trim(), activatedAt: new Date().toISOString() });
-        refreshBilling();
       } else {
         setRedeemKeyStatus({
           type: 'error',
@@ -413,12 +322,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
           msg: 'Product key activated successfully! Quotas updated.',
         });
         setProductKey({ key: redeemKeyInput.trim(), activatedAt: new Date().toISOString() });
-        setBillingPlan((prev: any) => ({
-          ...prev,
-          tier: 'pro',
-          name: 'Pro Plan',
-          monthlyPrice: 1499,
-        }));
       } else {
         setRedeemKeyStatus({
           type: 'error',
@@ -446,7 +349,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
     } catch {
       /* ignore */
     }
-    setSavedCard(cardData);
     setTimeout(() => {
       setPaymentSaving(false);
       setPaymentSuccess(true);
@@ -471,7 +373,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
     } catch {
       /* ignore */
     }
-    setSavedTaxInfo(taxData);
     setTimeout(() => {
       setTaxSaving(false);
       setTaxSuccess(true);
@@ -1293,9 +1194,6 @@ export function SettingsPage({ defaultSection }: { defaultSection?: Section }) {
             </div>
           </div>
         );
-
-      case 'billing':
-        return <BillingDashboard user={user} onPlanChanged={loadBillingData} />;
 
       case 'integrations':
         return (

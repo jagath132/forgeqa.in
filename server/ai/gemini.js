@@ -3,8 +3,15 @@ const ALLOWED_MODEL_PREFIXES = ['gemini-', 'models/'];
 const MAX_CONTEXT_CHARS_PER_CHUNK = 700;
 
 function resolveModel(userModel) {
-  if (!userModel) return null;
-  const trimmed = userModel.trim();
+  const modelId =
+    typeof userModel === 'string'
+      ? userModel
+      : userModel && typeof userModel === 'object'
+        ? (userModel.id ?? userModel.model ?? userModel.name)
+        : null;
+  if (typeof modelId !== 'string') return null;
+  const trimmed = modelId.trim();
+  if (!trimmed) return null;
   if (GEMINI_MODELS.includes(trimmed)) return trimmed;
   if (ALLOWED_MODEL_PREFIXES.some((p) => trimmed.startsWith(p))) return trimmed;
   return null;

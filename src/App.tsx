@@ -13,6 +13,7 @@ import { GeneratorPage } from './pages/GeneratorPage';
 import { TestScripts } from './pages/TestScripts';
 import { KnowledgeBase } from './pages/KnowledgeBase';
 import { SettingsPage } from './pages/SettingsPage';
+import { BillingPage } from './pages/BillingPage';
 
 import { RegressionPage } from './pages/RegressionPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -69,7 +70,7 @@ function AppLayout() {
               <Route path="/test-scripts" element={<TestScripts />} />
               <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/billing" element={<SettingsPage defaultSection="billing" />} />
+              <Route path="/billing" element={<BillingPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/billing/success" element={<CheckoutSuccessPage />} />
               <Route path="/billing/canceled" element={<CheckoutCanceledPage />} />
