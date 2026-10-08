@@ -1,16 +1,11 @@
+import { normalizeModelId } from './modelRegistry.js';
+
 const GEMINI_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 const ALLOWED_MODEL_PREFIXES = ['gemini-', 'models/'];
 const MAX_CONTEXT_CHARS_PER_CHUNK = 700;
 
 function resolveModel(userModel) {
-  const modelId =
-    typeof userModel === 'string'
-      ? userModel
-      : userModel && typeof userModel === 'object'
-        ? (userModel.id ?? userModel.model ?? userModel.name)
-        : null;
-  if (typeof modelId !== 'string') return null;
-  const trimmed = modelId.trim();
+  const trimmed = normalizeModelId(userModel);
   if (!trimmed) return null;
   if (GEMINI_MODELS.includes(trimmed)) return trimmed;
   if (ALLOWED_MODEL_PREFIXES.some((p) => trimmed.startsWith(p))) return trimmed;

@@ -47,7 +47,12 @@ import {
   dismissAllAlerts,
   checkUserProviderModel,
 } from './ai/modelHealthCheck.js';
-import { MODEL_REGISTRY, getRegistryDefault, resolveDeprecated } from './ai/modelRegistry.js';
+import {
+  MODEL_REGISTRY,
+  getRegistryDefault,
+  normalizeModelId,
+  resolveDeprecated,
+} from './ai/modelRegistry.js';
 import { resolveLiveModel } from './ai/modelSync.js';
 
 const ALLOWED_EXTENSIONS = [
@@ -187,7 +192,7 @@ const providerEnvKeyMap = {
  * zero code changes — just wait for the next 24-hour sync.
  */
 async function resolveModel(provider, model) {
-  const effective = model || getRegistryDefault(provider);
+  const effective = normalizeModelId(model) || getRegistryDefault(provider);
   if (!effective) return undefined;
 
   // Fast path: static registry says it's deprecated → redirect immediately
@@ -766,7 +771,7 @@ export function createApiMiddleware(env = {}) {
         }
 
         const chunks = await knowledge.searchChunks(requirement, 4, user.id);
-        const defaultModel = resolveModel(provider, model);
+        const defaultModel = await resolveModel(provider, model);
         let result;
 
         if (provider === 'gemini') {
@@ -853,7 +858,7 @@ export function createApiMiddleware(env = {}) {
         sendSSE('phase', { phase: 'prompt', message: 'Building RAG prompt...' });
 
         const prompt = buildQaPrompt(requirement, chunks);
-        const defaultModel = resolveModel(provider, model);
+        const defaultModel = await resolveModel(provider, model);
 
         sendSSE('phase', { phase: 'generating', message: 'Requesting AI model...' });
 
@@ -971,7 +976,7 @@ export function createApiMiddleware(env = {}) {
           targetUrl,
           options,
           testCases: selectedTestCases,
-          model: resolveModel(provider, model),
+          model: await resolveModel(provider, model),
         });
 
         sendJson(res, 200, result);
@@ -1028,7 +1033,7 @@ export function createApiMiddleware(env = {}) {
           targetUrl: targetUrl || 'https://example.com',
           options,
           testCases: selectedTestCases,
-          model: resolveModel(provider, model),
+          model: await resolveModel(provider, model),
         });
 
         sendJson(res, 200, result);
@@ -1070,7 +1075,7 @@ export function createApiMiddleware(env = {}) {
           failedLocator,
           targetUrl,
           testCaseSummary,
-          model: resolveModel(provider, model),
+          model: await resolveModel(provider, model),
         });
 
         sendJson(res, 200, diagnosis);
@@ -1130,7 +1135,7 @@ export function createApiMiddleware(env = {}) {
         });
 
         const prompt = buildPrdPromptFromText({ productName, moduleName, details });
-        const defaultModel = resolveModel(targetProvider, model);
+        const defaultModel = await resolveModel(targetProvider, model);
 
         sendSSE('phase', {
           phase: 'generating',
@@ -1225,7 +1230,7 @@ export function createApiMiddleware(env = {}) {
           });
 
           const prompt = buildPrdPromptFromCrawl(crawlReport);
-          const defaultModel = resolveModel(targetProvider, model);
+          const defaultModel = await resolveModel(targetProvider, model);
 
           sendSSE('phase', {
             phase: 'generating',
@@ -1343,7 +1348,7 @@ export function createApiMiddleware(env = {}) {
           requirement,
           existingTestCases: testCases,
           platform: platform || 'web',
-          model: resolveModel(provider, model),
+          model: await resolveModel(provider, model),
         });
         sendJson(res, 200, { testCases: result?.testCases || [], summary: result?.summary || '' });
         return;
@@ -1384,7 +1389,7 @@ export function createApiMiddleware(env = {}) {
           framework: fw,
           language: lang,
           targetUrl: targetUrl || 'http://localhost:3000',
-          model: resolveModel(provider, model),
+          model: await resolveModel(provider, model),
         });
         sendJson(res, 200, { scripts: [result] });
         return;

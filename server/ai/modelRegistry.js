@@ -235,6 +235,16 @@ export const MODEL_REGISTRY = {
   },
 };
 
+export function normalizeModelId(model) {
+  const modelId =
+    typeof model === 'string'
+      ? model
+      : model && typeof model === 'object'
+        ? (model.id ?? model.model ?? model.value ?? model.name)
+        : null;
+  return typeof modelId === 'string' && modelId.trim() ? modelId.trim() : null;
+}
+
 /** Returns the default (recommended) model ID for a given provider */
 export function getRegistryDefault(provider) {
   const entry = MODEL_REGISTRY[provider];

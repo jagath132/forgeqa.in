@@ -19,7 +19,7 @@
  */
 
 import { getDb } from '../db.js';
-import { MODEL_REGISTRY, getRegistryDefault } from './modelRegistry.js';
+import { MODEL_REGISTRY, getRegistryDefault, normalizeModelId } from './modelRegistry.js';
 
 // ── Provider fetchers ────────────────────────────────────────────────────────
 // Each fetcher receives the decrypted API key (may be undefined for keyless
@@ -181,6 +181,7 @@ export async function syncAllProviders() {
  * @returns {Promise<string|undefined>}
  */
 export async function resolveLiveModel(provider, requestedModel) {
+  requestedModel = normalizeModelId(requestedModel);
   const syncDoc = await loadSyncResult(provider);
 
   // No sync data yet (first boot or DB unavailable) → fall back to static registry
