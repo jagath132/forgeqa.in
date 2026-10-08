@@ -360,7 +360,7 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Full list — merge approved users + pending/rejected registrations, dedup by email
+        // Full list — merge users and registrations, preferring the latest active state per email.
         const users = await db
           .collection('users')
           .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
@@ -389,11 +389,10 @@ export function createApiMiddleware(env) {
           .sort({ createdAt: -1 })
           .toArray();
 
-        const dedupedRejected = rejectedRegs.filter((r) => !approvedEmails.has(r.email));
         const pendingRegs = await db
           .collection('pending_registrations')
           .find(
-            { status: 'pending_verification' },
+            { status: { $in: ['pending_verification', 'ready'] } },
             {
               projection: {
                 pendingId: 1,
@@ -408,11 +407,11 @@ export function createApiMiddleware(env) {
           .sort({ createdAt: -1 })
           .toArray();
 
-        const listedEmails = new Set([
-          ...approvedEmails,
-          ...dedupedRejected.map((r) => r.email),
-        ]);
-        const dedupedPending = pendingRegs.filter((r) => !listedEmails.has(r.email));
+        const activeRegistrationEmails = new Set(pendingRegs.map((r) => r.email));
+        const dedupedRejected = rejectedRegs.filter(
+          (r) => !approvedEmails.has(r.email) && !activeRegistrationEmails.has(r.email)
+        );
+        const dedupedPending = pendingRegs.filter((r) => !approvedEmails.has(r.email));
 
         const mapUser = async (u, status) => {
           const keys = await db
@@ -445,7 +444,7 @@ export function createApiMiddleware(env) {
           dedupedPending.map((r) =>
             mapUser(
               { ...r, _id: `pending_${r.pendingId || r.email}`, role: 'user' },
-              'pending_verification'
+              r.status === 'ready' ? 'approved' : 'pending_verification'
             )
           )
         );
