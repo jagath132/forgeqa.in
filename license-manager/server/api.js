@@ -7,7 +7,12 @@ import {
   getAuditLogs,
 } from './auth/index.js';
 import { KEY_ROUTES } from './keys/routes.js';
-import { sendProductKeyEmail, getEmailLogs, resendEmail } from './email/service.js';
+import {
+  sendProductKeyEmail,
+  sendVerificationEmail,
+  getEmailLogs,
+  resendEmail,
+} from './email/service.js';
 import { handleStripeWebhook } from './payments/stripe.js';
 import { handleRazorpayWebhook } from './payments/razorpay.js';
 
@@ -961,6 +966,10 @@ export function createApiMiddleware(env) {
           status: d.status,
           transactionId: d.transactionId || null,
           createdAt: d.createdAt,
+          productKey: d.productKey || null,
+          notificationEmailStatus: d.notificationEmailStatus || null,
+          notificationEmailSentAt: d.notificationEmailSentAt || null,
+          notificationEmailError: d.notificationEmailError || null,
         }));
         sendJson(res, 200, { registrations });
         return;
@@ -987,40 +996,98 @@ export function createApiMiddleware(env) {
           });
           return;
         }
-        // Generate a product key for this user
-        const { generateProductKeys } = await import('./keys/service.js');
-        const keys = await generateProductKeys(1, {
-          customerEmail: pending.email,
-          notes: `${pending.plan || 'free'} plan approval`,
-        });
-        const productKey = keys[0];
-        // Email the key to the user
+        let productKey = pending.productKey;
+        let generatedNewKey = false;
+        if (!productKey) {
+          const { generateProductKeys } = await import('./keys/service.js');
+          const keys = await generateProductKeys(1, {
+            customerEmail: pending.email,
+            notes: `${pending.plan || 'free'} plan approval`,
+          });
+          productKey = keys[0];
+          generatedNewKey = true;
+        }
+
+        const approvedAt = new Date().toISOString();
+        let claim;
+        try {
+          claim = await db.collection('pending_registrations').updateOne(
+            { pendingId, status: 'pending_verification' },
+            {
+              $set: {
+                status: 'ready',
+                productKey,
+                approvedAt,
+                approvedBy: admin.email,
+                notificationEmailStatus: 'pending',
+                notificationEmailError: null,
+                notificationEmailAttemptedAt: approvedAt,
+              },
+            },
+          );
+        } catch (err) {
+          if (generatedNewKey) {
+            await db
+              .collection('product_keys')
+              .deleteOne({ key: productKey, customerEmail: pending.email, status: 'available' })
+              .catch((cleanupError) =>
+                console.error('Failed to release unassigned approval key:', cleanupError)
+              );
+          }
+          throw err;
+        }
+        if (claim.matchedCount === 0) {
+          if (generatedNewKey) {
+            await db
+              .collection('product_keys')
+              .deleteOne({ key: productKey, customerEmail: pending.email, status: 'available' });
+          }
+          sendJson(res, 409, { error: 'Registration was already reviewed. Refresh the list.' });
+          return;
+        }
+
         const appUrl =
           process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
         const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${productKey}`;
-        await sendProductKeyEmail(pending.email, productKey, pending.name || '', completeUrl);
-        // Update the pending registration status to "ready" with the key
-        await db.collection('pending_registrations').updateOne(
-          { pendingId },
-          {
-            $set: {
-              status: 'ready',
-              productKey,
-              approvedAt: new Date().toISOString(),
-              approvedBy: admin.email,
-            },
-          }
-        );
+        let emailStatus = 'sent';
+        let emailError = null;
+        try {
+          await sendVerificationEmail({
+            to: pending.email,
+            name: pending.name || '',
+            status: 'approved',
+            productKey,
+            completeUrl,
+          });
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            {
+              $set: {
+                notificationEmailStatus: 'sent',
+                notificationEmailSentAt: new Date().toISOString(),
+                notificationEmailError: null,
+              },
+            }
+          );
+        } catch (err) {
+          emailStatus = 'failed';
+          emailError = err.message || 'Email delivery failed.';
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
+          console.error(`Approval email failed for ${pending.email}:`, err);
+        }
         await logAudit({
           adminId: admin.id,
           adminEmail: admin.email,
           action: 'approve_registration',
           resource: 'pending_registration',
           resourceId: pendingId,
-          details: { email: pending.email, plan: pending.plan, productKey },
+          details: { email: pending.email, plan: pending.plan, productKey, emailStatus },
           ip: clientIp,
         });
-        sendJson(res, 200, { ok: true, productKey, email: pending.email });
+        sendJson(res, 200, { ok: true, productKey, email: pending.email, emailStatus, emailError });
         return;
       }
 
@@ -1039,62 +1106,166 @@ export function createApiMiddleware(env) {
           sendJson(res, 404, { error: 'Pending registration not found.' });
           return;
         }
-        // Send rejection email
-        try {
-          const transporter = (await import('nodemailer')).default;
-          const host = process.env.SMTP_HOST;
-          const port = parseInt(process.env.SMTP_PORT, 10) || 587;
-          const user = process.env.SMTP_USER;
-          const pass = process.env.SMTP_PASS;
-          let t;
-          if (host && pass) {
-            t = transporter.createTransport({
-              host,
-              port,
-              secure: port === 465,
-              auth: { user, pass },
-            });
-          } else {
-            const account = await transporter.createTestAccount();
-            t = transporter.createTransport({
-              host: 'smtp.ethereal.email',
-              port: 587,
-              secure: false,
-              auth: { user: account.user, pass: account.pass },
-            });
-          }
-          const reasonHtml = reason ? `<p><strong>Reason:</strong> ${reason}</p>` : '';
-          await t.sendMail({
-            from: process.env.SMTP_FROM || 'ForgeQA <noreply@app-forgeqa.in>',
-            to: pending.email,
-            subject: 'ForgeKey Registration Update',
-            html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><h1 style="color:#F59E0B;">ForgeKey</h1><p>Hello${pending.name ? ' ' + pending.name : ''},</p><p>We were unable to approve your ForgeKey registration at this time.</p>${reasonHtml}<p>If you believe this is an error, please contact support.</p><p style="color:#999;font-size:12px;">ForgeKey Team</p></body></html>`,
+        if (pending.status !== 'pending_verification') {
+          sendJson(res, 400, {
+            error: `Registration is in '${pending.status}' state, not 'pending_verification'.`,
           });
-        } catch (emailErr) {
-          console.warn('Rejection email failed:', emailErr.message);
+          return;
         }
-        // Delete or mark as rejected
-        await db.collection('pending_registrations').updateOne(
-          { pendingId },
+        const rejectedAt = new Date().toISOString();
+        const rejectionReason = String(reason || '').trim();
+        const updateResult = await db.collection('pending_registrations').updateOne(
+          { pendingId, status: 'pending_verification' },
           {
             $set: {
               status: 'rejected',
-              rejectedAt: new Date().toISOString(),
+              rejectedAt,
               rejectedBy: admin.email,
-              rejectionReason: reason || null,
+              rejectionReason: rejectionReason || null,
+              notificationEmailStatus: 'pending',
+              notificationEmailError: null,
+              notificationEmailAttemptedAt: rejectedAt,
             },
           }
         );
+        if (updateResult.matchedCount === 0) {
+          sendJson(res, 409, { error: 'Registration was already reviewed. Refresh the list.' });
+          return;
+        }
+
+        let emailStatus = 'sent';
+        let emailError = null;
+        try {
+          await sendVerificationEmail({
+            to: pending.email,
+            name: pending.name || '',
+            status: 'rejected',
+            reason: rejectionReason,
+          });
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            {
+              $set: {
+                notificationEmailStatus: 'sent',
+                notificationEmailSentAt: new Date().toISOString(),
+                notificationEmailError: null,
+              },
+            }
+          );
+        } catch (emailErr) {
+          emailStatus = 'failed';
+          emailError = emailErr.message || 'Email delivery failed.';
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
+          console.error(`Rejection email failed for ${pending.email}:`, emailErr);
+        }
         await logAudit({
           adminId: admin.id,
           adminEmail: admin.email,
           action: 'reject_registration',
           resource: 'pending_registration',
           resourceId: pendingId,
-          details: { email: pending.email, reason },
+          details: { email: pending.email, reason: rejectionReason, emailStatus },
           ip: clientIp,
         });
-        sendJson(res, 200, { ok: true });
+        sendJson(res, 200, { ok: true, emailStatus, emailError });
+        return;
+      }
+
+      // Retry the existing approval or rejection email without changing the decision/key.
+      if (
+        url.pathname.startsWith('/api/admin/verifications/') &&
+        url.pathname.endsWith('/resend-email') &&
+        req.method === 'POST'
+      ) {
+        const encodedId = url.pathname
+          .replace('/api/admin/verifications/', '')
+          .replace(/\/resend-email$/, '');
+        const pendingId = decodeURIComponent(encodedId);
+        if (!pendingId || pendingId.includes('/')) {
+          sendJson(res, 400, { error: 'pendingId is required.' });
+          return;
+        }
+        const { getDb } = await import('./db.js');
+        const db = getDb();
+        const pending = await db.collection('pending_registrations').findOne({ pendingId });
+        if (!pending || !['ready', 'rejected'].includes(pending.status)) {
+          sendJson(res, 400, { error: 'Only approved or rejected registrations can be emailed.' });
+          return;
+        }
+        if (pending.notificationEmailStatus !== 'failed') {
+          sendJson(res, 409, { error: 'This registration does not have a failed email to retry.' });
+          return;
+        }
+        if (pending.status === 'ready' && !pending.productKey) {
+          sendJson(res, 409, { error: 'The approved registration has no product key to resend.' });
+          return;
+        }
+
+        const approved = pending.status === 'ready';
+        const attemptedAt = new Date().toISOString();
+        const retryClaim = await db.collection('pending_registrations').updateOne(
+          { pendingId, notificationEmailStatus: 'failed' },
+          {
+            $set: {
+              notificationEmailStatus: 'pending',
+              notificationEmailError: null,
+              notificationEmailAttemptedAt: attemptedAt,
+            },
+          }
+        );
+        if (retryClaim.matchedCount === 0) {
+          sendJson(res, 409, { error: 'Email retry is already in progress. Refresh the list.' });
+          return;
+        }
+
+        let emailStatus = 'sent';
+        let emailError = null;
+        try {
+          const appUrl =
+            process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
+          const completeUrl = approved
+            ? `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${encodeURIComponent(pending.productKey)}`
+            : undefined;
+          await sendVerificationEmail({
+            to: pending.email,
+            name: pending.name || '',
+            status: approved ? 'approved' : 'rejected',
+            productKey: pending.productKey,
+            completeUrl,
+            reason: pending.rejectionReason || '',
+          });
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            {
+              $set: {
+                notificationEmailStatus: 'sent',
+                notificationEmailSentAt: new Date().toISOString(),
+                notificationEmailError: null,
+              },
+            }
+          );
+        } catch (err) {
+          emailStatus = 'failed';
+          emailError = err.message || 'Email delivery failed.';
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
+          console.error(`Verification email retry failed for ${pending.email}:`, err);
+        }
+        await logAudit({
+          adminId: admin.id,
+          adminEmail: admin.email,
+          action: 'resend_verification_email',
+          resource: 'pending_registration',
+          resourceId: pendingId,
+          details: { email: pending.email, decision: pending.status, emailStatus },
+          ip: clientIp,
+        });
+        sendJson(res, 200, { ok: true, emailStatus, emailError });
         return;
       }
 

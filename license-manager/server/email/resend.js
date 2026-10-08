@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { getDb } from "../db.js";
+import { getVerificationEmailHtml } from "./templates.js";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
@@ -48,5 +49,55 @@ export async function sendProductKeyEmailResend(toEmail, productKey, customerNam
   });
 
   console.log(`Product key email sent via Resend to ${toEmail}, id=${data?.id}`);
+  return { success: true, messageId: data?.id };
+}
+
+export async function sendVerificationEmailResend({
+  to,
+  name,
+  status,
+  productKey,
+  completeUrl,
+  reason,
+}) {
+  const approved = status === "approved";
+  const subject = approved ? "Welcome to ForgeQA — your account is approved" : "ForgeQA registration update";
+  const supportEmail = process.env.SUPPORT_EMAIL || "support@forgeqa.in";
+  const { data, error } = await getResend().emails.send({
+    from: FROM,
+    to: [to],
+    subject,
+    html: getVerificationEmailHtml({
+      name,
+      status,
+      productKey,
+      completeUrl,
+      reason,
+      supportEmail,
+    }),
+  });
+
+  if (error) {
+    await logColl().insertOne({
+      to,
+      subject,
+      productKey: productKey || null,
+      emailType: approved ? "registration_approved" : "registration_rejected",
+      error: error.message,
+      status: "failed",
+      sentAt: new Date().toISOString(),
+    });
+    throw error;
+  }
+
+  await logColl().insertOne({
+    to,
+    subject,
+    productKey: productKey || null,
+    emailType: approved ? "registration_approved" : "registration_rejected",
+    messageId: data?.id,
+    status: "sent",
+    sentAt: new Date().toISOString(),
+  });
   return { success: true, messageId: data?.id };
 }

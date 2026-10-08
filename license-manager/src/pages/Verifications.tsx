@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 import { api, type PendingRegistration } from '../lib/api';
 import { useConfirm } from '../components/ConfirmDialog';
 import {
@@ -12,6 +13,8 @@ import {
   X,
   XCircle,
   Trash2,
+  Mail,
+  RefreshCw as RetryIcon,
 } from 'lucide-react';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', enterprise: 'Enterprise' };
@@ -20,6 +23,13 @@ const PLAN_COLORS: Record<string, string> = {
   pro: 'var(--color-accent)',
   enterprise: 'var(--color-warning)',
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error || fallback;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
 
 export function VerificationsPage() {
   const [items, setItems] = useState<PendingRegistration[]>([]);
@@ -36,7 +46,7 @@ export function VerificationsPage() {
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -47,24 +57,36 @@ export function VerificationsPage() {
       setItems(res.data.registrations);
     } catch {
       showToast('error', 'Failed to load registrations');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  }, [filter, showToast]);
 
   useEffect(() => {
     load();
     const interval = setInterval(load, 30000);
     return () => clearInterval(interval);
-  }, [filter]);
+  }, [load]);
 
   async function handleApprove(item: PendingRegistration) {
     setActionLoading(item.pendingId);
     try {
-      await api.post('/api/admin/verifications/approve', { pendingId: item.pendingId });
-      showToast('success', `Approved — product key sent to ${item.email}`);
-      await load();
-    } catch (err: any) {
-      showToast('error', err?.response?.data?.error || 'Failed to approve');
+      const res = await api.post<{ emailStatus: string; emailError?: string }>(
+        '/api/admin/verifications/approve',
+        { pendingId: item.pendingId }
+      );
+      if (res.data.emailStatus === 'failed') {
+        showToast(
+          'error',
+          `Approved, but the welcome email failed${res.data.emailError ? `: ${res.data.emailError}` : '.'}`
+        );
+        setFilter('all');
+      } else {
+        showToast('success', `Approved — welcome and activation email sent to ${item.email}`);
+        await load();
+      }
+    } catch (err: unknown) {
+      showToast('error', getErrorMessage(err, 'Failed to approve'));
     }
     setActionLoading(null);
   }
@@ -72,13 +94,42 @@ export function VerificationsPage() {
   async function handleReject(item: PendingRegistration, reason: string) {
     setActionLoading(item.pendingId);
     try {
-      await api.post('/api/admin/verifications/reject', { pendingId: item.pendingId, reason });
-      showToast('success', `Rejected registration for ${item.email}`);
+      const res = await api.post<{ emailStatus: string; emailError?: string }>(
+        '/api/admin/verifications/reject',
+        { pendingId: item.pendingId, reason }
+      );
+      if (res.data.emailStatus === 'failed') {
+        showToast(
+          'error',
+          `Registration rejected, but the email failed${res.data.emailError ? `: ${res.data.emailError}` : '.'}`
+        );
+        setFilter('all');
+      } else {
+        showToast('success', `Rejection email sent to ${item.email}`);
+      }
       setSelectedItem(null);
       setRejectReason('');
+      if (res.data.emailStatus !== 'failed') await load();
+    } catch (err: unknown) {
+      showToast('error', getErrorMessage(err, 'Failed to reject'));
+    }
+    setActionLoading(null);
+  }
+
+  async function handleRetryEmail(item: PendingRegistration) {
+    setActionLoading(item.pendingId);
+    try {
+      const res = await api.post<{ emailStatus: string; emailError?: string }>(
+        `/api/admin/verifications/${encodeURIComponent(item.pendingId)}/resend-email`
+      );
+      if (res.data.emailStatus === 'failed') {
+        showToast('error', res.data.emailError || 'Email delivery failed again.');
+      } else {
+        showToast('success', `Email sent to ${item.email}`);
+      }
       await load();
-    } catch (err: any) {
-      showToast('error', err?.response?.data?.error || 'Failed to reject');
+    } catch (err: unknown) {
+      showToast('error', getErrorMessage(err, 'Failed to resend email'));
     }
     setActionLoading(null);
   }
@@ -97,8 +148,8 @@ export function VerificationsPage() {
       await api.delete(`/api/admin/verifications/${encodeURIComponent(item.pendingId)}`);
       showToast('success', `Deleted registration for ${item.email}`);
       await load();
-    } catch (err: any) {
-      showToast('error', err?.response?.data?.error || 'Failed to delete');
+    } catch (err: unknown) {
+      showToast('error', getErrorMessage(err, 'Failed to delete'));
     }
     setActionLoading(null);
   }
@@ -138,7 +189,8 @@ export function VerificationsPage() {
           <div className="info-banner-title">Manual Verification Required</div>
           <div className="info-banner-text">
             All new registrations require admin approval. <strong>Approve</strong> generates a key
-            and emails it automatically. <strong>Reject</strong> sends a denial notice.
+            and emails a welcome message with activation steps. <strong>Reject</strong> sends a
+            decision notice with the optional reason.
           </div>
         </div>
       </div>
@@ -240,7 +292,48 @@ export function VerificationsPage() {
                       {item.status === 'pending_verification' ? 'Awaiting' : item.status}
                     </span>
                   </div>
+                  {item.notificationEmailStatus && (
+                    <div
+                      className="verification-meta-item"
+                      title={item.notificationEmailError || undefined}
+                    >
+                      <Mail size={14} strokeWidth={2} />
+                      <span
+                        className={`badge ${
+                          item.notificationEmailStatus === 'sent'
+                            ? 'badge-used'
+                            : item.notificationEmailStatus === 'failed'
+                              ? 'badge-expired'
+                              : 'badge-warning'
+                        }`}
+                        style={{ fontSize: 10 }}
+                      >
+                        Email {item.notificationEmailStatus}
+                      </span>
+                      {item.notificationEmailSentAt && (
+                        <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>
+                          {new Date(item.notificationEmailSentAt).toLocaleString(undefined, {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
+                {item.notificationEmailStatus === 'failed' && item.notificationEmailError && (
+                  <div
+                    role="alert"
+                    style={{
+                      marginTop: 8,
+                      color: 'var(--color-danger)',
+                      fontSize: 12,
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    Email delivery failed: {item.notificationEmailError}
+                  </div>
+                )}
               </div>
               {item.status === 'pending_verification' ? (
                 <div className="verification-actions">
@@ -302,6 +395,21 @@ export function VerificationsPage() {
                   >
                     {item.status === 'ready' ? 'Approved' : item.status}
                   </span>
+                  {item.notificationEmailStatus === 'failed' && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      disabled={actionLoading === item.pendingId}
+                      onClick={() => handleRetryEmail(item)}
+                      title={item.notificationEmailError || 'Retry notification email'}
+                    >
+                      {actionLoading === item.pendingId ? (
+                        <RetryIcon size={13} className="lm-spin" strokeWidth={2} />
+                      ) : (
+                        <RetryIcon size={13} strokeWidth={2} />
+                      )}
+                      Retry email
+                    </button>
+                  )}
                   <button
                     className="btn btn-secondary btn-sm"
                     disabled={actionLoading === item.pendingId}

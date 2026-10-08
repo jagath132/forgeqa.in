@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { getDb } from "../db.js";
-import { sendProductKeyEmailResend } from "./resend.js";
+import { sendProductKeyEmailResend, sendVerificationEmailResend } from "./resend.js";
+import { getVerificationEmailHtml } from "./templates.js";
 
 let etherealTransporter = null;
 
@@ -17,6 +18,10 @@ async function getTransporter() {
       secure: port === 465,
       auth: user && pass ? { user, pass } : undefined,
     });
+  }
+
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    throw new Error("Email transport is not configured. Set RESEND_API_KEY or SMTP settings.");
   }
 
   if (!etherealTransporter) {
@@ -87,6 +92,74 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
       to: toEmail,
       subject,
       productKey,
+      error: err.message,
+      status: "failed",
+      sentAt: new Date().toISOString(),
+    });
+    throw err;
+  }
+}
+
+export async function sendVerificationEmail({
+  to,
+  name,
+  status,
+  productKey,
+  completeUrl,
+  reason,
+}) {
+  const approved = status === "approved";
+  const subject = approved ? "Welcome to ForgeQA — your account is approved" : "ForgeQA registration update";
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      return await sendVerificationEmailResend({
+        to,
+        name,
+        status,
+        productKey,
+        completeUrl,
+        reason,
+      });
+    } catch (err) {
+      console.warn("Resend verification email failed; trying SMTP:", err.message);
+    }
+  }
+
+  const transporter = await getTransporter();
+  const supportEmail = process.env.SUPPORT_EMAIL || "support@forgeqa.in";
+  const html = getVerificationEmailHtml({
+    name,
+    status,
+    productKey,
+    completeUrl,
+    reason,
+    supportEmail,
+  });
+
+  try {
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || "ForgeQA <noreply@app-forgeqa.in>",
+      to,
+      subject,
+      html,
+    });
+    await logColl().insertOne({
+      to,
+      subject,
+      productKey: productKey || null,
+      emailType: approved ? "registration_approved" : "registration_rejected",
+      messageId: info.messageId,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    await logColl().insertOne({
+      to,
+      subject,
+      productKey: productKey || null,
+      emailType: approved ? "registration_approved" : "registration_rejected",
       error: err.message,
       status: "failed",
       sentAt: new Date().toISOString(),

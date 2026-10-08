@@ -74,6 +74,10 @@ export type PendingRegistration = {
   status: string;
   transactionId: string | null;
   createdAt: string;
+  productKey?: string | null;
+  notificationEmailStatus?: 'pending' | 'sent' | 'failed' | null;
+  notificationEmailSentAt?: string | null;
+  notificationEmailError?: string | null;
 };
 
 export type Plan = {
