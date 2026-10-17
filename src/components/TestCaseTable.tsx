@@ -21,13 +21,19 @@ const testCaseColumns = [
 
 type SortDir = 'asc' | 'desc' | null;
 
-function buildExportRows(testCases: TestCase[]) {
+function formatTestSteps(testSteps: string[], format: 'standard' | 'gherkin') {
+  return testSteps
+    .map((step, index) => (format === 'gherkin' ? step : `${index + 1}. ${step}`))
+    .join('\n');
+}
+
+function buildExportRows(testCases: TestCase[], format: 'standard' | 'gherkin') {
   return testCases.map((tc) => ({
     TC_ID: tc.tcId,
     Category: tc.category,
     Summary: tc.summary,
     'Test Description': tc.testDescription,
-    'Test Steps': tc.testSteps.map((step, i) => `${i + 1}. ${step}`).join('\n'),
+    'Test Steps': formatTestSteps(tc.testSteps, format),
     'Expected Result': tc.expected,
     Status: tc.status ?? 'draft',
   }));
@@ -41,9 +47,11 @@ function getExportFileName(extension: 'xlsx' | 'pdf') {
 export function TestCaseTable({
   title,
   testCases: rawTestCases,
+  format = 'standard',
 }: {
   title: string;
   testCases: TestCase[];
+  format?: 'standard' | 'gherkin';
 }) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -132,7 +140,7 @@ export function TestCaseTable({
     setIsExportingExcel(true);
     try {
       const XLSX = await import('xlsx');
-      const worksheet = XLSX.utils.json_to_sheet(buildExportRows(filteredAndSorted));
+      const worksheet = XLSX.utils.json_to_sheet(buildExportRows(filteredAndSorted, format));
       worksheet['!cols'] = [
         { wch: 12 },
         { wch: 18 },
@@ -191,7 +199,7 @@ export function TestCaseTable({
           tc.category,
           tc.summary,
           tc.testDescription,
-          tc.testSteps.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+          formatTestSteps(tc.testSteps, format),
           tc.expected,
         ];
         const splitCells = vals.map((v, i) => doc.splitTextToSize(v, columnWidths[i] - 8));
@@ -215,6 +223,32 @@ export function TestCaseTable({
     } finally {
       setIsExportingPdf(false);
     }
+  }
+
+  function exportGherkin() {
+    const content = [
+      `Feature: ${title.replace(/\r?\n/g, ' ').trim()}`,
+      '',
+      ...filteredAndSorted.flatMap((testCase) => {
+        const steps = [...testCase.testSteps];
+        if (!steps.some((step) => /^\s*Then\b/i.test(step))) {
+          steps.push(`Then ${testCase.expected}`);
+        }
+        return [
+          `  @${testCase.category.replace(/\W+/g, '_').toLowerCase()}`,
+          `  Scenario: ${testCase.tcId} - ${testCase.summary.replace(/\r?\n/g, ' ').trim()}`,
+          ...steps.map((step) => `    ${step}`),
+          '',
+        ];
+      }),
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${getExportFileName('xlsx').replace(/\.xlsx$/, '')}.feature`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -269,6 +303,15 @@ export function TestCaseTable({
               {selectedRows.size} selected
             </span>
           )}
+          {format === 'gherkin' ? (
+            <button
+              className="btn-secondary flex items-center gap-2 px-4 py-2.5 text-xs"
+              onClick={exportGherkin}
+              type="button"
+            >
+              Export .feature
+            </button>
+          ) : null}
           <button
             className="btn-primary flex items-center gap-2 px-4 py-2.5 text-xs"
             onClick={exportExcel}
@@ -438,14 +481,25 @@ export function TestCaseTable({
                     </td>
                     <td className="px-5 py-4">
                       {isExpanded ? (
-                        <ol
-                          className="list-decimal space-y-1 pl-4 text-sm"
-                          style={{ color: 'var(--text-secondary)' }}
-                        >
-                          {testCase.testSteps.map((step, sIdx) => (
-                            <li key={`${testCase.tcId}-step-${sIdx}`}>{step}</li>
-                          ))}
-                        </ol>
+                        format === 'gherkin' ? (
+                          <div
+                            className="space-y-1 font-mono text-sm"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            {testCase.testSteps.map((step, sIdx) => (
+                              <p key={`${testCase.tcId}-step-${sIdx}`}>{step}</p>
+                            ))}
+                          </div>
+                        ) : (
+                          <ol
+                            className="list-decimal space-y-1 pl-4 text-sm"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            {testCase.testSteps.map((step, sIdx) => (
+                              <li key={`${testCase.tcId}-step-${sIdx}`}>{step}</li>
+                            ))}
+                          </ol>
+                        )
                       ) : (
                         <span className="line-clamp-2" style={{ color: 'var(--text-muted)' }}>
                           {testCase.testSteps.length} step

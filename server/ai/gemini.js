@@ -24,7 +24,8 @@ function trimChunkText(text) {
   return `${normalized.slice(0, MAX_CONTEXT_CHARS_PER_CHUNK)}...`;
 }
 
-export function buildQaPrompt(requirement, contextChunks = []) {
+export function buildQaPrompt(requirement, contextChunks = [], options = {}) {
+  const { format = 'standard', techniques = [], requirements = [] } = options;
   const context = contextChunks.length
     ? contextChunks
         .map(
@@ -33,6 +34,20 @@ export function buildQaPrompt(requirement, contextChunks = []) {
         )
         .join('\n\n---\n\n')
     : 'No uploaded knowledge context matched this requirement.';
+  const techniqueGuidance = {
+    equivalence:
+      'Use Equivalence Partitioning: identify valid and invalid input classes and test representative values.',
+    boundary:
+      'Use Boundary Value Analysis: cover minimum, minimum-1, minimum+1, maximum, maximum-1, and maximum+1 where applicable.',
+    state:
+      'Use State Transition testing: cover valid and invalid state changes, transition guards, and resulting states.',
+    pairwise:
+      'Use Pairwise Combinatorial testing: cover pairs of interacting input/configuration values to reduce redundant combinations.',
+  };
+  const selectedTechniques = techniques
+    .map((technique) => techniqueGuidance[technique])
+    .filter(Boolean);
+  const requirementList = requirements.map((item) => `${item.id}: ${item.text}`).join('\n');
 
   return `
 You are a senior QA engineer. Use the uploaded project knowledge context first, then the user requirement.
@@ -43,12 +58,16 @@ ${context}
 Requirement:
 ${requirement.trim()}
 
+Requirements for traceability:
+${requirementList || 'Treat the complete requirement as R1.'}
+
 Return only valid JSON with this exact shape:
 {
   "summary": "short summary",
   "testCases": [
     {
       "tcId": "TC_001",
+      "requirementIds": ["R1"],
       "category": "Positive",
       "summary": "short test case summary",
       "testDescription": "clear professional test description",
@@ -75,8 +94,36 @@ Ensure extensive coverage across all categories:
 - Edge cases & Boundary conditions (concurrency, timeouts, network interruptions, rate limits, empty states)
 - Security & Permission checks (role privileges, token expiry, access violations)
 
+${selectedTechniques.length ? `Apply these QA techniques:\n- ${selectedTechniques.join('\n- ')}` : ''}
+${format === 'gherkin' ? `BDD / Gherkin mode is enabled. Write every testSteps item as a valid Given, When, Then, And, or But step. Preserve Gherkin syntax and do not add numbered prefixes.` : ''}
+For every test case, include all applicable requirement IDs from the traceability list. Never invent IDs.
 Use sequential TC_ID values starting from TC_001, TC_002, TC_003, etc.
 Prefer project-specific terminology, validations, workflows, and constraints found in the uploaded knowledge context.
+`;
+}
+
+export function buildQaRefinementPrompt(requirement, testCases, instruction, options = {}) {
+  const { format = 'standard', requirements = [], conversation = [] } = options;
+  return `You are refining an existing QA test matrix. Apply the user's instruction narrowly; preserve every unrelated test case, its ID, and its requirement mapping.
+
+Original requirement:
+${requirement.trim()}
+
+Requirement IDs:
+${requirements.map((item) => `${item.id}: ${item.text}`).join('\n')}
+
+Previous refinement conversation:
+${JSON.stringify(conversation)}
+
+Current test matrix:
+${JSON.stringify(testCases)}
+
+User refinement:
+${instruction.trim()}
+
+${format === 'gherkin' ? 'Keep every testSteps item in valid Given/When/Then/And/But Gherkin syntax.' : ''}
+Return only valid JSON with this shape:
+{"summary":"short summary","testCases":[{"tcId":"TC_001","requirementIds":["R1"],"category":"Positive","summary":"...","testDescription":"...","testSteps":["..."],"expected":"..."}]}
 `;
 }
 

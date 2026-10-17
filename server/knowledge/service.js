@@ -1,5 +1,7 @@
+import crypto from 'node:crypto';
 import { chunkText } from './chunker.js';
 import { extractTextFromBuffer, extractTextFromFile, getFileType } from './parsers.js';
+import { createEmbeddings } from '../ai/embeddings.js';
 
 export function createKnowledgeService(store, env = {}) {
   function withoutExtractedText(file) {
@@ -9,14 +11,26 @@ export function createKnowledgeService(store, env = {}) {
   }
 
   async function saveExtractedKnowledge(
-    { fileName, fileType, sourceType, text, pageCount },
-    userId
+    {
+      fileName,
+      fileType,
+      sourceType,
+      text,
+      pageCount,
+      entities = [],
+      externalId,
+      externalUrl,
+      modifiedAt,
+    },
+    userId,
+    { beforeCreate } = {}
   ) {
     if (!text.trim()) {
       throw new Error(`No readable text found in ${fileName}`);
     }
 
-    const file = await store.createFile({
+    const contentHash = crypto.createHash('sha256').update(text).digest('hex');
+    const fileData = {
       user_id: userId || env.DEFAULT_USER_ID || 'local-user',
       file_name: fileName,
       file_type: fileType,
@@ -24,7 +38,22 @@ export function createKnowledgeService(store, env = {}) {
       status: 'needs_chunking',
       extracted_text: text,
       page_count: pageCount,
-    });
+      entities,
+      external_id: externalId,
+      external_url: externalUrl,
+      modified_at: modifiedAt,
+      last_synced_at: new Date().toISOString(),
+      content_hash: contentHash,
+    };
+    const existing = externalId
+      ? await store.findFileByExternalId(sourceType, externalId, userId)
+      : null;
+    if (existing?.content_hash === contentHash) return null;
+    if (!existing && beforeCreate) await beforeCreate();
+    if (existing) await store.clearFileChunks(existing.id, userId);
+    const file = existing
+      ? await store.updateFile(existing.id, fileData, userId)
+      : await store.createFile(fileData);
 
     return withoutExtractedText({
       ...file,
@@ -35,6 +64,22 @@ export function createKnowledgeService(store, env = {}) {
 
   return {
     saveExtractedKnowledge,
+    async syncConnector(provider, documents, userId, options = {}) {
+      const saved = [];
+      for (const document of documents) {
+        const file = await saveExtractedKnowledge(
+          {
+            ...document,
+            sourceType: provider,
+            pageCount: null,
+          },
+          userId,
+          options
+        );
+        if (file) saved.push(file);
+      }
+      return saved;
+    },
     async processUpload(file, userId) {
       const parsed = await extractTextFromFile(file);
 
@@ -45,6 +90,7 @@ export function createKnowledgeService(store, env = {}) {
           sourceType: 'upload',
           text: parsed.text,
           pageCount: parsed.pageCount,
+          entities: parsed.entities,
         },
         userId
       );
@@ -93,6 +139,7 @@ export function createKnowledgeService(store, env = {}) {
             sourceType: 'sharepoint',
             text: parsed.text,
             pageCount: parsed.pageCount,
+            entities: parsed.entities,
           },
           userId
         );
@@ -111,13 +158,14 @@ export function createKnowledgeService(store, env = {}) {
       return store.deleteFile(id, userId);
     },
 
-    async refreshChunks(userId) {
+    async refreshChunks(userId, { provider, apiKey } = {}) {
       const files = await store.listChunkableFiles(userId);
       let chunkCount = 0;
 
       for (const file of files) {
         const chunks = chunkText(file.extracted_text, {
           pageNumber: file.page_count ? 1 : null,
+          entities: file.entities ?? [],
         });
 
         if (!chunks.length) {
@@ -132,6 +180,23 @@ export function createKnowledgeService(store, env = {}) {
           continue;
         }
 
+        if (!provider || !apiKey) {
+          throw new Error('Select an AI provider with a configured API key to create embeddings.');
+        }
+        const vectors = [];
+        for (let offset = 0; offset < chunks.length; offset += 64) {
+          const batch = chunks.slice(offset, offset + 64);
+          vectors.push(
+            ...(await createEmbeddings({
+              apiKey,
+              provider,
+              inputs: batch.map((chunk) => chunk.chunk_text),
+            }))
+          );
+        }
+        chunks.forEach((chunk, index) => {
+          chunk.embedding = vectors[index];
+        });
         await store.replaceChunks(file.id, chunks, userId);
         chunkCount += chunks.length;
       }
@@ -142,8 +207,16 @@ export function createKnowledgeService(store, env = {}) {
       };
     },
 
-    searchChunks(query, limit, userId, fileId) {
-      return store.searchChunks(query, limit, userId, fileId);
+    async searchChunks(query, limit, userId, fileId, embeddingOptions = {}) {
+      let queryEmbedding = null;
+      if (embeddingOptions.provider && embeddingOptions.apiKey) {
+        [queryEmbedding] = await createEmbeddings({
+          ...embeddingOptions,
+          embeddingTaskType: 'RETRIEVAL_QUERY',
+          inputs: [query],
+        });
+      }
+      return store.searchChunks(query, limit, userId, fileId, queryEmbedding);
     },
   };
 }

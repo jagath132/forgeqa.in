@@ -62,7 +62,7 @@ export type KnowledgeFile = {
   file_name: string;
   file_type: string;
   upload_date: string;
-  source_type: 'upload' | 'sharepoint';
+  source_type: string;
   status: 'processing' | 'needs_chunking' | 'ready' | 'failed';
   chunk_count?: number;
 };
@@ -71,6 +71,7 @@ export type KnowledgeChunk = {
   fileName: string;
   chunkText: string;
   score: number;
+  section?: string | null;
 };
 
 export type ProviderKeyMap = Partial<Record<AiProvider, boolean>>;
@@ -97,13 +98,23 @@ export type TestCase = {
   testDescription: string;
   testSteps: string[];
   expected: string;
+  requirementIds?: string[];
   status?: TestCaseStatus;
 };
 
 export type QaResponse = {
   summary: string;
   testCases: TestCase[];
+  format?: 'standard' | 'gherkin';
   knowledgeContext?: KnowledgeChunk[];
+  requirements?: Array<{ id: string; text: string }>;
+  traceability?: Array<{
+    id: string;
+    text: string;
+    caseIds: string[];
+    covered: boolean;
+  }>;
+  warnings?: string[];
 };
 
 export type AiProvider = 'gemini' | 'openai' | 'claude' | 'openrouter' | 'opencode' | 'groq';
