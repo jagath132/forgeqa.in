@@ -1,5 +1,6 @@
 import { getDb } from '../db.js';
 import { ObjectId } from 'mongodb';
+import { rankChunks } from '../knowledge/search.js';
 
 export function createMongoKnowledgeStore() {
   return {
@@ -15,6 +16,12 @@ export function createMongoKnowledgeStore() {
         sourceType: file.source_type,
         status: file.status ?? 'needs_chunking',
         extractedText: file.extracted_text ?? '',
+        entities: file.entities ?? [],
+        externalId: file.external_id ?? null,
+        externalUrl: file.external_url ?? null,
+        modifiedAt: file.modified_at ?? null,
+        lastSyncedAt: file.last_synced_at ?? null,
+        contentHash: file.content_hash ?? null,
         pageCount: file.page_count ?? null,
         chunkCount: 0,
         uploadDate: now,
@@ -31,6 +38,7 @@ export function createMongoKnowledgeStore() {
         status: doc.status,
         chunk_count: 0,
         extracted_text: file.extracted_text ?? '',
+        entities: file.entities ?? [],
         page_count: file.page_count ?? null,
         created_at: now,
       };
@@ -50,6 +58,36 @@ export function createMongoKnowledgeStore() {
       return this.listFiles('', null).then((files) => files.find((f) => f.id === id));
     },
 
+    async findFileByExternalId(sourceType, externalId, userId) {
+      const db = getDb();
+      const query = { sourceType, externalId };
+      if (userId) query.userId = userId;
+      const file = await db.collection('knowledge_files').findOne(query, {
+        projection: { _id: 1, modifiedAt: 1, contentHash: 1 },
+      });
+      return file
+        ? {
+            id: file._id.toString(),
+            modified_at: file.modifiedAt,
+            content_hash: file.contentHash,
+          }
+        : null;
+    },
+
+    async clearFileChunks(fileId, userId) {
+      const db = getDb();
+      const fileQuery = { _id: new ObjectId(fileId) };
+      if (userId) fileQuery.userId = userId;
+      const file = await db.collection('knowledge_files').findOne(fileQuery, {
+        projection: { _id: 1 },
+      });
+      if (!file) throw new Error('File not found or access denied.');
+      await db.collection('knowledge_chunks').deleteMany({ fileId });
+      await db
+        .collection('knowledge_files')
+        .updateOne(fileQuery, { $set: { status: 'needs_chunking', chunkCount: 0 } });
+    },
+
     async replaceChunks(fileId, chunks, userId) {
       const db = getDb();
       const fileQuery = { _id: new ObjectId(fileId) };
@@ -64,7 +102,10 @@ export function createMongoKnowledgeStore() {
       const rows = chunks.map((chunk) => ({
         fileId,
         chunkText: chunk.chunk_text,
+        embedding: chunk.embedding ?? null,
         pageNumber: chunk.page_number ?? null,
+        section: chunk.section ?? null,
+        entity: chunk.entity ?? null,
         createdAt: now,
       }));
       await db.collection('knowledge_chunks').insertMany(rows);
@@ -76,7 +117,10 @@ export function createMongoKnowledgeStore() {
       return rows.map((r) => ({
         file_id: r.fileId,
         chunk_text: r.chunkText,
+        embedding: r.embedding,
         page_number: r.pageNumber,
+        section: r.section,
+        entity: r.entity,
         created_at: r.createdAt,
       }));
     },
@@ -92,12 +136,13 @@ export function createMongoKnowledgeStore() {
       const docs = await db
         .collection('knowledge_files')
         .find(query)
-        .project({ id: 1, extractedText: 1, pageCount: 1, status: 1 })
+        .project({ id: 1, extractedText: 1, pageCount: 1, status: 1, entities: 1 })
         .toArray();
       return docs.map((d) => ({
         id: d._id.toString(),
         extracted_text: d.extractedText,
         page_count: d.pageCount,
+        entities: d.entities ?? [],
         status: d.status,
       }));
     },
@@ -127,6 +172,8 @@ export function createMongoKnowledgeStore() {
           file_type: d.fileType,
           upload_date: d.uploadDate,
           source_type: d.sourceType,
+          external_url: d.externalUrl ?? null,
+          last_synced_at: d.lastSyncedAt ?? null,
           status: d.status,
           chunk_count: d.chunkCount,
           created_at: d.createdAt,
@@ -142,10 +189,8 @@ export function createMongoKnowledgeStore() {
       if (!result.deletedCount) throw new Error('File not found or access denied.');
     },
 
-    async searchChunks(query = '', limit = 50, userId, fileId = null) {
+    async searchChunks(query = '', limit = 50, userId, fileId = null, queryEmbedding = null) {
       const db = getDb();
-      const cleanQuery = (query || '').trim().toLowerCase();
-      const terms = cleanQuery ? cleanQuery.split(/\W+/).filter((t) => t.length > 1) : [];
 
       const userFileIds = await db
         .collection('knowledge_files')
@@ -169,30 +214,27 @@ export function createMongoKnowledgeStore() {
         .toArray();
       for (const f of files) filesMap[f._id.toString()] = f;
 
-      const results = allChunks
-        .map((chunk) => {
-          const text = chunk.chunkText.toLowerCase();
-          const score =
-            terms.length === 0
-              ? 1
-              : terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
-          const file = filesMap[chunk.fileId] || {};
-          return {
-            id: chunk._id.toString(),
-            file_id: chunk.fileId,
-            chunk_text: chunk.chunkText,
-            page_number: chunk.pageNumber,
-            score,
-            user_id: file.userId,
-            file_name: file.fileName ?? 'Unknown file',
-            created_at: chunk.createdAt,
-          };
-        })
-        .filter((chunk) => chunk.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
-
-      return results;
+      const normalized = allChunks.map((chunk) => {
+        const file = filesMap[chunk.fileId] || {};
+        return {
+          id: chunk._id.toString(),
+          file_id: chunk.fileId,
+          chunk_text: chunk.chunkText,
+          embedding: chunk.embedding ?? null,
+          page_number: chunk.pageNumber,
+          section: chunk.section ?? null,
+          entity: chunk.entity ?? null,
+          user_id: file.userId,
+          file_name: file.fileName ?? 'Unknown file',
+          created_at: chunk.createdAt,
+        };
+      });
+      return rankChunks(
+        normalized.filter((chunk) => !userId || chunk.user_id === userId),
+        query,
+        limit,
+        queryEmbedding
+      );
     },
   };
 }

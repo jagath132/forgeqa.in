@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { rankChunks } from '../knowledge/search.js';
 
 const DATA_DIR = path.resolve('.data');
 const DB_PATH = path.join(DATA_DIR, 'knowledge-store.json');
@@ -53,6 +54,12 @@ export function createLocalKnowledgeStore() {
         status: file.status ?? 'needs_chunking',
         chunk_count: 0,
         extracted_text: file.extracted_text ?? '',
+        entities: file.entities ?? [],
+        external_id: file.external_id ?? null,
+        external_url: file.external_url ?? null,
+        modified_at: file.modified_at ?? null,
+        last_synced_at: file.last_synced_at ?? null,
+        content_hash: file.content_hash ?? null,
         page_count: file.page_count ?? null,
         created_at: now,
       };
@@ -71,14 +78,44 @@ export function createLocalKnowledgeStore() {
       return state.knowledge_files.find((file) => file.id === id);
     },
 
+    async findFileByExternalId(sourceType, externalId, userId) {
+      const state = await readStore();
+      const file = state.knowledge_files.find(
+        (item) =>
+          item.source_type === sourceType &&
+          item.external_id === externalId &&
+          (!userId || item.user_id === userId)
+      );
+      return file
+        ? {
+            id: file.id,
+            modified_at: file.modified_at,
+            content_hash: file.content_hash,
+          }
+        : null;
+    },
+
+    async clearFileChunks(fileId, userId) {
+      const state = await readStore();
+      const file = state.knowledge_files.find(
+        (item) => item.id === fileId && (!userId || item.user_id === userId)
+      );
+      if (!file) throw new Error('File not found or access denied.');
+      state.knowledge_chunks = state.knowledge_chunks.filter((chunk) => chunk.file_id !== fileId);
+      Object.assign(file, { status: 'needs_chunking', chunk_count: 0 });
+      await writeStore(state);
+    },
+
     async replaceChunks(fileId, chunks, _userId) {
       const state = await readStore();
       const records = chunks.map((chunk) => ({
         id: createId(),
         file_id: fileId,
         chunk_text: chunk.chunk_text,
-        embedding_placeholder: chunk.embedding_placeholder ?? null,
+        embedding: chunk.embedding ?? null,
         page_number: chunk.page_number ?? null,
+        section: chunk.section ?? null,
+        entity: chunk.entity ?? null,
         created_at: new Date().toISOString(),
       }));
 
@@ -131,37 +168,24 @@ export function createLocalKnowledgeStore() {
       await writeStore(state);
     },
 
-    async searchChunks(query = '', limit = 50, userId, fileId = null) {
+    async searchChunks(query = '', limit = 50, userId, fileId = null, queryEmbedding = null) {
       const state = await readStore();
-      const cleanQuery = (query || '').trim().toLowerCase();
-      const terms = cleanQuery ? cleanQuery.split(/\W+/).filter((term) => term.length > 1) : [];
-
-      return state.knowledge_chunks
+      const candidates = state.knowledge_chunks
         .filter((chunk) => {
           if (fileId && chunk.file_id !== fileId) return false;
           return true;
         })
         .map((chunk) => {
-          const text = chunk.chunk_text.toLowerCase();
-          const score =
-            terms.length === 0
-              ? 1
-              : terms.reduce((total, term) => total + (text.includes(term) ? 1 : 0), 0);
           const file = state.knowledge_files.find((item) => item.id === chunk.file_id);
 
           return {
             ...chunk,
-            score,
             user_id: file?.user_id,
             file_name: file?.file_name ?? 'Unknown file',
           };
         })
-        .filter((chunk) => {
-          if (userId && chunk.user_id !== userId) return false;
-          return chunk.score > 0;
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
+        .filter((chunk) => !userId || chunk.user_id === userId);
+      return rankChunks(candidates, query, limit, queryEmbedding);
     },
   };
 }

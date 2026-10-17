@@ -192,6 +192,14 @@ export function GeneratorPage() {
   const provider = useAppStore((s) => s.provider);
 
   const [requirement, setRequirement] = useState('');
+  const [outputFormat, setOutputFormat] = useState<'standard' | 'gherkin'>('standard');
+  const [techniques, setTechniques] = useState<string[]>([]);
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.92);
+  const [refinement, setRefinement] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+  const [refinementHistory, setRefinementHistory] = useState<
+    Array<{ instruction: string; summary: string }>
+  >([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [knowledgeFileCount, setKnowledgeFileCount] = useState(0);
@@ -258,6 +266,9 @@ export function GeneratorPage() {
         body: JSON.stringify({
           requirement: requirementText,
           provider,
+          format: outputFormat,
+          techniques,
+          similarityThreshold,
         }),
         signal: abortController.signal,
       });
@@ -312,6 +323,7 @@ export function GeneratorPage() {
               if (data.summary) {
                 const result = data as QaResponse;
                 setQaResult(result);
+                setOutputFormat(result.format ?? outputFormat);
                 addToHistory(requirementText, result);
                 setIsLoading(false);
                 setStreamPhase(null);
@@ -342,6 +354,7 @@ export function GeneratorPage() {
     event.preventDefault();
     setError('');
     setQaResult(null);
+    setRefinementHistory([]);
     if (!provider) {
       setError('Select an AI provider in Settings before generating.');
       return;
@@ -362,8 +375,12 @@ export function GeneratorPage() {
       const response = await api.post<QaResponse>('/api/generate-test-cases', {
         requirement,
         provider,
+        format: outputFormat,
+        techniques,
+        similarityThreshold,
       });
       setQaResult(response.data);
+      setOutputFormat(response.data.format ?? outputFormat);
       addToHistory(requirement, response.data);
     } catch (requestError) {
       if (axios.isAxiosError(requestError)) {
@@ -379,6 +396,48 @@ export function GeneratorPage() {
       }
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleRefine(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!qaResult || !refinement.trim()) return;
+    setError('');
+    setIsRefining(true);
+    try {
+      const response = await api.post<QaResponse>('/api/generate-test-cases/refine', {
+        requirement,
+        instruction: refinement,
+        testCases: qaResult.testCases,
+        summary: qaResult.summary,
+        knowledgeContext: qaResult.knowledgeContext,
+        provider,
+        format: outputFormat,
+        similarityThreshold,
+        conversation: refinementHistory,
+      });
+      setQaResult(response.data);
+      setOutputFormat(response.data.format ?? outputFormat);
+      addToHistory(requirement, response.data);
+      setRefinementHistory((current) => [
+        ...current,
+        { instruction: refinement, summary: response.data.summary },
+      ]);
+      setRefinement('');
+    } catch (requestError) {
+      if (axios.isAxiosError(requestError)) {
+        setError(
+          requestError.response?.data?.error ||
+            requestError.message ||
+            'Unable to refine test cases.'
+        );
+      } else {
+        setError(
+          requestError instanceof Error ? requestError.message : 'Unable to refine test cases.'
+        );
+      }
+    } finally {
+      setIsRefining(false);
     }
   }
 
@@ -513,6 +572,79 @@ export function GeneratorPage() {
                     </svg>
                   </button>
                 )}
+              </div>
+              <div
+                className="mt-4 space-y-3 rounded-xl p-4"
+                style={{ background: 'var(--bg-secondary)' }}
+              >
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <label
+                    className="flex items-center gap-2 text-xs font-medium"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={outputFormat === 'gherkin'}
+                      onChange={(event) =>
+                        setOutputFormat(event.target.checked ? 'gherkin' : 'standard')
+                      }
+                      className="accent-[var(--accent)]"
+                    />
+                    BDD / Gherkin steps
+                  </label>
+                  <label
+                    className="flex items-center gap-2 text-xs font-medium"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    Similarity merge
+                    <input
+                      aria-label="Similarity merge threshold"
+                      type="range"
+                      min="0.70"
+                      max="0.99"
+                      step="0.01"
+                      value={similarityThreshold}
+                      onChange={(event) => setSimilarityThreshold(Number(event.target.value))}
+                    />
+                    <span className="font-mono">{similarityThreshold.toFixed(2)}</span>
+                  </label>
+                </div>
+                <div>
+                  <p
+                    className="mb-2 text-xs font-semibold"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    QA coverage presets
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {[
+                      ['equivalence', 'Equivalence partitioning'],
+                      ['boundary', 'Boundary value analysis'],
+                      ['state', 'State transition'],
+                      ['pairwise', 'Pairwise combinatorial'],
+                    ].map(([id, label]) => (
+                      <label
+                        key={id}
+                        className="flex items-center gap-1.5 text-xs"
+                        style={{ color: 'var(--text-muted)' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={techniques.includes(id)}
+                          onChange={(event) =>
+                            setTechniques((current) =>
+                              event.target.checked
+                                ? [...current, id]
+                                : current.filter((item) => item !== id)
+                            )
+                          }
+                          className="accent-[var(--accent)]"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
               {error ? (
                 <p
@@ -661,6 +793,142 @@ export function GeneratorPage() {
 
             <KnowledgeContext chunks={qaResult.knowledgeContext ?? []} />
 
+            {qaResult.warnings?.length ? (
+              <div
+                className="rounded-lg px-4 py-3 text-sm"
+                style={{
+                  background: 'var(--warning-soft)',
+                  color: 'var(--warning)',
+                  border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)',
+                }}
+              >
+                {qaResult.warnings.join(' ')}
+              </div>
+            ) : null}
+
+            {qaResult.traceability?.length ? (
+              <Card>
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                      Requirements Traceability Matrix
+                    </h2>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                      {qaResult.traceability.filter((item) => item.covered).length} of{' '}
+                      {qaResult.traceability.length} requirements have linked test cases.
+                    </p>
+                  </div>
+                  <span className="badge badge-primary">
+                    {Math.round(
+                      (qaResult.traceability.filter((item) => item.covered).length /
+                        qaResult.traceability.length) *
+                        100
+                    )}
+                    % coverage
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
+                        <th
+                          className="px-3 py-2 text-xs uppercase"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Requirement
+                        </th>
+                        <th
+                          className="px-3 py-2 text-xs uppercase"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Coverage
+                        </th>
+                        <th
+                          className="px-3 py-2 text-xs uppercase"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          Test cases
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qaResult.traceability.map((item) => (
+                        <tr
+                          key={item.id}
+                          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+                        >
+                          <td className="px-3 py-3">
+                            <span
+                              className="mr-2 font-mono text-xs"
+                              style={{ color: 'var(--accent)' }}
+                            >
+                              {item.id}
+                            </span>
+                            <span style={{ color: 'var(--text-primary)' }}>{item.text}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span
+                              className={`badge ${item.covered ? 'badge-success' : 'badge-danger'}`}
+                            >
+                              {item.covered ? 'Covered' : '0 coverage'}
+                            </span>
+                          </td>
+                          <td
+                            className="px-3 py-3 font-mono text-xs"
+                            style={{ color: 'var(--text-secondary)' }}
+                          >
+                            {item.caseIds.join(', ') || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            ) : null}
+
+            <Card>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                Refine this test matrix
+              </h2>
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Ask for focused changes without regenerating the entire batch.
+              </p>
+              <form className="mt-3 flex flex-col gap-3 sm:flex-row" onSubmit={handleRefine}>
+                <input
+                  className="input-modern min-w-0 flex-1 px-4 py-2.5 text-sm"
+                  placeholder="e.g. Make TC_004 test SQL injection attempts"
+                  value={refinement}
+                  onChange={(event) => setRefinement(event.target.value)}
+                />
+                <button
+                  className="btn-primary px-4 py-2.5 text-sm font-semibold"
+                  disabled={isRefining || !refinement.trim()}
+                  type="submit"
+                >
+                  {isRefining ? 'Refining…' : 'Apply refinement'}
+                </button>
+              </form>
+              {refinementHistory.length ? (
+                <div className="mt-4 space-y-2">
+                  {refinementHistory.map((turn, index) => (
+                    <div
+                      key={`${index}-${turn.instruction}`}
+                      className="rounded-lg px-3 py-2 text-xs"
+                      style={{ background: 'var(--bg-secondary)' }}
+                    >
+                      <p style={{ color: 'var(--text-primary)' }}>
+                        <strong>You:</strong> {turn.instruction}
+                      </p>
+                      <p className="mt-1" style={{ color: 'var(--text-muted)' }}>
+                        <strong>AI:</strong> Matrix updated — {turn.summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </Card>
+
             {history.length > 0 ? (
               <Card className="p-0 overflow-hidden">
                 <div className="p-5 border-b" style={{ borderColor: 'var(--border-default)' }}>
@@ -761,6 +1029,9 @@ export function GeneratorPage() {
                               }}
                               onClick={() => {
                                 setQaResult(item.result);
+                                setOutputFormat(item.result.format ?? 'standard');
+                                setRequirement(item.requirement);
+                                setRefinementHistory([]);
                                 window.scrollTo({
                                   top: document.body.scrollHeight / 3,
                                   behavior: 'smooth',
@@ -798,6 +1069,9 @@ export function GeneratorPage() {
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     setQaResult(item.result);
+                                    setOutputFormat(item.result.format ?? 'standard');
+                                    setRequirement(item.requirement);
+                                    setRefinementHistory([]);
                                   }}
                                   className="btn-ghost px-2 py-1 text-xs"
                                   type="button"
@@ -836,7 +1110,11 @@ export function GeneratorPage() {
               </Card>
             ) : null}
 
-            <TestCaseTable title={qaResult.summary} testCases={qaResult.testCases} />
+            <TestCaseTable
+              title={qaResult.summary}
+              testCases={qaResult.testCases}
+              format={qaResult.format ?? outputFormat}
+            />
           </section>
         ) : (
           <section className="card p-12 text-center">

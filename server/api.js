@@ -6,11 +6,20 @@ import { createKnowledgeService } from './knowledge/service.js';
 import { createKnowledgeStore } from './storage/index.js';
 import {
   buildQaPrompt,
+  buildQaRefinementPrompt,
   generateWithGemini,
   generateWithGeminiStream,
   parseSafeJson,
 } from './ai/gemini.js';
 import { generateWithOpenAI, generateWithOpenAIStream } from './ai/openai.js';
+import { supportsEmbeddings } from './ai/embeddings.js';
+import {
+  buildTraceability,
+  deduplicateTestCases,
+  embedTestCases,
+  extractRequirements,
+  normalizeGherkinSteps,
+} from './ai/qa.js';
 import {
   generateTestScript,
   generateFrameworkProject,
@@ -54,6 +63,15 @@ import {
   resolveDeprecated,
 } from './ai/modelRegistry.js';
 import { resolveLiveModel } from './ai/modelSync.js';
+import {
+  completeConnectorOAuth,
+  createAuthorizationUrl,
+  disconnectConnector,
+  getConnectorConnection,
+  getConnectorStatuses,
+  saveConnectorSettings,
+  syncConnectorDocuments,
+} from './knowledge/connectors.js';
 
 const ALLOWED_EXTENSIONS = [
   '.apk',
@@ -227,6 +245,39 @@ async function resolveApiKey(provider, requestApiKey, env, userId) {
     }
   }
   return env?.[providerEnvKeyMap[provider]] || process.env[providerEnvKeyMap[provider]] || '';
+}
+
+async function resolveEmbeddingOptions(provider, apiKey, env, userId) {
+  if (supportsEmbeddings(provider)) return { provider, apiKey };
+  const openAiKey = await resolveApiKey('openai', null, env, userId);
+  return openAiKey ? { provider: 'openai', apiKey: openAiKey } : null;
+}
+
+async function finalizeQaResult(
+  result,
+  requirement,
+  embeddingOptions,
+  threshold,
+  format = 'standard'
+) {
+  const requirements = extractRequirements(requirement);
+  const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+  const cases =
+    format === 'gherkin' ? normalizeGherkinSteps(result.testCases ?? []) : result.testCases;
+  const embeddings = embeddingOptions ? await embedTestCases(cases, embeddingOptions) : null;
+  if (!embeddings) {
+    warnings.push(
+      'Embedding-based similarity merging is unavailable for the selected provider. Configure Gemini, OpenAI, or OpenRouter embeddings.'
+    );
+  }
+  const testCases = deduplicateTestCases(cases, embeddings, threshold);
+  return {
+    ...result,
+    testCases,
+    requirements,
+    traceability: buildTraceability(requirements, testCases),
+    ...(warnings.length ? { warnings } : {}),
+  };
 }
 
 async function cleanupFiles(files = []) {
@@ -455,6 +506,29 @@ export function createApiMiddleware(env = {}) {
       const matched = await handleAuthRoute(req, res, url);
       if (matched) return;
 
+      if (url.pathname === '/api/knowledge/connectors/oauth/callback' && req.method === 'GET') {
+        const appUrl = process.env.APP_URL || 'http://127.0.0.1:5173';
+        try {
+          const code = url.searchParams.get('code');
+          const state = url.searchParams.get('state');
+          if (!code || !state || url.searchParams.has('error')) {
+            throw new Error('Authorization was cancelled.');
+          }
+          const completed = await completeConnectorOAuth({ code, state, authStore });
+          res.writeHead(302, {
+            Location: `${appUrl}/knowledge?connector=${encodeURIComponent(completed.provider)}&connected=1`,
+          });
+          res.end();
+        } catch (error) {
+          console.error('Knowledge connector OAuth failed:', error.message);
+          res.writeHead(302, {
+            Location: `${appUrl}/knowledge?connector_error=1`,
+          });
+          res.end();
+        }
+        return;
+      }
+
       // 1b. Payment routes (unauthenticated — part of registration flow)
       if (url.pathname === '/api/payments/create-checkout' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
@@ -513,6 +587,100 @@ export function createApiMiddleware(env = {}) {
       } catch (authError) {
         sendJson(res, authError.statusCode || 401, { error: authError.message });
         return;
+      }
+
+      const syncKnowledgeConnector = async (provider) => {
+        const connection = await getConnectorConnection(authStore, user.id, provider);
+        if (!connection) throw new Error('Connect this account before syncing.');
+        const documents = await syncConnectorDocuments(provider, connection.access_token);
+        const { checkPlanLimit } = await import('./billing/usage.js');
+        const savedFiles = await knowledge.syncConnector(provider, documents, user.id, {
+          beforeCreate: async () => {
+            const limitCheck = await checkPlanLimit(user.id, 'knowledgeFiles', 1);
+            if (!limitCheck.allowed) {
+              const error = new Error(limitCheck.reason);
+              error.statusCode = 429;
+              throw error;
+            }
+          },
+        });
+        const settingsKey = `knowledge-connector-settings:${provider}`;
+        const settings = (await authStore.loadUserData(user.id, settingsKey)) ?? {};
+        await authStore.saveUserData(user.id, settingsKey, {
+          ...settings,
+          lastSyncAt: new Date().toISOString(),
+        });
+
+        let indexedChunkCount = 0;
+        if (savedFiles.length && ['gemini', 'openai', 'openrouter'].includes(user.activeProvider)) {
+          const embeddingApiKey = await resolveApiKey(user.activeProvider, null, env, user.id);
+          if (embeddingApiKey) {
+            const result = await knowledge.refreshChunks(user.id, {
+              provider: user.activeProvider,
+              apiKey: embeddingApiKey,
+            });
+            indexedChunkCount = result.chunkCount;
+          }
+        }
+        return {
+          provider,
+          documentCount: savedFiles.length,
+          indexedChunkCount,
+          indexingRequired: savedFiles.length > 0 && indexedChunkCount === 0,
+        };
+      };
+
+      if (url.pathname === '/api/knowledge/connectors' && req.method === 'GET') {
+        const connectors = await getConnectorStatuses(authStore, user.id);
+        sendJson(res, 200, { connectors });
+        return;
+      }
+
+      if (url.pathname === '/api/knowledge/connectors/sync-due' && req.method === 'POST') {
+        const connectors = await getConnectorStatuses(authStore, user.id);
+        const synced = [];
+        const errors = [];
+        for (const connector of connectors) {
+          if (!connector.connected || connector.autoSyncMinutes <= 0) continue;
+          const lastSync = connector.lastSyncAt ? Date.parse(connector.lastSyncAt) : 0;
+          if (Date.now() - lastSync < connector.autoSyncMinutes * 60_000) continue;
+          try {
+            synced.push(await syncKnowledgeConnector(connector.id));
+          } catch (error) {
+            errors.push({ provider: connector.id, message: error.message });
+          }
+        }
+        sendJson(res, 200, { synced, errors });
+        return;
+      }
+
+      const connectorMatch = url.pathname.match(
+        /^\/api\/knowledge\/connectors\/(confluence|notion|googleDrive|github)(?:\/(authorize|sync|settings))?$/
+      );
+      if (connectorMatch) {
+        const [, connectorProvider, action] = connectorMatch;
+        if (action === 'authorize' && req.method === 'POST') {
+          sendJson(res, 200, {
+            authorizationUrl: createAuthorizationUrl(connectorProvider, user.id),
+          });
+          return;
+        }
+        if (action === 'sync' && req.method === 'POST') {
+          sendJson(res, 200, await syncKnowledgeConnector(connectorProvider));
+          return;
+        }
+        if (action === 'settings' && req.method === 'POST') {
+          const rawBody = await readRequestBody(req);
+          const { autoSyncMinutes } = JSON.parse(rawBody || '{}');
+          await saveConnectorSettings(authStore, user.id, connectorProvider, autoSyncMinutes);
+          sendJson(res, 200, { ok: true });
+          return;
+        }
+        if (!action && req.method === 'DELETE') {
+          await disconnectConnector(authStore, user.id, connectorProvider);
+          sendJson(res, 200, { ok: true });
+          return;
+        }
       }
 
       // Admin routes (require Admin role)
@@ -731,13 +899,30 @@ export function createApiMiddleware(env = {}) {
         const query = url.searchParams.get('q') ?? '';
         const fileId = url.searchParams.get('fileId') || null;
         const limit = Number(url.searchParams.get('limit') || '50');
-        const chunks = await knowledge.searchChunks(query, limit, user.id, fileId);
+        const provider = user.activeProvider;
+        const apiKey = provider ? await resolveApiKey(provider, null, env, user.id) : '';
+        const embeddingOptions = await resolveEmbeddingOptions(provider, apiKey, env, user.id);
+        const chunks = await knowledge.searchChunks(query, limit, user.id, fileId, {
+          ...(embeddingOptions ?? {}),
+        });
         sendJson(res, 200, { chunks });
         return;
       }
 
       if (url.pathname === '/api/knowledge/chunks/refresh' && req.method === 'POST') {
-        const result = await knowledge.refreshChunks(user.id);
+        const rawBody = await readRequestBody(req);
+        const { provider: requestedProvider } = JSON.parse(rawBody || '{}');
+        const provider = requestedProvider || user.activeProvider;
+        if (!provider) {
+          sendJson(res, 400, { error: 'Select an AI provider before creating embeddings.' });
+          return;
+        }
+        const apiKey = await resolveApiKey(provider, null, env, user.id);
+        if (!apiKey) {
+          sendJson(res, 400, { error: `Missing ${provider} API key. Configure it in Settings.` });
+          return;
+        }
+        const result = await knowledge.refreshChunks(user.id, { provider, apiKey });
         sendJson(res, 200, result);
         return;
       }
@@ -751,7 +936,15 @@ export function createApiMiddleware(env = {}) {
         }
 
         const rawBody = await readRequestBody(req);
-        const { requirement, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || '{}');
+        const {
+          requirement,
+          apiKey: requestApiKey,
+          model,
+          provider,
+          format,
+          techniques,
+          similarityThreshold,
+        } = JSON.parse(rawBody || '{}');
         if (!provider) {
           sendJson(res, 400, { error: 'provider is required.' });
           return;
@@ -770,14 +963,23 @@ export function createApiMiddleware(env = {}) {
           return;
         }
 
-        const chunks = await knowledge.searchChunks(requirement, 4, user.id);
+        const requirements = extractRequirements(requirement);
+        const embeddingOptions = await resolveEmbeddingOptions(provider, apiKey, env, user.id);
+        const chunks = await knowledge.searchChunks(requirement, 4, user.id, null, {
+          ...(embeddingOptions ?? {}),
+        });
         const defaultModel = await resolveModel(provider, model);
+        const promptOptions = {
+          format: format === 'gherkin' ? 'gherkin' : 'standard',
+          techniques: Array.isArray(techniques) ? techniques : [],
+          requirements,
+        };
         let result;
 
         if (provider === 'gemini') {
           result = await generateWithGemini({
             apiKey,
-            prompt: buildQaPrompt(requirement, chunks),
+            prompt: buildQaPrompt(requirement, chunks, promptOptions),
             model: defaultModel,
           });
         } else if (
@@ -795,7 +997,7 @@ export function createApiMiddleware(env = {}) {
 
           const responseText = await generateWithOpenAI({
             apiKey,
-            prompt: buildQaPrompt(requirement, chunks),
+            prompt: buildQaPrompt(requirement, chunks, promptOptions),
             model: defaultModel,
             endpoint,
             provider,
@@ -806,10 +1008,18 @@ export function createApiMiddleware(env = {}) {
           return;
         }
 
+        result = await finalizeQaResult(
+          result,
+          requirement,
+          embeddingOptions,
+          similarityThreshold,
+          promptOptions.format
+        );
         await incrementAiGenerations(user.id);
 
         sendJson(res, 200, {
           ...result,
+          format: promptOptions.format,
           knowledgeContext: chunks.map((chunk) => ({
             fileName: chunk.file_name,
             chunkText: chunk.chunk_text,
@@ -819,9 +1029,115 @@ export function createApiMiddleware(env = {}) {
         return;
       }
 
-      if (url.pathname === '/api/generate-test-cases/stream' && req.method === 'POST') {
+      if (url.pathname === '/api/generate-test-cases/refine' && req.method === 'POST') {
+        const { checkPlanLimit, incrementAiGenerations } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'aiGenerations', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
         const rawBody = await readRequestBody(req);
-        const { requirement, apiKey: requestApiKey, model, provider } = JSON.parse(rawBody || '{}');
+        const {
+          requirement,
+          instruction,
+          testCases,
+          summary,
+          knowledgeContext = [],
+          conversation = [],
+          apiKey: requestApiKey,
+          model,
+          provider,
+          format,
+          similarityThreshold,
+        } = JSON.parse(rawBody || '{}');
+        if (!provider) {
+          sendJson(res, 400, { error: 'provider is required.' });
+          return;
+        }
+        if (!requirement || !Array.isArray(testCases) || !testCases.length) {
+          sendJson(res, 400, { error: 'An existing test matrix and requirement are required.' });
+          return;
+        }
+        if (!instruction || !instruction.trim()) {
+          sendJson(res, 400, { error: 'A refinement instruction is required.' });
+          return;
+        }
+        const apiKey = await resolveApiKey(provider, requestApiKey, env, user.id);
+        if (!apiKey) {
+          sendJson(res, 500, {
+            error: `Missing ${provider} API key. Provide it in settings or env.`,
+          });
+          return;
+        }
+
+        const defaultModel = await resolveModel(provider, model);
+        const prompt = buildQaRefinementPrompt(requirement, testCases, instruction, {
+          format: format === 'gherkin' ? 'gherkin' : 'standard',
+          requirements: extractRequirements(requirement),
+          conversation: Array.isArray(conversation) ? conversation : [],
+        });
+        let result;
+        if (provider === 'gemini') {
+          result = await generateWithGemini({ apiKey, prompt, model: defaultModel });
+        } else if (
+          provider === 'openai' ||
+          provider === 'openrouter' ||
+          provider === 'opencode' ||
+          provider === 'groq'
+        ) {
+          const endpoint =
+            provider === 'openrouter'
+              ? 'https://openrouter.ai/api/v1/chat/completions'
+              : provider === 'groq'
+                ? 'https://api.groq.com/openai/v1/chat/completions'
+                : 'https://api.openai.com/v1/chat/completions';
+          result = parseSafeJson(
+            await generateWithOpenAI({
+              apiKey,
+              prompt,
+              model: defaultModel,
+              endpoint,
+              provider,
+            })
+          );
+        } else {
+          sendJson(res, 501, { error: `${provider} support is not implemented yet.` });
+          return;
+        }
+        result = await finalizeQaResult(
+          result,
+          requirement,
+          await resolveEmbeddingOptions(provider, apiKey, env, user.id),
+          similarityThreshold,
+          format === 'gherkin' ? 'gherkin' : 'standard'
+        );
+        await incrementAiGenerations(user.id);
+        sendJson(res, 200, {
+          ...result,
+          format: format === 'gherkin' ? 'gherkin' : 'standard',
+          knowledgeContext,
+          summary: result.summary || summary,
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/generate-test-cases/stream' && req.method === 'POST') {
+        const { checkPlanLimit, incrementAiGenerations } = await import('./billing/usage.js');
+        const limitCheck = await checkPlanLimit(user.id, 'aiGenerations', 1);
+        if (!limitCheck.allowed) {
+          sendJson(res, 429, { error: limitCheck.reason, code: 'LIMIT_EXCEEDED' });
+          return;
+        }
+        const rawBody = await readRequestBody(req);
+        const {
+          requirement,
+          apiKey: requestApiKey,
+          model,
+          provider,
+          format,
+          techniques,
+          similarityThreshold,
+        } = JSON.parse(rawBody || '{}');
         if (!provider) {
           sendJson(res, 400, { error: 'provider is required.' });
           return;
@@ -853,11 +1169,19 @@ export function createApiMiddleware(env = {}) {
 
         sendSSE('phase', { phase: 'knowledge', message: 'Searching knowledge base...' });
 
-        const chunks = await knowledge.searchChunks(requirement, 4, user.id);
+        const requirements = extractRequirements(requirement);
+        const embeddingOptions = await resolveEmbeddingOptions(provider, apiKey, env, user.id);
+        const chunks = await knowledge.searchChunks(requirement, 4, user.id, null, {
+          ...(embeddingOptions ?? {}),
+        });
 
         sendSSE('phase', { phase: 'prompt', message: 'Building RAG prompt...' });
 
-        const prompt = buildQaPrompt(requirement, chunks);
+        const prompt = buildQaPrompt(requirement, chunks, {
+          format: format === 'gherkin' ? 'gherkin' : 'standard',
+          techniques: Array.isArray(techniques) ? techniques : [],
+          requirements,
+        });
         const defaultModel = await resolveModel(provider, model);
 
         sendSSE('phase', { phase: 'generating', message: 'Requesting AI model...' });
@@ -904,10 +1228,18 @@ export function createApiMiddleware(env = {}) {
             return;
           }
 
-          const result = parseSafeJson(fullText);
+          const result = await finalizeQaResult(
+            parseSafeJson(fullText),
+            requirement,
+            embeddingOptions,
+            similarityThreshold,
+            format === 'gherkin' ? 'gherkin' : 'standard'
+          );
+          await incrementAiGenerations(user.id);
 
           sendSSE('complete', {
             ...result,
+            format: format === 'gherkin' ? 'gherkin' : 'standard',
             knowledgeContext: chunks.map((chunk) => ({
               fileName: chunk.file_name,
               chunkText: chunk.chunk_text,
@@ -1283,7 +1615,15 @@ export function createApiMiddleware(env = {}) {
             user.id
           );
 
-          const refreshResult = await knowledge.refreshChunks(user.id);
+          const provider = user.activeProvider;
+          const apiKey = provider ? await resolveApiKey(provider, null, env, user.id) : '';
+          if (!provider || !apiKey) {
+            sendJson(res, 400, {
+              error: 'Select an AI provider and configure its API key before indexing this PRD.',
+            });
+            return;
+          }
+          const refreshResult = await knowledge.refreshChunks(user.id, { provider, apiKey });
           sendJson(res, 200, { ok: true, file, chunkCount: refreshResult.chunkCount });
         } catch (kbError) {
           sendJson(res, 500, { error: kbError.message || 'Failed to save PRD to Knowledge Base.' });
@@ -1433,7 +1773,8 @@ export function createApiMiddleware(env = {}) {
           return;
         }
         sendJson(res, 501, {
-          error: 'Regression test execution is not configured. No tests were run and no results were recorded.',
+          error:
+            'Regression test execution is not configured. No tests were run and no results were recorded.',
         });
         return;
       }

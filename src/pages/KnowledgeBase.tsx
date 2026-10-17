@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Eye, Sparkles } from 'lucide-react';
 import { api, type KnowledgeFile } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
 import { Card } from '../components/ui/Card';
 import { ChunkSlicePreviewModal } from '../components/ChunkSlicePreviewModal';
+
+type KnowledgeConnector = {
+  id: 'confluence' | 'notion' | 'googleDrive' | 'github';
+  label: string;
+  configured: boolean;
+  connected: boolean;
+  lastSyncAt: string | null;
+  autoSyncMinutes: number;
+};
 
 const fileIcons: Record<string, { label: string; color: string }> = {
   pdf: { label: 'PDF', color: 'badge-danger' },
@@ -12,6 +22,8 @@ const fileIcons: Record<string, { label: string; color: string }> = {
   csv: { label: 'CSV', color: 'badge-success' },
   markdown: { label: 'MD', color: 'badge-primary' },
   md: { label: 'MD', color: 'badge-primary' },
+  openapi: { label: 'API', color: 'badge-violet' },
+  postman: { label: 'API', color: 'badge-cyan' },
   text: { label: 'TXT', color: 'badge' },
   image: { label: 'IMG', color: 'badge-warning' },
 };
@@ -24,6 +36,10 @@ function formatDate(value: string) {
 
 export function KnowledgeBase() {
   const [files, setFiles] = useState<KnowledgeFile[]>([]);
+  const provider = useAppStore((state) => state.provider);
+  const loadFilesRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const [connectors, setConnectors] = useState<KnowledgeConnector[]>([]);
+  const [syncingConnector, setSyncingConnector] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sharePointUrl, setSharePointUrl] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -57,6 +73,18 @@ export function KnowledgeBase() {
       setIsLoading(false);
     }
   }, [search]);
+  loadFilesRef.current = loadFiles;
+
+  const loadConnectors = useCallback(async () => {
+    try {
+      const response = await api.get<{ connectors: KnowledgeConnector[] }>(
+        '/api/knowledge/connectors'
+      );
+      setConnectors(response.data.connectors);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to load sync connectors.');
+    }
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -64,6 +92,100 @@ export function KnowledgeBase() {
     }, 200);
     return () => window.clearTimeout(timeout);
   }, [loadFiles]);
+
+  useEffect(() => {
+    void loadConnectors();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === '1') {
+      setMessage(`${params.get('connector') ?? 'Knowledge source'} connected successfully.`);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.has('connector_error')) {
+      setMessage('Connector authorization failed or was cancelled.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [loadConnectors]);
+
+  useEffect(() => {
+    const syncDue = () => {
+      api
+        .post('/api/knowledge/connectors/sync-due')
+        .then((response) => {
+          if (response.data.synced?.length) {
+            void loadFilesRef.current();
+            void loadConnectors();
+          }
+          if (response.data.errors?.length) {
+            setMessage(
+              `Automatic sync failed: ${response.data.errors
+                .map(
+                  (item: { provider: string; message: string }) =>
+                    `${item.provider}: ${item.message}`
+                )
+                .join('; ')}`
+            );
+          }
+        })
+        .catch((error) => {
+          setMessage(error instanceof Error ? error.message : 'Automatic knowledge sync failed.');
+        });
+    };
+    syncDue();
+    const timer = window.setInterval(syncDue, 5 * 60_000);
+    return () => window.clearInterval(timer);
+  }, [loadConnectors]);
+
+  async function connectConnector(id: KnowledgeConnector['id']) {
+    try {
+      const response = await api.post<{ authorizationUrl: string }>(
+        `/api/knowledge/connectors/${id}/authorize`
+      );
+      window.location.assign(response.data.authorizationUrl);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : 'Unable to start connector authorization.'
+      );
+    }
+  }
+
+  async function syncConnector(id: KnowledgeConnector['id']) {
+    setSyncingConnector(id);
+    setMessage('');
+    try {
+      const response = await api.post(`/api/knowledge/connectors/${id}/sync`);
+      const result = response.data;
+      setMessage(
+        `${result.documentCount} document(s) synced from ${id}. ${
+          result.indexingRequired
+            ? 'Configure a supported embedding provider and refresh chunks to index them.'
+            : `${result.indexedChunkCount} chunks indexed.`
+        }`
+      );
+      await Promise.all([loadFiles(), loadConnectors()]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to sync this connector.');
+    } finally {
+      setSyncingConnector(null);
+    }
+  }
+
+  async function disconnectConnector(id: KnowledgeConnector['id']) {
+    try {
+      await api.delete(`/api/knowledge/connectors/${id}`);
+      setMessage('Knowledge connector disconnected.');
+      await loadConnectors();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to disconnect this connector.');
+    }
+  }
+
+  async function updateAutoSync(id: KnowledgeConnector['id'], autoSyncMinutes: number) {
+    try {
+      await api.post(`/api/knowledge/connectors/${id}/settings`, { autoSyncMinutes });
+      await loadConnectors();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Unable to update the sync schedule.');
+    }
+  }
 
   useEffect(() => {
     if (!showReadyBanner) return;
@@ -95,7 +217,7 @@ export function KnowledgeBase() {
         // Auto-chunk immediately after upload so users don't have to remember to refresh
         setUploadStage('chunking');
         setUploadProgress(75);
-        const chunkRes = await api.post('/api/knowledge/chunks/refresh');
+        const chunkRes = await api.post('/api/knowledge/chunks/refresh', { provider });
 
         setUploadProgress(100);
         setUploadStage('ready');
@@ -118,7 +240,7 @@ export function KnowledgeBase() {
         }, 2200);
       }
     },
-    [loadFiles]
+    [loadFiles, provider]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -131,6 +253,7 @@ export function KnowledgeBase() {
       'text/x-markdown': ['.md', '.markdown'],
       'text/plain': ['.txt', '.md', '.markdown'],
       'text/csv': ['.csv'],
+      'application/json': ['.json'],
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xls'],
       'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'],
     },
@@ -153,7 +276,7 @@ export function KnowledgeBase() {
 
       setUploadStage('chunking');
       setUploadProgress(80);
-      const chunkRes = await api.post('/api/knowledge/chunks/refresh');
+      const chunkRes = await api.post('/api/knowledge/chunks/refresh', { provider });
 
       setUploadProgress(100);
       setUploadStage('ready');
@@ -191,7 +314,7 @@ export function KnowledgeBase() {
     setIsChunking(true);
     setMessage('');
     try {
-      const response = await api.post('/api/knowledge/chunks/refresh');
+      const response = await api.post('/api/knowledge/chunks/refresh', { provider });
       setChunkRefreshNeeded(false);
       setMessage(
         `Chunks refreshed for ${response.data.fileCount} file(s). Stored ${response.data.chunkCount} reusable chunk(s).`
@@ -229,8 +352,8 @@ export function KnowledgeBase() {
               Knowledge Vectorization
             </h2>
             <p className="text-xs mt-0.5 max-w-xl" style={{ color: 'var(--text-muted)' }}>
-              File uploads save text fields locally. Regenerate embeddings to update prompt-matching
-              vector chunks.
+              Semantic chunking and hybrid vector / BM25 search use Gemini, OpenAI, or OpenRouter
+              embeddings. Configure one of these providers in Settings before indexing files.
             </p>
           </div>
           <button
@@ -365,7 +488,7 @@ export function KnowledgeBase() {
                 Upload Documents
               </h2>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                PDFs, DOCX, Markdown (.md), TXT, CSV, XLSX, and images.
+                PDFs, DOCX, Markdown, OpenAPI / Postman JSON, TXT, CSV, XLSX, and images.
               </p>
             </div>
             <div
@@ -515,6 +638,100 @@ export function KnowledgeBase() {
           </div>
         </Card>
       </div>
+
+      <Card>
+        <div className="mb-5">
+          <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+            Live Sync Connectors
+          </h2>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Connect with OAuth and periodically sync documentation while ForgeQA is open. Tokens are
+            encrypted at rest.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {connectors.map((connector) => (
+            <div
+              key={connector.id}
+              className="rounded-xl p-4"
+              style={{
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {connector.label}
+                  </h3>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {connector.connected
+                      ? connector.lastSyncAt
+                        ? `Last synced ${formatDate(connector.lastSyncAt)}`
+                        : 'Connected — not synced yet'
+                      : connector.configured
+                        ? 'Not connected'
+                        : 'OAuth app credentials are not configured'}
+                  </p>
+                </div>
+                <span className={`badge ${connector.connected ? 'badge-success' : 'badge'}`}>
+                  {connector.connected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {connector.connected ? (
+                  <>
+                    <button
+                      className="btn-primary px-3 py-2 text-xs font-semibold"
+                      disabled={syncingConnector === connector.id}
+                      onClick={() => void syncConnector(connector.id)}
+                      type="button"
+                    >
+                      {syncingConnector === connector.id ? 'Syncing…' : 'Sync now'}
+                    </button>
+                    <button
+                      className="btn-ghost px-3 py-2 text-xs"
+                      onClick={() => void disconnectConnector(connector.id)}
+                      type="button"
+                    >
+                      Disconnect
+                    </button>
+                    <label
+                      className="ml-auto flex items-center gap-2 text-xs"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Auto-sync
+                      <select
+                        className="input-modern px-2 py-1.5 text-xs"
+                        value={connector.autoSyncMinutes}
+                        onChange={(event) =>
+                          void updateAutoSync(connector.id, Number(event.target.value))
+                        }
+                      >
+                        <option value={0}>Off</option>
+                        <option value={15}>Every 15 min</option>
+                        <option value={30}>Every 30 min</option>
+                        <option value={60}>Hourly</option>
+                        <option value={360}>Every 6 hours</option>
+                        <option value={1440}>Daily</option>
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <button
+                    className="btn-primary px-3 py-2 text-xs font-semibold"
+                    disabled={!connector.configured}
+                    onClick={() => void connectConnector(connector.id)}
+                    type="button"
+                  >
+                    Connect {connector.label}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* File List */}
       <Card className="p-0 overflow-hidden">
