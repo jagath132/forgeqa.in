@@ -1,10 +1,9 @@
-﻿import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { api, type PendingRegistration, type ProductKey } from '../lib/api';
 import { useConfirm } from '../components/ConfirmDialog';
 import {
   RefreshCw,
-  Info,
   ShieldCheck,
   Clock,
   Calendar,
@@ -233,21 +232,6 @@ export function VerificationsPage() {
           <RefreshCw size={14} strokeWidth={2} />
           Refresh
         </button>
-      </div>
-
-      <div className="info-banner">
-        <Info size={18} className="info-banner-icon" strokeWidth={2} />
-        <div>
-          <div className="info-banner-title">Two-Step Approval Workflow</div>
-          <div className="info-banner-text">
-            <strong>Step 1 ΓÇö Approve or Reject:</strong> Review the request and click{' '}
-            <strong>Approve</strong> or <strong>Reject</strong>. No email is sent at this point.
-            <br />
-            <strong>Step 2 ΓÇö Assign a Product Key:</strong> For approved registrations, click{' '}
-            <strong>Assign Key</strong> to pick an available key. This triggers exactly one welcome
-            email containing the key and activation instructions.
-          </div>
-        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
