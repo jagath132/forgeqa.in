@@ -1,4 +1,4 @@
-import { connectDb, isMongoUriConfigured } from './db.js';
+﻿import { connectDb, isMongoUriConfigured } from './db.js';
 import {
   adminStore,
   authenticateToken,
@@ -97,7 +97,7 @@ export function createApiMiddleware(env) {
       return;
     }
 
-    // Healthcheck — always responds immediately, no DB needed
+    // Healthcheck ΓÇö always responds immediately, no DB needed
     if (url.pathname === '/api/health' && req.method === 'GET') {
       sendJson(res, 200, { status: 'ok', uptime: process.uptime() });
       return;
@@ -152,18 +152,23 @@ export function createApiMiddleware(env) {
       // Internal endpoints (bypass admin auth)
       if (url.pathname === '/api/internal/register-key' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
-        const { email } = JSON.parse(rawBody || '{}');
+        const { email, name } = JSON.parse(rawBody || '{}');
         if (!email) {
           sendJson(res, 400, { error: 'Email is required.' });
           return;
         }
         try {
-          const { generateProductKeys } = await import('./keys/service.js');
+          const { generateProductKeys, listProductKeys } = await import('./keys/service.js');
           const keys = await generateProductKeys(1, {
             customerEmail: email,
             notes: 'Free plan registration',
           });
           const key = keys[0];
+          const { sendProductKeyEmail } = await import('./email/service.js');
+          const appUrl =
+            process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
+          const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(email)}&key=${key}`;
+          await sendProductKeyEmail(email, key, name || '', completeUrl);
           sendJson(res, 200, { key, email });
         } catch (err) {
           sendJson(res, 500, { error: err.message });
@@ -355,7 +360,7 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Full list — merge users and registrations, preferring the latest active state per email.
+        // Full list ΓÇö merge users and registrations, preferring the latest active state per email.
         const users = await db
           .collection('users')
           .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
@@ -601,7 +606,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // ── Plan management ──────────────────────────────────────────────────────
+      // ΓöÇΓöÇ Plan management ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
       // List all plans
       if (url.pathname === '/api/admin/plans' && req.method === 'GET') {
@@ -935,7 +940,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // ── Verification routes ──────────────────────────────────────────────────
+      // ΓöÇΓöÇ Verification routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
       // List pending registrations (from main app shared DB)
       if (url.pathname === '/api/admin/verifications' && req.method === 'GET') {
@@ -969,7 +974,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // Approve a pending registration
+      // Approve a pending registration (status change only ΓÇö no key, no email)
       if (url.pathname === '/api/admin/verifications/approve' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { pendingId } = JSON.parse(rawBody || '{}');
@@ -990,56 +995,132 @@ export function createApiMiddleware(env) {
           });
           return;
         }
-        let productKey = pending.productKey;
-        let generatedNewKey = false;
-        if (!productKey) {
-          const { generateProductKeys } = await import('./keys/service.js');
-          const keys = await generateProductKeys(1, {
-            customerEmail: pending.email,
-            notes: `${pending.plan || 'free'} plan approval`,
-          });
-          productKey = keys[0];
-          generatedNewKey = true;
-        }
 
         const approvedAt = new Date().toISOString();
-        let claim;
-        try {
-          claim = await db.collection('pending_registrations').updateOne(
-            { pendingId, status: 'pending_verification' },
-            {
-              $set: {
-                status: 'ready',
-                productKey,
-                approvedAt,
-                approvedBy: admin.email,
-                notificationEmailStatus: 'pending',
-                notificationEmailError: null,
-                notificationEmailAttemptedAt: approvedAt,
-              },
-            }
-          );
-        } catch (err) {
-          if (generatedNewKey) {
-            await db
-              .collection('product_keys')
-              .deleteOne({ key: productKey, customerEmail: pending.email, status: 'available' })
-              .catch((cleanupError) =>
-                console.error('Failed to release unassigned approval key:', cleanupError)
-              );
-          }
-          throw err;
-        }
+        const claim = await db.collection('pending_registrations').updateOne(
+          { pendingId, status: 'pending_verification' },
+          {
+            $set: {
+              status: 'ready',
+              approvedAt,
+              approvedBy: admin.email,
+              // Clear any stale email state ΓÇö email will only be sent after key assignment
+              notificationEmailStatus: null,
+              notificationEmailError: null,
+              notificationEmailSentAt: null,
+              notificationEmailAttemptedAt: null,
+            },
+          },
+        );
         if (claim.matchedCount === 0) {
-          if (generatedNewKey) {
-            await db
-              .collection('product_keys')
-              .deleteOne({ key: productKey, customerEmail: pending.email, status: 'available' });
-          }
           sendJson(res, 409, { error: 'Registration was already reviewed. Refresh the list.' });
           return;
         }
 
+        await logAudit({
+          adminId: admin.id,
+          adminEmail: admin.email,
+          action: 'approve_registration',
+          resource: 'pending_registration',
+          resourceId: pendingId,
+          details: { email: pending.email, plan: pending.plan },
+          ip: clientIp,
+        });
+        sendJson(res, 200, { ok: true, email: pending.email });
+        return;
+      }
+
+      // Assign a product key to an approved registration and send the welcome email.
+      // This is the ONLY place the welcome/approval email is triggered.
+      if (
+        url.pathname.startsWith('/api/admin/verifications/') &&
+        url.pathname.endsWith('/assign-key') &&
+        req.method === 'POST'
+      ) {
+        const encodedId = url.pathname
+          .replace('/api/admin/verifications/', '')
+          .replace(/\/assign-key$/, '');
+        const pendingId = decodeURIComponent(encodedId);
+        if (!pendingId || pendingId.includes('/')) {
+          sendJson(res, 400, { error: 'pendingId is required.' });
+          return;
+        }
+        const rawBody = await readRequestBody(req);
+        const { productKey: providedKey } = JSON.parse(rawBody || '{}');
+        if (!providedKey || !String(providedKey).trim()) {
+          sendJson(res, 400, { error: 'productKey is required.' });
+          return;
+        }
+        const productKey = String(providedKey).trim().toUpperCase();
+
+        const { getDb } = await import('./db.js');
+        const db = getDb();
+
+        // Verify the registration is approved and hasn't already had an email sent
+        const pending = await db.collection('pending_registrations').findOne({ pendingId });
+        if (!pending) {
+          sendJson(res, 404, { error: 'Pending registration not found.' });
+          return;
+        }
+        if (pending.status !== 'ready') {
+          sendJson(res, 400, {
+            error: `Registration must be in 'ready' (approved) state to assign a key. Current state: '${pending.status}'.`,
+          });
+          return;
+        }
+        if (pending.notificationEmailStatus === 'sent') {
+          sendJson(res, 409, {
+            error: 'A welcome email has already been sent for this registration.',
+          });
+          return;
+        }
+
+        // Verify the product key exists and is available
+        const keyDoc = await db.collection('product_keys').findOne({ key: productKey });
+        if (!keyDoc) {
+          sendJson(res, 404, { error: 'Product key not found.' });
+          return;
+        }
+        if (keyDoc.status !== 'available') {
+          sendJson(res, 409, {
+            error: `Product key is not available (current status: '${keyDoc.status}').`,
+          });
+          return;
+        }
+
+        // Atomically claim the key for this registration
+        const { ObjectId } = await import('mongodb');
+        const keyClaim = await db.collection('product_keys').updateOne(
+          { _id: keyDoc._id, status: 'available' },
+          {
+            $set: {
+              customerEmail: pending.email.toLowerCase().trim(),
+              notes: keyDoc.notes || `${pending.plan || 'free'} plan ΓÇö assigned during approval`,
+            },
+          }
+        );
+        if (keyClaim.modifiedCount === 0) {
+          sendJson(res, 409, { error: 'Key was just claimed by another action. Please choose a different key.' });
+          return;
+        }
+
+        // Record the key on the registration and mark email as pending
+        const assignedAt = new Date().toISOString();
+        await db.collection('pending_registrations').updateOne(
+          { pendingId },
+          {
+            $set: {
+              productKey,
+              keyAssignedAt: assignedAt,
+              keyAssignedBy: admin.email,
+              notificationEmailStatus: 'pending',
+              notificationEmailError: null,
+              notificationEmailAttemptedAt: assignedAt,
+            },
+          }
+        );
+
+        // Send the welcome email ΓÇö this is the single, authoritative trigger
         const appUrl =
           process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
         const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${productKey}`;
@@ -1066,28 +1147,27 @@ export function createApiMiddleware(env) {
         } catch (err) {
           emailStatus = 'failed';
           emailError = err.message || 'Email delivery failed.';
-          await db
-            .collection('pending_registrations')
-            .updateOne(
-              { pendingId },
-              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-            );
-          console.error(`Approval email failed for ${pending.email}:`, err);
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
+          console.error(`Welcome email failed for ${pending.email}:`, err);
         }
+
         await logAudit({
           adminId: admin.id,
           adminEmail: admin.email,
-          action: 'approve_registration',
+          action: 'assign_key_to_registration',
           resource: 'pending_registration',
           resourceId: pendingId,
-          details: { email: pending.email, plan: pending.plan, productKey, emailStatus },
+          details: { email: pending.email, productKey, emailStatus },
           ip: clientIp,
         });
         sendJson(res, 200, { ok: true, productKey, email: pending.email, emailStatus, emailError });
         return;
       }
 
-      // Reject a pending registration
+      // Reject a pending registration ΓÇö sends a rejection notice email (no product key)
       if (url.pathname === '/api/admin/verifications/reject' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { pendingId, reason } = JSON.parse(rawBody || '{}');
@@ -1129,6 +1209,7 @@ export function createApiMiddleware(env) {
           return;
         }
 
+        // Send rejection notice ΓÇö no product key included
         let emailStatus = 'sent';
         let emailError = null;
         try {
@@ -1151,12 +1232,10 @@ export function createApiMiddleware(env) {
         } catch (emailErr) {
           emailStatus = 'failed';
           emailError = emailErr.message || 'Email delivery failed.';
-          await db
-            .collection('pending_registrations')
-            .updateOne(
-              { pendingId },
-              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-            );
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
           console.error(`Rejection email failed for ${pending.email}:`, emailErr);
         }
         await logAudit({
@@ -1172,7 +1251,8 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // Retry the existing approval or rejection email without changing the decision/key.
+      // Retry a failed notification email without changing the decision/key.
+      // For 'ready' registrations: only retries if a product key has already been assigned.
       if (
         url.pathname.startsWith('/api/admin/verifications/') &&
         url.pathname.endsWith('/resend-email') &&
@@ -1197,8 +1277,11 @@ export function createApiMiddleware(env) {
           sendJson(res, 409, { error: 'This registration does not have a failed email to retry.' });
           return;
         }
+        // For approved registrations, a product key must have been assigned before the email can be resent
         if (pending.status === 'ready' && !pending.productKey) {
-          sendJson(res, 409, { error: 'The approved registration has no product key to resend.' });
+          sendJson(res, 409, {
+            error: 'Cannot resend welcome email: no product key has been assigned to this registration yet.',
+          });
           return;
         }
 
@@ -1248,12 +1331,10 @@ export function createApiMiddleware(env) {
         } catch (err) {
           emailStatus = 'failed';
           emailError = err.message || 'Email delivery failed.';
-          await db
-            .collection('pending_registrations')
-            .updateOne(
-              { pendingId },
-              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-            );
+          await db.collection('pending_registrations').updateOne(
+            { pendingId },
+            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+          );
           console.error(`Verification email retry failed for ${pending.email}:`, err);
         }
         await logAudit({
@@ -1357,7 +1438,7 @@ export function createApiMiddleware(env) {
           });
           return;
         }
-        // Recreate the account without a password — user signs in via "Forgot password".
+        // Recreate the account without a password ΓÇö user signs in via "Forgot password".
         const restored = {
           email,
           passwordHash: null,

@@ -1,7 +1,7 @@
-import nodemailer from 'nodemailer';
-import { getDb } from '../db.js';
-import { sendProductKeyEmailResend, sendVerificationEmailResend } from './resend.js';
-import { getVerificationEmailHtml } from './templates.js';
+﻿import nodemailer from "nodemailer";
+import { getDb } from "../db.js";
+import { sendProductKeyEmailResend, sendVerificationEmailResend } from "./resend.js";
+import { getVerificationEmailHtml } from "./templates.js";
 
 let etherealTransporter = null;
 
@@ -20,33 +20,25 @@ async function getTransporter() {
     });
   }
 
-  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-    throw new Error('Email transport is not configured. Set RESEND_API_KEY or SMTP settings.');
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    throw new Error("Email transport is not configured. Set RESEND_API_KEY or SMTP settings.");
   }
 
   if (!etherealTransporter) {
     const account = await nodemailer.createTestAccount();
     etherealTransporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
+      host: "smtp.ethereal.email",
       port: 587,
       secure: false,
       auth: { user: account.user, pass: account.pass },
     });
-    console.log('SMTP not configured — using Ethereal dev email. View at:', account.web);
+    console.log("SMTP not configured ΓÇö using Ethereal dev email. View at:", account.web);
   }
   return etherealTransporter;
 }
 
 function logColl() {
-  return getDb().collection('email_logs');
-}
-
-async function recordVerificationEmailLog(entry) {
-  try {
-    await logColl().insertOne(entry);
-  } catch (err) {
-    console.error('Failed to record verification email log:', err.message);
-  }
+  return getDb().collection("email_logs");
 }
 
 export async function sendProductKeyEmail(toEmail, productKey, customerName, completeUrl) {
@@ -55,13 +47,9 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
   }
   const transporter = await getTransporter();
 
-  const from = process.env.SMTP_FROM || 'ForgeQA <noreply@app-forgeqa.in>';
-  const subject = 'Your ForgeKey Product Key';
-  const buttonUrl =
-    completeUrl ||
-    (process.env.APP_URL || 'http://127.0.0.1:5173') +
-      '/auth/complete-registration?email=' +
-      encodeURIComponent(toEmail);
+  const from = process.env.SMTP_FROM || "ForgeQA <noreply@app-forgeqa.in>";
+  const subject = "Your ForgeKey Product Key";
+  const buttonUrl = completeUrl || (process.env.APP_URL || "http://127.0.0.1:5173") + "/auth/complete-registration?email=" + encodeURIComponent(toEmail);
 
   const html = `
 <!DOCTYPE html>
@@ -71,7 +59,7 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
     <h1 style="color: #F59E0B;">ForgeKey</h1>
     <p style="color: #888;">License Activation</p>
   </div>
-  <p>Hello${customerName ? ' ' + customerName : ''},</p>
+  <p>Hello${customerName ? " " + customerName : ""},</p>
   <p>Thank you for purchasing ForgeKey! Your product key is:</p>
   <div style="text-align: center; margin: 30px 0; padding: 20px; background: #1a1a1a; border-radius: 8px; border: 2px dashed #F59E0B;">
     <h2 style="font-family: 'Courier New', monospace; letter-spacing: 3px; color: #FBBF24; font-size: 24px; margin: 0;">${productKey}</h2>
@@ -94,7 +82,7 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
       subject,
       productKey,
       messageId: info.messageId,
-      status: 'sent',
+      status: "sent",
       sentAt: new Date().toISOString(),
     });
 
@@ -105,37 +93,43 @@ export async function sendProductKeyEmail(toEmail, productKey, customerName, com
       subject,
       productKey,
       error: err.message,
-      status: 'failed',
+      status: "failed",
       sentAt: new Date().toISOString(),
     });
     throw err;
   }
 }
 
-export async function sendVerificationEmail({ to, name, status, productKey, completeUrl, reason }) {
-  const approved = status === 'approved';
-  if (approved && (!productKey || !completeUrl)) {
-    throw new Error(
-      'Approved registration emails require an assigned product key and activation URL.'
-    );
-  }
+export async function sendVerificationEmail({
+  to,
+  name,
+  status,
+  productKey,
+  completeUrl,
+  reason,
+}) {
+  const approved = status === "approved";
   const subject = approved
-    ? 'Welcome to ForgeQA — your account is approved'
-    : 'ForgeQA registration update';
+    ? "Welcome to ForgeQA ΓÇö your registration is approved"
+    : "ForgeQA registration update";
 
   if (process.env.RESEND_API_KEY) {
-    return sendVerificationEmailResend({
-      to,
-      name,
-      status,
-      productKey,
-      completeUrl,
-      reason,
-    });
+    try {
+      return await sendVerificationEmailResend({
+        to,
+        name,
+        status,
+        productKey,
+        completeUrl,
+        reason,
+      });
+    } catch (err) {
+      console.warn("Resend verification email failed; trying SMTP:", err.message);
+    }
   }
 
   const transporter = await getTransporter();
-  const supportEmail = process.env.SUPPORT_EMAIL || 'support@forgeqa.in';
+  const supportEmail = process.env.SUPPORT_EMAIL || "support@forgeqa.in";
   const html = getVerificationEmailHtml({
     name,
     status,
@@ -145,50 +139,52 @@ export async function sendVerificationEmail({ to, name, status, productKey, comp
     supportEmail,
   });
 
-  let info;
   try {
-    info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'ForgeQA <noreply@app-forgeqa.in>',
+    const info = await transporter.sendMail({
+      from: process.env.SMTP_FROM || "ForgeQA <noreply@app-forgeqa.in>",
       to,
       subject,
       html,
     });
-  } catch (err) {
-    await recordVerificationEmailLog({
+    await logColl().insertOne({
       to,
       subject,
       productKey: productKey || null,
-      emailType: approved ? 'registration_approved' : 'registration_rejected',
+      emailType: approved ? "registration_approved" : "registration_rejected",
+      messageId: info.messageId,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    await logColl().insertOne({
+      to,
+      subject,
+      productKey: productKey || null,
+      emailType: approved ? "registration_approved" : "registration_rejected",
       error: err.message,
-      status: 'failed',
+      status: "failed",
       sentAt: new Date().toISOString(),
     });
     throw err;
   }
-
-  await recordVerificationEmailLog({
-    to,
-    subject,
-    productKey: productKey || null,
-    emailType: approved ? 'registration_approved' : 'registration_rejected',
-    messageId: info.messageId,
-    status: 'sent',
-    sentAt: new Date().toISOString(),
-  });
-  return { success: true, messageId: info.messageId };
 }
 
 export async function getEmailLogs(filter = {}) {
   const query = {};
 
   if (filter.search) {
-    const re = { $regex: filter.search, $options: 'i' };
-    query.$or = [{ to: re }, { productKey: re }, { subject: re }];
+    const re = { $regex: filter.search, $options: "i" };
+    query.$or = [
+      { to: re },
+      { productKey: re },
+      { subject: re },
+    ];
   }
-  if (filter.status && filter.status !== 'all') {
+  if (filter.status && filter.status !== "all") {
     query.status = filter.status;
   }
-  if (filter.to) query.to = { $regex: filter.to, $options: 'i' };
+  if (filter.to) query.to = { $regex: filter.to, $options: "i" };
   if (filter.dateFrom || filter.dateTo) {
     query.sentAt = {};
     if (filter.dateFrom) query.sentAt.$gte = filter.dateFrom;
@@ -225,10 +221,10 @@ export async function getEmailLogs(filter = {}) {
 }
 
 export async function resendEmail(logId) {
-  const { ObjectId } = await import('mongodb');
+  const { ObjectId } = await import("mongodb");
   const doc = await logColl().findOne({ _id: new ObjectId(logId) });
-  if (!doc) throw new Error('Email log entry not found.');
+  if (!doc) throw new Error("Email log entry not found.");
 
-  const result = await sendProductKeyEmail(doc.to, doc.productKey, '');
+  const result = await sendProductKeyEmail(doc.to, doc.productKey, "");
   return result;
 }
