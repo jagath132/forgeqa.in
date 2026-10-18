@@ -41,6 +41,14 @@ function logColl() {
   return getDb().collection('email_logs');
 }
 
+async function recordVerificationEmailLog(entry) {
+  try {
+    await logColl().insertOne(entry);
+  } catch (err) {
+    console.error('Failed to record verification email log:', err.message);
+  }
+}
+
 export async function sendProductKeyEmail(toEmail, productKey, customerName, completeUrl) {
   if (process.env.RESEND_API_KEY) {
     return sendProductKeyEmailResend(toEmail, productKey, customerName, completeUrl);
@@ -116,18 +124,14 @@ export async function sendVerificationEmail({ to, name, status, productKey, comp
     : 'ForgeQA registration update';
 
   if (process.env.RESEND_API_KEY) {
-    try {
-      return await sendVerificationEmailResend({
-        to,
-        name,
-        status,
-        productKey,
-        completeUrl,
-        reason,
-      });
-    } catch (err) {
-      console.warn('Resend verification email failed; trying SMTP:', err.message);
-    }
+    return sendVerificationEmailResend({
+      to,
+      name,
+      status,
+      productKey,
+      completeUrl,
+      reason,
+    });
   }
 
   const transporter = await getTransporter();
@@ -141,25 +145,16 @@ export async function sendVerificationEmail({ to, name, status, productKey, comp
     supportEmail,
   });
 
+  let info;
   try {
-    const info = await transporter.sendMail({
+    info = await transporter.sendMail({
       from: process.env.SMTP_FROM || 'ForgeQA <noreply@app-forgeqa.in>',
       to,
       subject,
       html,
     });
-    await logColl().insertOne({
-      to,
-      subject,
-      productKey: productKey || null,
-      emailType: approved ? 'registration_approved' : 'registration_rejected',
-      messageId: info.messageId,
-      status: 'sent',
-      sentAt: new Date().toISOString(),
-    });
-    return { success: true, messageId: info.messageId };
   } catch (err) {
-    await logColl().insertOne({
+    await recordVerificationEmailLog({
       to,
       subject,
       productKey: productKey || null,
@@ -170,6 +165,17 @@ export async function sendVerificationEmail({ to, name, status, productKey, comp
     });
     throw err;
   }
+
+  await recordVerificationEmailLog({
+    to,
+    subject,
+    productKey: productKey || null,
+    emailType: approved ? 'registration_approved' : 'registration_rejected',
+    messageId: info.messageId,
+    status: 'sent',
+    sentAt: new Date().toISOString(),
+  });
+  return { success: true, messageId: info.messageId };
 }
 
 export async function getEmailLogs(filter = {}) {
