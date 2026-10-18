@@ -1,4 +1,4 @@
-﻿import { connectDb, isMongoUriConfigured } from './db.js';
+import { connectDb, isMongoUriConfigured } from './db.js';
 import {
   adminStore,
   authenticateToken,
@@ -97,7 +97,7 @@ export function createApiMiddleware(env) {
       return;
     }
 
-    // Healthcheck ΓÇö always responds immediately, no DB needed
+    // Healthcheck - always responds immediately, no DB needed
     if (url.pathname === '/api/health' && req.method === 'GET') {
       sendJson(res, 200, { status: 'ok', uptime: process.uptime() });
       return;
@@ -360,7 +360,7 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Full list ΓÇö merge users and registrations, preferring the latest active state per email.
+        // Full list - merge users and registrations, preferring the latest active state per email.
         const users = await db
           .collection('users')
           .find({}, { projection: { email: 1, role: 1, name: 1, createdAt: 1, notes: 1 } })
@@ -606,7 +606,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // ΓöÇΓöÇ Plan management ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+      // -- Plan management ------------------------------------------------
 
       // List all plans
       if (url.pathname === '/api/admin/plans' && req.method === 'GET') {
@@ -940,7 +940,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // ΓöÇΓöÇ Verification routes ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+      // -- Verification routes ---------------------------------------------
 
       // List pending registrations (from main app shared DB)
       if (url.pathname === '/api/admin/verifications' && req.method === 'GET') {
@@ -974,7 +974,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // Approve a pending registration (status change only ΓÇö no key, no email)
+      // Approve a pending registration (status change only - no key, no email)
       if (url.pathname === '/api/admin/verifications/approve' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { pendingId } = JSON.parse(rawBody || '{}');
@@ -1004,7 +1004,7 @@ export function createApiMiddleware(env) {
               status: 'ready',
               approvedAt,
               approvedBy: admin.email,
-              // Clear any stale email state ΓÇö email will only be sent after key assignment
+              // Clear any stale email state - email will only be sent after key assignment
               notificationEmailStatus: null,
               notificationEmailError: null,
               notificationEmailSentAt: null,
@@ -1046,12 +1046,7 @@ export function createApiMiddleware(env) {
           return;
         }
         const rawBody = await readRequestBody(req);
-        const { productKey: providedKey } = JSON.parse(rawBody || '{}');
-        if (!providedKey || !String(providedKey).trim()) {
-          sendJson(res, 400, { error: 'productKey is required.' });
-          return;
-        }
-        const productKey = String(providedKey).trim().toUpperCase();
+        const { productKey: providedKey, autoGenerate } = JSON.parse(rawBody || '{}');
 
         const { getDb } = await import('./db.js');
         const db = getDb();
@@ -1075,33 +1070,49 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Verify the product key exists and is available
-        const keyDoc = await db.collection('product_keys').findOne({ key: productKey });
-        if (!keyDoc) {
-          sendJson(res, 404, { error: 'Product key not found.' });
-          return;
-        }
-        if (keyDoc.status !== 'available') {
-          sendJson(res, 409, {
-            error: `Product key is not available (current status: '${keyDoc.status}').`,
+        let productKey;
+        if (autoGenerate || !providedKey) {
+          // Auto-generate a fresh unique product key on the fly for this user
+          const { generateProductKeys } = await import('./keys/service.js');
+          const generated = await generateProductKeys(1, {
+            customerEmail: pending.email.toLowerCase().trim(),
+            notes: `${pending.plan || 'free'} plan - assigned during verification approval`,
           });
-          return;
-        }
-
-        // Atomically claim the key for this registration
-        const { ObjectId } = await import('mongodb');
-        const keyClaim = await db.collection('product_keys').updateOne(
-          { _id: keyDoc._id, status: 'available' },
-          {
-            $set: {
-              customerEmail: pending.email.toLowerCase().trim(),
-              notes: keyDoc.notes || `${pending.plan || 'free'} plan ΓÇö assigned during approval`,
-            },
+          if (!generated || !generated.length) {
+            sendJson(res, 500, { error: 'Failed to auto-generate a product key.' });
+            return;
           }
-        );
-        if (keyClaim.modifiedCount === 0) {
-          sendJson(res, 409, { error: 'Key was just claimed by another action. Please choose a different key.' });
-          return;
+          productKey = generated[0];
+        } else {
+          productKey = String(providedKey).trim().toUpperCase();
+
+          // Verify the product key exists and is available
+          const keyDoc = await db.collection('product_keys').findOne({ key: productKey });
+          if (!keyDoc) {
+            sendJson(res, 404, { error: 'Product key not found.' });
+            return;
+          }
+          if (keyDoc.status !== 'available') {
+            sendJson(res, 409, {
+              error: `Product key is not available (current status: '${keyDoc.status}').`,
+            });
+            return;
+          }
+
+          // Atomically claim the key for this registration
+          const keyClaim = await db.collection('product_keys').updateOne(
+            { _id: keyDoc._id, status: 'available' },
+            {
+              $set: {
+                customerEmail: pending.email.toLowerCase().trim(),
+                notes: keyDoc.notes || `${pending.plan || 'free'} plan - assigned during approval`,
+              },
+            }
+          );
+          if (keyClaim.modifiedCount === 0) {
+            sendJson(res, 409, { error: 'Key was just claimed by another action. Please choose a different key.' });
+            return;
+          }
         }
 
         // Record the key on the registration and mark email as pending
@@ -1120,7 +1131,7 @@ export function createApiMiddleware(env) {
           }
         );
 
-        // Send the welcome email ΓÇö this is the single, authoritative trigger
+        // Send the welcome email - this is the single, authoritative trigger
         const appUrl =
           process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
         const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(pending.email)}&key=${productKey}`;
@@ -1167,7 +1178,7 @@ export function createApiMiddleware(env) {
         return;
       }
 
-      // Reject a pending registration ΓÇö sends a rejection notice email (no product key)
+      // Reject a pending registration - sends a rejection notice email (no product key)
       if (url.pathname === '/api/admin/verifications/reject' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
         const { pendingId, reason } = JSON.parse(rawBody || '{}');
@@ -1209,7 +1220,7 @@ export function createApiMiddleware(env) {
           return;
         }
 
-        // Send rejection notice ΓÇö no product key included
+        // Send rejection notice - no product key included
         let emailStatus = 'sent';
         let emailError = null;
         try {
@@ -1438,7 +1449,7 @@ export function createApiMiddleware(env) {
           });
           return;
         }
-        // Recreate the account without a password ΓÇö user signs in via "Forgot password".
+        // Recreate the account without a password - user signs in via "Forgot password".
         const restored = {
           email,
           passwordHash: null,

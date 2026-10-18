@@ -1,4 +1,4 @@
-﻿import nodemailer from "nodemailer";
+import nodemailer from "nodemailer";
 import { getDb } from "../db.js";
 import { sendProductKeyEmailResend, sendVerificationEmailResend } from "./resend.js";
 import { getVerificationEmailHtml } from "./templates.js";
@@ -32,7 +32,7 @@ async function getTransporter() {
       secure: false,
       auth: { user: account.user, pass: account.pass },
     });
-    console.log("SMTP not configured ΓÇö using Ethereal dev email. View at:", account.web);
+    console.log("SMTP not configured - using Ethereal dev email. View at:", account.web);
   }
   return etherealTransporter;
 }
@@ -110,7 +110,7 @@ export async function sendVerificationEmail({
 }) {
   const approved = status === "approved";
   const subject = approved
-    ? "Welcome to ForgeQA ΓÇö your registration is approved"
+    ? "Welcome to ForgeQA - your registration is approved"
     : "ForgeQA registration update";
 
   if (process.env.RESEND_API_KEY) {

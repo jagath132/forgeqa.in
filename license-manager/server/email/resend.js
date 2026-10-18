@@ -1,4 +1,4 @@
-﻿import { Resend } from "resend";
+import { Resend } from "resend";
 import { getDb } from "../db.js";
 import { getVerificationEmailHtml } from "./templates.js";
 
@@ -64,7 +64,7 @@ export async function sendVerificationEmailResend({
 }) {
   const approved = status === "approved";
   const subject = approved
-    ? "Welcome to ForgeQA ΓÇö your registration is approved"
+    ? "Welcome to ForgeQA - your registration is approved"
     : "ForgeQA registration update";
   const supportEmail = process.env.SUPPORT_EMAIL || "support@forgeqa.in";
   const { data, error } = await getResend().emails.send({

@@ -15,6 +15,7 @@ import {
   Mail,
   KeyRound,
   RefreshCw as RetryIcon,
+  Sparkles,
 } from 'lucide-react';
 
 const PLAN_LABELS: Record<string, string> = { free: 'Free', pro: 'Pro', enterprise: 'Enterprise' };
@@ -42,11 +43,11 @@ export function VerificationsPage() {
 
   // Assign Key modal state
   const [assignKeyItem, setAssignKeyItem] = useState<PendingRegistration | null>(null);
+  const [assignMode, setAssignMode] = useState<'auto' | 'inventory' | 'manual'>('auto');
   const [availableKeys, setAvailableKeys] = useState<ProductKey[]>([]);
   const [keysLoading, setKeysLoading] = useState(false);
   const [selectedKeyValue, setSelectedKeyValue] = useState('');
   const [manualKey, setManualKey] = useState('');
-  const [useManualKey, setUseManualKey] = useState(false);
 
   const confirm = useConfirm();
 
@@ -83,7 +84,7 @@ export function VerificationsPage() {
       await api.post('/api/admin/verifications/approve', { pendingId: item.pendingId });
       showToast(
         'success',
-        `${item.email} approved ΓÇö now go to the Product Keys module and assign a key to send the welcome email.`
+        `${item.email} approved - assign a product key to send the welcome email.`
       );
       await load();
     } catch (err: unknown) {
@@ -119,9 +120,9 @@ export function VerificationsPage() {
 
   async function openAssignKeyModal(item: PendingRegistration) {
     setAssignKeyItem(item);
+    setAssignMode('auto');
     setSelectedKeyValue('');
     setManualKey('');
-    setUseManualKey(false);
     setKeysLoading(true);
     try {
       const res = await api.get<{ keys: ProductKey[] }>('/api/admin/keys?status=available');
@@ -136,16 +137,30 @@ export function VerificationsPage() {
 
   async function handleAssignKey() {
     if (!assignKeyItem) return;
-    const key = useManualKey ? manualKey.trim().toUpperCase() : selectedKeyValue;
-    if (!key) {
-      showToast('error', 'Please select or enter a product key.');
-      return;
+    const payload: { autoGenerate?: boolean; productKey?: string } = {};
+
+    if (assignMode === 'auto') {
+      payload.autoGenerate = true;
+    } else if (assignMode === 'inventory') {
+      if (!selectedKeyValue) {
+        showToast('error', 'Please select a product key from the inventory.');
+        return;
+      }
+      payload.productKey = selectedKeyValue;
+    } else if (assignMode === 'manual') {
+      const key = manualKey.trim().toUpperCase();
+      if (!key) {
+        showToast('error', 'Please enter a valid product key.');
+        return;
+      }
+      payload.productKey = key;
     }
+
     setActionLoading(assignKeyItem.pendingId);
     try {
       const res = await api.post<{ emailStatus: string; emailError?: string; productKey: string }>(
         `/api/admin/verifications/${encodeURIComponent(assignKeyItem.pendingId)}/assign-key`,
-        { productKey: key }
+        payload
       );
       if (res.data.emailStatus === 'failed') {
         showToast(
@@ -290,7 +305,7 @@ export function VerificationsPage() {
                 {(item.name || item.email).charAt(0).toUpperCase()}
               </div>
               <div className="verification-info">
-                <div className="name">{item.name || 'ΓÇö'}</div>
+                <div className="name">{item.name || '-'}</div>
                 <div className="email">{item.email}</div>
                 <div className="verification-meta">
                   <div className="verification-meta-item">
@@ -304,7 +319,7 @@ export function VerificationsPage() {
                         letterSpacing: '0.05em',
                       }}
                     >
-                      {item.plan ? PLAN_LABELS[item.plan] : 'ΓÇö'}
+                      {item.plan ? PLAN_LABELS[item.plan] : '-'}
                     </span>
                   </div>
                   <div className="verification-meta-item">
@@ -325,13 +340,12 @@ export function VerificationsPage() {
                   </div>
                   <div className="verification-meta-item">
                     <span
-                      className={`badge ${
-                        item.status === 'pending_verification'
-                          ? 'badge-warning'
-                          : item.status === 'ready'
-                            ? 'badge-used'
-                            : 'badge-available'
-                      }`}
+                      className={`badge ${item.status === 'pending_verification'
+                        ? 'badge-warning'
+                        : item.status === 'ready'
+                          ? 'badge-used'
+                          : 'badge-available'
+                        }`}
                       style={{ fontSize: 10 }}
                     >
                       {item.status === 'pending_verification'
@@ -360,13 +374,12 @@ export function VerificationsPage() {
                     >
                       <Mail size={14} strokeWidth={2} />
                       <span
-                        className={`badge ${
-                          item.notificationEmailStatus === 'sent'
-                            ? 'badge-used'
-                            : item.notificationEmailStatus === 'failed'
-                              ? 'badge-expired'
-                              : 'badge-warning'
-                        }`}
+                        className={`badge ${item.notificationEmailStatus === 'sent'
+                          ? 'badge-used'
+                          : item.notificationEmailStatus === 'failed'
+                            ? 'badge-expired'
+                            : 'badge-warning'
+                          }`}
                         style={{ fontSize: 10 }}
                       >
                         Email {item.notificationEmailStatus}
@@ -453,7 +466,7 @@ export function VerificationsPage() {
                     justifyContent: 'flex-end',
                   }}
                 >
-                  {/* Assign Key button ΓÇö shown for approved registrations without a welcome email yet */}
+                  {/* Assign Key button - shown for approved registrations without a welcome email yet */}
                   {item.status === 'ready' && item.notificationEmailStatus !== 'sent' && (
                     <button
                       className="btn btn-primary btn-sm"
@@ -465,7 +478,7 @@ export function VerificationsPage() {
                       Assign Key
                     </button>
                   )}
-                  {/* Retry email ΓÇö for approved registrations where key is assigned but email failed */}
+                  {/* Retry email - for approved registrations where key is assigned but email failed */}
                   {item.notificationEmailStatus === 'failed' && item.productKey && (
                     <button
                       className="btn btn-secondary btn-sm"
@@ -579,6 +592,7 @@ export function VerificationsPage() {
       )}
 
       {/* Assign Key modal */}
+      {/* Assign Key Modal */}
       {assignKeyItem && (
         <div className="modal-overlay" onClick={() => setAssignKeyItem(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
@@ -588,11 +602,37 @@ export function VerificationsPage() {
                 <X size={18} strokeWidth={2} />
               </button>
             </div>
+
+            {/* Mode selection tabs */}
+            <div className="modal-tabs">
+              <button
+                type="button"
+                className={`modal-tab${assignMode === 'auto' ? ' active' : ''}`}
+                onClick={() => setAssignMode('auto')}
+              >
+                ⚡ Auto-Generate
+              </button>
+              <button
+                type="button"
+                className={`modal-tab${assignMode === 'inventory' ? ' active' : ''}`}
+                onClick={() => setAssignMode('inventory')}
+              >
+                From Stock ({availableKeys.length})
+              </button>
+              <button
+                type="button"
+                className={`modal-tab${assignMode === 'manual' ? ' active' : ''}`}
+                onClick={() => setAssignMode('manual')}
+              >
+                Manual Key
+              </button>
+            </div>
+
             <div className="modal-body">
               {/* Registration summary */}
               <div
                 style={{
-                  marginBottom: 20,
+                  marginBottom: 16,
                   padding: '12px 16px',
                   background: 'var(--color-bg)',
                   borderRadius: 'var(--radius)',
@@ -622,88 +662,80 @@ export function VerificationsPage() {
                 )}
               </div>
 
-              <div
-                style={{
-                  padding: '10px 14px',
-                  background: 'var(--color-accent-subtle)',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid var(--color-accent)',
-                  fontSize: 12,
-                  color: 'var(--color-accent)',
-                  marginBottom: 20,
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'flex-start',
-                }}
-              >
-                <Mail size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>
-                  Assigning a key will immediately send a <strong>Welcome to ForgeQA</strong> email
-                  to <strong>{assignKeyItem.email}</strong> containing the product key and activation
-                  instructions. Exactly one email will be sent.
-                </span>
-              </div>
-
-              {/* Key selection */}
-              <div className="form-group">
-                <label>Select from available keys</label>
-                {keysLoading ? (
-                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '8px 0' }}>
-                    Loading keysΓÇª
-                  </div>
-                ) : availableKeys.length === 0 ? (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--color-warning)',
-                      padding: '8px 0',
-                    }}
-                  >
-                    No available keys found. Generate keys in the Product Keys module first, or enter
-                    one manually below.
-                  </div>
-                ) : (
-                  <select
-                    className="form-input"
-                    value={selectedKeyValue}
-                    onChange={(e) => {
-                      setSelectedKeyValue(e.target.value);
-                      setUseManualKey(false);
-                    }}
-                    disabled={useManualKey}
-                  >
-                    <option value="">ΓÇö Select a key ΓÇö</option>
-                    {availableKeys.map((k) => (
-                      <option key={k.id} value={k.key}>
-                        {k.key}
-                        {k.customerEmail ? ` (pre-assigned: ${k.customerEmail})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <input
-                  type="checkbox"
-                  id="use-manual-key"
-                  checked={useManualKey}
-                  onChange={(e) => {
-                    setUseManualKey(e.target.checked);
-                    if (e.target.checked) setSelectedKeyValue('');
+              {/* Mode 1: Auto-generate */}
+              {assignMode === 'auto' && (
+                <div
+                  style={{
+                    padding: '16px',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-accent)',
+                    marginBottom: 16,
                   }}
-                  style={{ cursor: 'pointer' }}
-                />
-                <label
-                  htmlFor="use-manual-key"
-                  style={{ fontSize: 13, cursor: 'pointer', margin: 0 }}
                 >
-                  Enter key manually
-                </label>
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <Sparkles size={16} style={{ color: 'var(--color-accent)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                      Instant Key Minting (1-Click)
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                    A fresh, unique product key tailored for the{' '}
+                    <strong style={{ color: 'var(--color-text-primary)' }}>
+                      {PLAN_LABELS[assignKeyItem.plan] || 'Free'} Plan
+                    </strong>{' '}
+                    will be generated automatically on the fly and assigned to{' '}
+                    <strong style={{ color: 'var(--color-text-primary)' }}>{assignKeyItem.email}</strong>.
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                    ⚡ No need to pre-generate keys or maintain stock beforehand.
+                  </div>
+                </div>
+              )}
 
-              {useManualKey && (
-                <div className="form-group">
+              {/* Mode 2: From Inventory */}
+              {assignMode === 'inventory' && (
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label>Select from available stock ({availableKeys.length} available)</label>
+                  {keysLoading ? (
+                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '8px 0' }}>
+                      Loading keys...
+                    </div>
+                  ) : availableKeys.length === 0 ? (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--color-warning)',
+                        padding: '12px',
+                        background: 'rgba(217,119,6,0.08)',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid rgba(217,119,6,0.2)',
+                      }}
+                    >
+                      No pre-generated keys in stock. Switch to the <strong>⚡ Auto-Generate</strong> tab to mint a fresh key instantly.
+                    </div>
+                  ) : (
+                    <select
+                      className="form-input"
+                      value={selectedKeyValue}
+                      onChange={(e) => setSelectedKeyValue(e.target.value)}
+                    >
+                      <option value="">-- Select a product key --</option>
+                      {availableKeys.map((k) => (
+                        <option key={k.id} value={k.key}>
+                          {k.key}
+                          {k.customerEmail ? ` (pre-assigned: ${k.customerEmail})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
+              {/* Mode 3: Manual Entry */}
+              {assignMode === 'manual' && (
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label>Enter Key Manually</label>
                   <input
                     className="form-input text-mono"
                     placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
@@ -716,7 +748,29 @@ export function VerificationsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Notice */}
+              <div
+                style={{
+                  padding: '10px 14px',
+                  background: 'var(--color-accent-subtle)',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--color-accent)',
+                  fontSize: 12,
+                  color: 'var(--color-accent)',
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'flex-start',
+                }}
+              >
+                <Mail size={14} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+                <span>
+                  Confirming will immediately send exactly one <strong>Welcome to ForgeQA</strong> email
+                  to <strong>{assignKeyItem.email}</strong> with activation instructions.
+                </span>
+              </div>
             </div>
+
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setAssignKeyItem(null)}>
                 Cancel
@@ -725,17 +779,22 @@ export function VerificationsPage() {
                 className="btn btn-primary"
                 disabled={
                   actionLoading === assignKeyItem.pendingId ||
-                  (!useManualKey && !selectedKeyValue) ||
-                  (useManualKey && !manualKey.trim())
+                  (assignMode === 'inventory' && !selectedKeyValue) ||
+                  (assignMode === 'manual' && !manualKey.trim())
                 }
                 onClick={handleAssignKey}
               >
                 {actionLoading === assignKeyItem.pendingId ? (
-                  'AssigningΓÇª'
+                  'Assigning & Sending...'
+                ) : assignMode === 'auto' ? (
+                  <>
+                    <Sparkles size={14} strokeWidth={2} />
+                    Generate Key &amp; Send Welcome Email
+                  </>
                 ) : (
                   <>
                     <Mail size={14} strokeWidth={2} />
-                    Assign &amp; Send Welcome Email
+                    Assign Key &amp; Send Welcome Email
                   </>
                 )}
               </button>
