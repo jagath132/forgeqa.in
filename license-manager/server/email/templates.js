@@ -24,6 +24,7 @@ export function getVerificationEmailHtml({
   const title = approved ? 'Welcome to ForgeQA' : 'ForgeQA registration update';
   const content = approved
     ? `<p>Good news — your ForgeQA registration has been approved. We’re glad to welcome you!</p>
+       <p><strong>Registration status:</strong> Approved</p>
        <p>Your product key is:</p>
        <div style="background:#f8fafc;border:1px dashed #94a3b8;border-radius:8px;padding:16px;text-align:center;font-family:Consolas,'Courier New',monospace;font-size:20px;font-weight:700;letter-spacing:2px;color:#0f172a;">${escapeHtml(productKey)}</div>
        <h2 style="font-size:16px;color:#0f172a;margin:24px 0 8px;">Activate your account</h2>

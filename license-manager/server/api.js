@@ -152,23 +152,18 @@ export function createApiMiddleware(env) {
       // Internal endpoints (bypass admin auth)
       if (url.pathname === '/api/internal/register-key' && req.method === 'POST') {
         const rawBody = await readRequestBody(req);
-        const { email, name } = JSON.parse(rawBody || '{}');
+        const { email } = JSON.parse(rawBody || '{}');
         if (!email) {
           sendJson(res, 400, { error: 'Email is required.' });
           return;
         }
         try {
-          const { generateProductKeys, listProductKeys } = await import('./keys/service.js');
+          const { generateProductKeys } = await import('./keys/service.js');
           const keys = await generateProductKeys(1, {
             customerEmail: email,
             notes: 'Free plan registration',
           });
           const key = keys[0];
-          const { sendProductKeyEmail } = await import('./email/service.js');
-          const appUrl =
-            process.env.app_forgeqa_in_APP_URL || process.env.APP_URL || 'http://127.0.0.1:5173';
-          const completeUrl = `${appUrl}/auth/complete-registration?email=${encodeURIComponent(email)}&key=${key}`;
-          await sendProductKeyEmail(email, key, name || '', completeUrl);
           sendJson(res, 200, { key, email });
         } catch (err) {
           sendJson(res, 500, { error: err.message });
@@ -1022,7 +1017,7 @@ export function createApiMiddleware(env) {
                 notificationEmailError: null,
                 notificationEmailAttemptedAt: approvedAt,
               },
-            },
+            }
           );
         } catch (err) {
           if (generatedNewKey) {
@@ -1071,10 +1066,12 @@ export function createApiMiddleware(env) {
         } catch (err) {
           emailStatus = 'failed';
           emailError = err.message || 'Email delivery failed.';
-          await db.collection('pending_registrations').updateOne(
-            { pendingId },
-            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-          );
+          await db
+            .collection('pending_registrations')
+            .updateOne(
+              { pendingId },
+              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+            );
           console.error(`Approval email failed for ${pending.email}:`, err);
         }
         await logAudit({
@@ -1154,10 +1151,12 @@ export function createApiMiddleware(env) {
         } catch (emailErr) {
           emailStatus = 'failed';
           emailError = emailErr.message || 'Email delivery failed.';
-          await db.collection('pending_registrations').updateOne(
-            { pendingId },
-            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-          );
+          await db
+            .collection('pending_registrations')
+            .updateOne(
+              { pendingId },
+              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+            );
           console.error(`Rejection email failed for ${pending.email}:`, emailErr);
         }
         await logAudit({
@@ -1249,10 +1248,12 @@ export function createApiMiddleware(env) {
         } catch (err) {
           emailStatus = 'failed';
           emailError = err.message || 'Email delivery failed.';
-          await db.collection('pending_registrations').updateOne(
-            { pendingId },
-            { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
-          );
+          await db
+            .collection('pending_registrations')
+            .updateOne(
+              { pendingId },
+              { $set: { notificationEmailStatus: 'failed', notificationEmailError: emailError } }
+            );
           console.error(`Verification email retry failed for ${pending.email}:`, err);
         }
         await logAudit({
