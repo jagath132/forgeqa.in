@@ -193,8 +193,6 @@ export function GeneratorPage() {
 
   const [requirement, setRequirement] = useState('');
   const [outputFormat, setOutputFormat] = useState<'standard' | 'gherkin'>('standard');
-  const [techniques, setTechniques] = useState<string[]>([]);
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.92);
   const [refinement, setRefinement] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [refinementHistory, setRefinementHistory] = useState<
@@ -267,8 +265,8 @@ export function GeneratorPage() {
           requirement: requirementText,
           provider,
           format: outputFormat,
-          techniques,
-          similarityThreshold,
+          techniques: [],
+          similarityThreshold: 0.92,
         }),
         signal: abortController.signal,
       });
@@ -376,8 +374,8 @@ export function GeneratorPage() {
         requirement,
         provider,
         format: outputFormat,
-        techniques,
-        similarityThreshold,
+        techniques: [],
+        similarityThreshold: 0.92,
       });
       setQaResult(response.data);
       setOutputFormat(response.data.format ?? outputFormat);
@@ -413,7 +411,7 @@ export function GeneratorPage() {
         knowledgeContext: qaResult.knowledgeContext,
         provider,
         format: outputFormat,
-        similarityThreshold,
+        similarityThreshold: 0.92,
         conversation: refinementHistory,
       });
       setQaResult(response.data);
@@ -572,79 +570,6 @@ export function GeneratorPage() {
                     </svg>
                   </button>
                 )}
-              </div>
-              <div
-                className="mt-4 space-y-3 rounded-xl p-4"
-                style={{ background: 'var(--bg-secondary)' }}
-              >
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                  <label
-                    className="flex items-center gap-2 text-xs font-medium"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={outputFormat === 'gherkin'}
-                      onChange={(event) =>
-                        setOutputFormat(event.target.checked ? 'gherkin' : 'standard')
-                      }
-                      className="accent-[var(--accent)]"
-                    />
-                    BDD / Gherkin steps
-                  </label>
-                  <label
-                    className="flex items-center gap-2 text-xs font-medium"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    Similarity merge
-                    <input
-                      aria-label="Similarity merge threshold"
-                      type="range"
-                      min="0.70"
-                      max="0.99"
-                      step="0.01"
-                      value={similarityThreshold}
-                      onChange={(event) => setSimilarityThreshold(Number(event.target.value))}
-                    />
-                    <span className="font-mono">{similarityThreshold.toFixed(2)}</span>
-                  </label>
-                </div>
-                <div>
-                  <p
-                    className="mb-2 text-xs font-semibold"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    QA coverage presets
-                  </p>
-                  <div className="flex flex-wrap gap-x-4 gap-y-2">
-                    {[
-                      ['equivalence', 'Equivalence partitioning'],
-                      ['boundary', 'Boundary value analysis'],
-                      ['state', 'State transition'],
-                      ['pairwise', 'Pairwise combinatorial'],
-                    ].map(([id, label]) => (
-                      <label
-                        key={id}
-                        className="flex items-center gap-1.5 text-xs"
-                        style={{ color: 'var(--text-muted)' }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={techniques.includes(id)}
-                          onChange={(event) =>
-                            setTechniques((current) =>
-                              event.target.checked
-                                ? [...current, id]
-                                : current.filter((item) => item !== id)
-                            )
-                          }
-                          className="accent-[var(--accent)]"
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
               {error ? (
                 <p
