@@ -112,11 +112,11 @@ export const PLANS = {
 
 export async function seedPlans() {
   const db = getDb();
-  for (const plan of Object.values(PLANS)) {
-    await db
-      .collection('subscription_plans')
-      .updateOne({ tier: plan.tier }, { $set: plan }, { upsert: true });
-  }
+  await db.collection('subscription_plans').bulkWrite(
+    Object.values(PLANS).map((plan) => ({
+      updateOne: { filter: { tier: plan.tier }, update: { $set: plan }, upsert: true },
+    }))
+  );
 }
 
 export async function getUserPlan(userId) {

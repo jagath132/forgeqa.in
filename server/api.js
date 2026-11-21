@@ -300,6 +300,7 @@ export function createApiMiddleware(env = {}) {
   // promise so the next request retries, instead of latching a rejected
   // promise and answering 503 "Database not connected" until restart.
   let dbReady = null;
+  let plansReady = null;
   let lastDbError = null;
   let nextDbAttemptAt = 0;
   const DB_RETRY_COOLDOWN_MS = 2000;
@@ -313,116 +314,11 @@ export function createApiMiddleware(env = {}) {
     nextDbAttemptAt = Date.now() + DB_RETRY_COOLDOWN_MS;
 
     dbReady = connectDb()
-      .then(async () => {
+      .then(() => {
         // Connection is live — stop failing fast with the stale error.
         lastDbError = null;
-        try {
-          store = createKnowledgeStore();
-          knowledge = createKnowledgeService(store, env);
-          const { seedPlans } = await import('./billing/plans.js');
-          await seedPlans();
-
-          const plansDb = getDb();
-          const defaults = [
-            {
-              id: 'free',
-              name: 'Free',
-              price: 0,
-              currency: 'inr',
-              period: 'monthly',
-              description: 'Get started with essential testing tools at no cost.',
-              features: [
-                '100 test cases/month',
-                '1 AI provider',
-                'Basic reporting',
-                'Community support',
-                '1 user',
-              ],
-              popular: false,
-              active: true,
-              sortOrder: 1,
-              maxUsers: 1,
-              maxTestCases: 100,
-              aiProviders: 1,
-              advancedExport: false,
-              regressionTesting: false,
-              prioritySupport: false,
-              customIntegrations: false,
-              onPremise: false,
-            },
-            {
-              id: 'pro',
-              name: 'Pro',
-              price: 99900,
-              currency: 'inr',
-              period: 'monthly',
-              description: 'For teams that need advanced testing and analytics.',
-              features: [
-                'Unlimited test cases',
-                '5 AI providers',
-                'Advanced reporting & export',
-                'Regression testing',
-                'Email support',
-                'Up to 10 users',
-              ],
-              popular: true,
-              active: true,
-              sortOrder: 2,
-              maxUsers: 10,
-              maxTestCases: null,
-              aiProviders: 5,
-              advancedExport: true,
-              regressionTesting: true,
-              prioritySupport: false,
-              customIntegrations: false,
-              onPremise: false,
-            },
-            {
-              id: 'enterprise',
-              name: 'Enterprise',
-              price: 0,
-              currency: 'inr',
-              period: 'monthly',
-              description: 'Custom solutions for large organizations. Contact us for pricing.',
-              features: [
-                'Everything in Pro',
-                'Unlimited users',
-                'All AI providers',
-                'Custom integrations',
-                'On-premise deployment',
-                'Priority support',
-                'Dedicated account manager',
-                'SLA guarantee',
-              ],
-              popular: false,
-              active: true,
-              sortOrder: 3,
-              maxUsers: null,
-              maxTestCases: null,
-              aiProviders: null,
-              advancedExport: true,
-              regressionTesting: true,
-              prioritySupport: true,
-              customIntegrations: true,
-              onPremise: true,
-            },
-          ];
-          for (const plan of defaults) {
-            await plansDb.collection('plans').updateOne(
-              { id: plan.id },
-              {
-                $set: { ...plan, updatedAt: new Date().toISOString() },
-                $setOnInsert: { createdAt: new Date().toISOString() },
-              },
-              { upsert: true }
-            );
-          }
-        } catch (setupErr) {
-          // Setup/seeding must not mark the database unavailable: the connection
-          // is live, so serve requests and retry the setup on the next request.
-          dbReady = null;
-          console.error('Post-connect setup failed (will retry):', setupErr.message || setupErr);
-        }
+        store = createKnowledgeStore();
+        knowledge = createKnowledgeService(store, env);
       })
       .catch((err) => {
         dbReady = null;
@@ -432,6 +328,117 @@ export function createApiMiddleware(env = {}) {
       });
 
     return dbReady;
+  }
+
+  function getPlansReady() {
+    if (plansReady) return plansReady;
+    plansReady = (async () => {
+      const { seedPlans } = await import('./billing/plans.js');
+      const defaults = [
+        {
+          id: 'free',
+          name: 'Free',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Get started with essential testing tools at no cost.',
+          features: [
+            '100 test cases/month',
+            '1 AI provider',
+            'Basic reporting',
+            'Community support',
+            '1 user',
+          ],
+          popular: false,
+          active: true,
+          sortOrder: 1,
+          maxUsers: 1,
+          maxTestCases: 100,
+          aiProviders: 1,
+          advancedExport: false,
+          regressionTesting: false,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'pro',
+          name: 'Pro',
+          price: 99900,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'For teams that need advanced testing and analytics.',
+          features: [
+            'Unlimited test cases',
+            '5 AI providers',
+            'Advanced reporting & export',
+            'Regression testing',
+            'Email support',
+            'Up to 10 users',
+          ],
+          popular: true,
+          active: true,
+          sortOrder: 2,
+          maxUsers: 10,
+          maxTestCases: null,
+          aiProviders: 5,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: false,
+          customIntegrations: false,
+          onPremise: false,
+        },
+        {
+          id: 'enterprise',
+          name: 'Enterprise',
+          price: 0,
+          currency: 'inr',
+          period: 'monthly',
+          description: 'Custom solutions for large organizations. Contact us for pricing.',
+          features: [
+            'Everything in Pro',
+            'Unlimited users',
+            'All AI providers',
+            'Custom integrations',
+            'On-premise deployment',
+            'Priority support',
+            'Dedicated account manager',
+            'SLA guarantee',
+          ],
+          popular: false,
+          active: true,
+          sortOrder: 3,
+          maxUsers: null,
+          maxTestCases: null,
+          aiProviders: null,
+          advancedExport: true,
+          regressionTesting: true,
+          prioritySupport: true,
+          customIntegrations: true,
+          onPremise: true,
+        },
+      ];
+      const timestamp = new Date().toISOString();
+      await Promise.all([
+        seedPlans(),
+        getDb().collection('plans').bulkWrite(
+          defaults.map((plan) => ({
+            updateOne: {
+              filter: { id: plan.id },
+              update: {
+                $set: { ...plan, updatedAt: timestamp },
+                $setOnInsert: { createdAt: timestamp },
+              },
+              upsert: true,
+            },
+          }))
+        ),
+      ]);
+    })().catch((error) => {
+      plansReady = null;
+      console.error('Plan setup failed (will retry):', error.message || error);
+    });
+    return plansReady;
   }
 
   // Start connecting immediately: startup background jobs (model sync, health
@@ -492,6 +499,7 @@ export function createApiMiddleware(env = {}) {
     try {
       // 0b. Plans lookup — public (used during registration flow)
       if (url.pathname === '/api/plans' && req.method === 'GET') {
+        await getPlansReady();
         const db = getDb();
         const plans = await db
           .collection('plans')
@@ -503,6 +511,9 @@ export function createApiMiddleware(env = {}) {
       }
 
       // 1. Try auth routes (register, login, forgot-password, reset-password, /me, api-keys)
+      if (url.pathname === '/api/auth/select-plan' && req.method === 'POST') {
+        await getPlansReady();
+      }
       const matched = await handleAuthRoute(req, res, url);
       if (matched) return;
 
@@ -776,6 +787,7 @@ export function createApiMiddleware(env = {}) {
         }
         if (url.pathname === '/api/admin/billing/plans' && req.method === 'GET') {
           const { getDb } = await import('./db.js');
+          await getPlansReady();
           const plans = await getDb().collection('subscription_plans').find({}).toArray();
           sendJson(res, 200, { plans: plans.map((p) => ({ ...p, id: p._id.toString() })) });
           return;

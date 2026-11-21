@@ -41,7 +41,7 @@ export async function findProductKeyByEmail(email) {
 }
 
 export async function findProductKeyByUserId(userId) {
-  return keyColl().findOne({ usedBy: userId });
+  return keyColl().findOne({ usedBy: userId }, { projection: { key: 1, usedAt: 1, _id: 0 } });
 }
 
 export async function getKeyStats() {

@@ -295,9 +295,10 @@ export async function changePassword(currentPassword: string, newPassword: strin
   await api.put('/api/auth/password', { currentPassword, newPassword });
 }
 
-export async function getProductKey() {
+export async function getProductKey(signal?: AbortSignal) {
   const res = await api.get<{ productKey: { key: string; activatedAt: string } | null }>(
-    '/api/user/product-key'
+    '/api/user/product-key',
+    { signal, timeout: 15000 }
   );
   return res.data.productKey;
 }

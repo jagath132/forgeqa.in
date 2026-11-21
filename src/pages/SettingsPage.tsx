@@ -86,7 +86,8 @@ export function SettingsPage() {
   const [localName, setLocalName] = useState(profileName);
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
-  const [productKey, setProductKey] = useState<{ key: string; activatedAt: string } | null>(null);
+  const [productKey, setProductKey] = useState<{ key: string; activatedAt: string } | null>();
+  const [productKeyError, setProductKeyError] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,8 +178,23 @@ export function SettingsPage() {
         setLocalName('');
       }
     });
-    getProductKey().then(setProductKey);
   }, [user, setProfileName]);
+
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    setProductKey(undefined);
+    setProductKeyError(false);
+    getProductKey(controller.signal)
+      .then((key) => {
+        if (!controller.signal.aborted) setProductKey((current) => current ?? key);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setProductKeyError(true);
+      });
+    return () => controller.abort();
+  }, [userId]);
 
   useEffect(() => {
     const saved = localStorage.getItem('nextest_picture');
@@ -815,9 +831,9 @@ export function SettingsPage() {
                         </p>
                         {productKey ? (
                           <Badge variant="success">Active</Badge>
-                        ) : (
+                        ) : productKey === null ? (
                           <Badge variant="muted">Inactive</Badge>
-                        )}
+                        ) : null}
                       </div>
                       <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
                         License access
@@ -841,7 +857,11 @@ export function SettingsPage() {
                     </div>
                   ) : (
                     <p className="text-sm flex-1 px-1" style={{ color: 'var(--color-text-muted)' }}>
-                      No product key associated with this account.
+                      {productKeyError
+                        ? 'Unable to load the product key. Reload the page to try again.'
+                        : productKey === undefined
+                          ? 'Loading product key…'
+                          : 'No product key associated with this account.'}
                     </p>
                   )}
                 </div>

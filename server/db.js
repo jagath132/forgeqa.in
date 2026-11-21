@@ -103,6 +103,7 @@ async function ensureIndexes(targetDb) {
     targetDb.collection('product_keys').createIndex({ key: 1 }, { unique: true }),
     targetDb.collection('product_keys').createIndex({ customerEmail: 1 }),
     targetDb.collection('product_keys').createIndex({ status: 1 }),
+    targetDb.collection('product_keys').createIndex({ usedBy: 1 }),
     targetDb.collection('admins').createIndex({ email: 1 }, { unique: true }),
     targetDb.collection('rate_limits').createIndex({ ip: 1, endpoint: 1 }, { unique: true }),
     targetDb.collection('rate_limits').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),

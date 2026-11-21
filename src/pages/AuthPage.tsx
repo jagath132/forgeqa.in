@@ -145,12 +145,9 @@ export function AuthPage() {
           localStorage.setItem('forgeqa_device_token', res.data.deviceToken);
         }
         setBtnSuccess(true);
-        // Navigate immediately — secondary data loads in the background
-        requestAnimationFrame(() => {
-          const isNewUser = !res.data.user.has_seen_welcome;
-          loginUser(res.data.user);
-          navigate(isNewUser ? '/dashboard?welcome=true' : '/dashboard');
-        });
+        const isNewUser = !res.data.user.has_seen_welcome;
+        loginUser(res.data.user);
+        navigate(isNewUser ? '/dashboard?welcome=true' : '/dashboard');
       } else {
         const res = await api.post<{ message: string }>('/api/auth/forgot-password', { email });
         setSuccessMessage(res.data.message);

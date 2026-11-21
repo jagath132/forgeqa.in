@@ -63,7 +63,8 @@ export function ProfilePage() {
   const [localName, setLocalName] = useState(profileName);
   const [nameSaving, setNameSaving] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
-  const [productKey, setProductKey] = useState<{ key: string; activatedAt: string } | null>(null);
+  const [productKey, setProductKey] = useState<{ key: string; activatedAt: string } | null>();
+  const [productKeyError, setProductKeyError] = useState(false);
   const [supportSent, setSupportSent] = useState(false);
   const [supportForm, setSupportForm] = useState({ name: '', email: '', subject: '', message: '' });
 
@@ -101,8 +102,23 @@ export function ProfilePage() {
         setLocalName(profile.displayName);
       }
     });
-    getProductKey().then(setProductKey);
   }, [user, setProfileName]);
+
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    setProductKey(undefined);
+    setProductKeyError(false);
+    getProductKey(controller.signal)
+      .then((key) => {
+        if (!controller.signal.aborted) setProductKey((current) => current ?? key);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setProductKeyError(true);
+      });
+    return () => controller.abort();
+  }, [userId]);
 
   function handleSaveName() {
     const name = localName.trim();
@@ -354,7 +370,11 @@ export function ProfilePage() {
                 Product Key
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                No product key associated with this account.
+                {productKeyError
+                        ? 'Unable to load the product key. Reload the page to try again.'
+                        : productKey === undefined
+                          ? 'Loading product key…'
+                          : 'No product key associated with this account.'}
               </p>
             </div>
           </div>
