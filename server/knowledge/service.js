@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { chunkText } from './chunker.js';
 import { extractTextFromBuffer, extractTextFromFile, getFileType } from './parsers.js';
-import { createEmbeddings } from '../ai/embeddings.js';
+import { createEmbeddings, supportsEmbeddings } from '../ai/embeddings.js';
 
 export function createKnowledgeService(store, env = {}) {
   function withoutExtractedText(file) {
@@ -160,7 +160,10 @@ export function createKnowledgeService(store, env = {}) {
 
     async refreshChunks(userId, { provider, apiKey } = {}) {
       const files = await store.listChunkableFiles(userId);
+      let canEmbed = Boolean(apiKey) && supportsEmbeddings(provider);
+      let fileCount = 0;
       let chunkCount = 0;
+      let keywordOnlyFileCount = 0;
 
       for (const file of files) {
         const chunks = chunkText(file.extracted_text, {
@@ -180,41 +183,53 @@ export function createKnowledgeService(store, env = {}) {
           continue;
         }
 
-        if (!provider || !apiKey) {
-          throw new Error('Select an AI provider with a configured API key to create embeddings.');
+        if (canEmbed) {
+          const vectors = [];
+          try {
+            for (let offset = 0; offset < chunks.length; offset += 64) {
+              const batch = chunks.slice(offset, offset + 64);
+              vectors.push(
+                ...(await createEmbeddings({
+                  apiKey,
+                  provider,
+                  inputs: batch.map((chunk) => chunk.chunk_text),
+                }))
+              );
+            }
+            chunks.forEach((chunk, index) => {
+              chunk.embedding = vectors[index];
+            });
+          } catch {
+            canEmbed = false;
+          }
         }
-        const vectors = [];
-        for (let offset = 0; offset < chunks.length; offset += 64) {
-          const batch = chunks.slice(offset, offset + 64);
-          vectors.push(
-            ...(await createEmbeddings({
-              apiKey,
-              provider,
-              inputs: batch.map((chunk) => chunk.chunk_text),
-            }))
-          );
-        }
-        chunks.forEach((chunk, index) => {
-          chunk.embedding = vectors[index];
-        });
+        if (!canEmbed && file.status === 'ready') continue;
+
         await store.replaceChunks(file.id, chunks, userId);
+        fileCount += 1;
         chunkCount += chunks.length;
+        if (!canEmbed) keywordOnlyFileCount += 1;
       }
 
       return {
-        fileCount: files.length,
+        fileCount,
         chunkCount,
+        keywordOnlyFileCount,
       };
     },
 
     async searchChunks(query, limit, userId, fileId, embeddingOptions = {}) {
       let queryEmbedding = null;
-      if (embeddingOptions.provider && embeddingOptions.apiKey) {
-        [queryEmbedding] = await createEmbeddings({
-          ...embeddingOptions,
-          embeddingTaskType: 'RETRIEVAL_QUERY',
-          inputs: [query],
-        });
+      if (query.trim() && supportsEmbeddings(embeddingOptions.provider) && embeddingOptions.apiKey) {
+        try {
+          [queryEmbedding] = await createEmbeddings({
+            ...embeddingOptions,
+            embeddingTaskType: 'RETRIEVAL_QUERY',
+            inputs: [query],
+          });
+        } catch {
+          // Stored text remains searchable if the embedding provider is unavailable.
+        }
       }
       return store.searchChunks(query, limit, userId, fileId, queryEmbedding);
     },

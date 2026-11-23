@@ -134,7 +134,7 @@ export function ChunkSlicePreviewModal({ file, onClose }: ChunkSlicePreviewModal
             <div className="space-y-3 py-8 text-center">
               <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
               <p className="text-xs text-slate-500">
-                Retrieving vector slices from knowledge index...
+                Retrieving chunks from the knowledge index...
               </p>
             </div>
           ) : filteredChunks.length === 0 ? (

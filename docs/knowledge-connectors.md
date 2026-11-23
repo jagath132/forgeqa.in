@@ -20,8 +20,9 @@ repositories so it does not request broad private-repository access. The first
 sync indexes at most 100 documents per connector; GitHub sync scans up to 20
 recently updated repositories and indexes up to 10 Markdown files per repository.
 
-Auto-sync defaults to hourly and checks for due work while the Knowledge Base
-page is open. Choose a different interval or turn it off in the connector card.
+Auto-sync settings default to hourly. API clients can change the interval or
+disable it and call the due-sync endpoint to check for work. See the
+[Knowledge Base API reference](../forgeqa-module-specs/05-knowledge-base.md#api-contract).
 Semantic indexing additionally requires a configured Gemini, OpenAI, or
 OpenRouter provider with embedding support. Connector documents can be synced
 first and indexed later from **Create / Refresh Chunks**.

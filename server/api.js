@@ -925,16 +925,9 @@ export function createApiMiddleware(env = {}) {
         const rawBody = await readRequestBody(req);
         const { provider: requestedProvider } = JSON.parse(rawBody || '{}');
         const provider = requestedProvider || user.activeProvider;
-        if (!provider) {
-          sendJson(res, 400, { error: 'Select an AI provider before creating embeddings.' });
-          return;
-        }
-        const apiKey = await resolveApiKey(provider, null, env, user.id);
-        if (!apiKey) {
-          sendJson(res, 400, { error: `Missing ${provider} API key. Configure it in Settings.` });
-          return;
-        }
-        const result = await knowledge.refreshChunks(user.id, { provider, apiKey });
+        const apiKey = provider ? await resolveApiKey(provider, null, env, user.id) : '';
+        const embeddingOptions = await resolveEmbeddingOptions(provider, apiKey, env, user.id);
+        const result = await knowledge.refreshChunks(user.id, embeddingOptions ?? {});
         sendJson(res, 200, result);
         return;
       }
@@ -1629,13 +1622,8 @@ export function createApiMiddleware(env = {}) {
 
           const provider = user.activeProvider;
           const apiKey = provider ? await resolveApiKey(provider, null, env, user.id) : '';
-          if (!provider || !apiKey) {
-            sendJson(res, 400, {
-              error: 'Select an AI provider and configure its API key before indexing this PRD.',
-            });
-            return;
-          }
-          const refreshResult = await knowledge.refreshChunks(user.id, { provider, apiKey });
+          const embeddingOptions = await resolveEmbeddingOptions(provider, apiKey, env, user.id);
+          const refreshResult = await knowledge.refreshChunks(user.id, embeddingOptions ?? {});
           sendJson(res, 200, { ok: true, file, chunkCount: refreshResult.chunkCount });
         } catch (kbError) {
           sendJson(res, 500, { error: kbError.message || 'Failed to save PRD to Knowledge Base.' });
