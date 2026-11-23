@@ -18,6 +18,12 @@ Test Scripts at `/test-scripts` transforms selected cases from the current matri
 3. Framework mode requests page-object, test-spec, and API-spec content and combines the available output with framework-specific scaffolding. Individual AI-generation failures can fall back to scaffold defaults. The response includes project metadata and files with path, content, and language.
 4. The code viewer presents generated files for review, copy, individual download, and framework ZIP download. Saved-script history and the current framework project use browser storage.
 
+## Static preview and execution logs
+
+Static Preview lists recognizable test declarations, literal target URLs, and locator references from the selected file, with source line numbers. Its pattern-based inspection can miss dynamic values and unsupported syntax. Download Log saves that inspection as text.
+
+For execution output, run the downloaded project with its framework runner. For example, from the Selenium Java project directory in PowerShell, run `mvn test 2>&1 | Tee-Object -FilePath selenium-run.log`. Select Import Run Log in Static Preview to view that file. Copy Logs and Download Log preserve the imported text.
+
 Failure diagnosis takes an error log and optional locator, URL, and case summary. The returned data can include a root cause, category, confidence score, flaky flag, suggested locator, fix, and prevention advice.
 
 ## API contract

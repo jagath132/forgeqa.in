@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import { TestScriptCodeViewer } from './TestScriptCodeViewer';
 
@@ -10,30 +10,29 @@ describe('TestScriptCodeViewer static preview', () => {
     });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('does not report generated test blocks as passed without an executor', () => {
-    const script = `test('rejects invalid email', async () => {
-  await page.goto('https://example.com');
-  await page.getByLabel('Email').fill('not-an-email');
-});`;
+  it('reports declarations and locators from Selenium source without fabricating execution results', async () => {
+    const script = `// @Test void commentedOut() {}
+class WorkflowTest {
+  @Test
+  void rejectsInvalidEmail() {
+    driver.findElement(By.id("email")).sendKeys("invalid");
+  }
+}`;
 
     render(
       <TestScriptCodeViewer
         scriptResult={null}
         frameworkProject={{
           projectName: 'test-project',
-          framework: 'playwright',
-          language: 'typescript',
+          framework: 'selenium',
+          language: 'java',
           targetUrl: 'https://example.com',
           testCasesCount: 1,
-          files: [{ path: 'workflow.spec.ts', content: script, language: 'typescript' }],
+          files: [{ path: 'WorkflowTest.java', content: script, language: 'java' }],
         }}
         isLoading={false}
-        framework="playwright"
-        language="typescript"
+        framework="selenium"
+        language="java"
         onClear={vi.fn()}
         onCopy={vi.fn()}
         onDownload={vi.fn()}
@@ -42,15 +41,17 @@ describe('TestScriptCodeViewer static preview', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Static Preview' }));
-    vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Run Static Preview' }));
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(screen.getByText(/0 passed, 0 failed, 1 not run/)).toBeInTheDocument();
+    expect(screen.getByText('Line 3 | Test | rejectsInvalidEmail')).toBeInTheDocument();
+    expect(screen.getByText('Line 5 | Locator | email')).toBeInTheDocument();
+    expect(screen.queryByText(/commentedOut|example\.com|0 passed|Test Case 1/)).not.toBeInTheDocument();
     expect(screen.getByText(/no test executor is configured/i)).toBeInTheDocument();
-    expect(screen.queryByText(/completed successfully/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/not contacted in static preview/i)).toBeInTheDocument();
+
+    const log = 'Tests run: 1, Failures: 1\nExpected valid email';
+    fireEvent.change(screen.getByLabelText('Import Run Log'), {
+      target: { files: [{ name: 'selenium.log', text: async () => log }] },
+    });
+    expect((await screen.findByText(/Expected valid email/)).textContent).toBe(log);
+    expect(screen.getByRole('button', { name: 'Download Log' })).toBeInTheDocument();
   });
 });

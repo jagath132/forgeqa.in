@@ -81,181 +81,38 @@ function getFileIcon(path: string) {
   return { label: 'JS', color: 'text-cyan-400 bg-cyan-950/60 border-cyan-800/50' };
 }
 
-interface ParsedTestCase {
-  id: string;
-  name: string;
-  line: number;
-  locators: string[];
-  actions: string[];
-  assertions: string[];
-}
+function analyzeTestScript(code: string, language: string) {
+  const commentsAndStrings = language === 'python'
+    ? /"""[\s\S]*?"""|'''[\s\S]*?'''|#[^\r\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g
+    : /\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\x60(?:\\.|[^\x60\\])*\x60/g;
+  const mask = (text: string) => text.replace(/[^\r\n]/g, ' ');
+  const source = code.replace(commentsAndStrings, (token) =>
+    token.startsWith('/') || token.startsWith('#') ? mask(token) : token
+  );
+  const structure = code.replace(commentsAndStrings, mask);
+  const testPattern = language === 'java'
+    ? /@(?:[\w.]+\.)?(?:Test|ParameterizedTest|RepeatedTest)\b(?:\s*\([^)]*\))?(?:\s*@[\w.]+(?:\s*\([^)]*\))?)*\s+(?:(?:public|protected|private|static|final)\s+)*void\s+(\w+)\s*\(/g
+    : language === 'csharp'
+      ? /\[(?:Test|Fact|Theory|TestMethod)(?:\([^)]*\))?\](?:\s*\[[^\]]*\])*\s+(?:(?:public|private|protected|internal|async|static)\s+)*(?:void|Task)\s+(\w+)\s*\(/g
+      : language === 'python'
+        ? /^\s*(?:async\s+)?def\s+(test_\w+)\s*\(/gm
+        : /\b(?:test|it)(?:\.(?:only|skip|todo|fixme|fail))?\s*\(\s*(['"\x60])((?:\\.|(?!\1)[^\r\n])*)\1/g;
 
-interface ScriptAnalysis {
-  totalLines: number;
-  targetUrl: string;
-  tests: ParsedTestCase[];
-  locatorsList: string[];
-  totalLocators: number;
-  syntaxErrors: string[];
-  syntaxWarnings: string[];
-}
-
-function analyzeTestScript(
-  code: string,
-  fileName: string,
-  frameworkName: string,
-  fallbackCases?: Array<{ tcId?: string; title?: string }>
-): ScriptAnalysis {
-  const lines = code.split('\n');
-  const targetUrls: string[] = [];
-  const locatorsSet = new Set<string>();
-  const syntaxErrors: string[] = [];
-  const syntaxWarnings: string[] = [];
-
-  // 1. Bracket & delimiter balance check
-  let curly = 0;
-  let round = 0;
-  let square = 0;
-  for (let i = 0; i < code.length; i++) {
-    const char = code[i];
-    if (char === '{') curly++;
-    else if (char === '}') curly--;
-    else if (char === '(') round++;
-    else if (char === ')') round--;
-    else if (char === '[') square++;
-    else if (char === ']') square--;
-  }
-
-  if (curly !== 0)
-    syntaxErrors.push(
-      `Unmatched curly braces '{ }' (difference: ${curly > 0 ? `+${curly}` : curly})`
-    );
-  if (round !== 0)
-    syntaxErrors.push(
-      `Unmatched parentheses '( )' (difference: ${round > 0 ? `+${round}` : round})`
-    );
-  if (square !== 0)
-    syntaxErrors.push(
-      `Unmatched square brackets '[ ]' (difference: ${square > 0 ? `+${square}` : square})`
-    );
-
-  // 2. Extract URLs
-  const urlRegex = /(?:goto|visit|get)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
-  let urlMatch;
-  while ((urlMatch = urlRegex.exec(code)) !== null) {
-    if (urlMatch[1] && !targetUrls.includes(urlMatch[1])) {
-      targetUrls.push(urlMatch[1]);
-    }
-  }
-
-  // 3. Extract Locators across the file
-  const locatorRegex =
-    /(?:locator|getByRole|getByText|getByLabel|getByPlaceholder|getByTestId|get|contains|findElement)\s*\(\s*['"`]([^'"`]+)['"`]/g;
-  let locMatch;
-  while ((locMatch = locatorRegex.exec(code)) !== null) {
-    if (locMatch[1]) locatorsSet.add(locMatch[1]);
-  }
-
-  // 4. Extract Tests
-  const tests: ParsedTestCase[] = [];
-  const testRegex = /(?:test|it)\s*\(\s*['"`]([^'"`]+)['"`]/g;
-  let tMatch;
-  while ((tMatch = testRegex.exec(code)) !== null) {
-    const testName = tMatch[1];
-    const lineNum = code.slice(0, tMatch.index).split('\n').length;
-    tests.push({
-      id: `tc-${tests.length + 1}`,
-      name: testName,
-      line: lineNum,
-      locators: Array.from(locatorsSet).slice(tests.length * 2, tests.length * 2 + 3),
-      actions: ['navigate', 'verify-element', 'interact', 'assert'],
-      assertions: ['expect(locator).toBeVisible()'],
+  function extract(pattern: RegExp, group: number) {
+    return Array.from(source.matchAll(pattern)).flatMap((match) => {
+      const start = match.index + match[0].search(/\S/);
+      if (!structure[start]?.trim()) return [];
+      return [{ text: match[group], line: source.slice(0, start).split('\n').length }];
     });
   }
-
-  // Python pytest match: def test_...
-  if (tests.length === 0) {
-    const pyTestRegex = /def\s+(test_[a-zA-Z0-9_]+)/g;
-    let pyMatch;
-    while ((pyMatch = pyTestRegex.exec(code)) !== null) {
-      const testName = pyMatch[1].replace(/_/g, ' ');
-      const lineNum = code.slice(0, pyMatch.index).split('\n').length;
-      tests.push({
-        id: `tc-${tests.length + 1}`,
-        name: testName,
-        line: lineNum,
-        locators: Array.from(locatorsSet).slice(tests.length * 2, tests.length * 2 + 3),
-        actions: ['navigate', 'verify-element', 'interact', 'assert'],
-        assertions: ['assert element.is_displayed()'],
-      });
-    }
-  }
-
-  // Fallback to testCases passed from QA result
-  if (tests.length === 0 && fallbackCases && fallbackCases.length > 0) {
-    fallbackCases.forEach((tc, idx) => {
-      tests.push({
-        id: tc.tcId || `tc-${idx + 1}`,
-        name: tc.title || `Test Case ${idx + 1}`,
-        line: 1,
-        locators: Array.from(locatorsSet).slice(idx * 2, idx * 2 + 3),
-        actions: ['navigate', 'verify-element', 'interact', 'assert'],
-        assertions: ['expect(locator).toBeVisible()'],
-      });
-    });
-  }
-
-  // If still 0 and code has content
-  if (tests.length === 0 && code.trim().length > 0) {
-    const isConfig = fileName.includes('config');
-    const isPageObject = fileName.includes('.page.') || fileName.includes('Page');
-    if (isConfig) {
-      tests.push({
-        id: 'cfg-1',
-        name: `Validate ${fileName || 'Framework'} Configuration & Browser Settings`,
-        line: 1,
-        locators: [],
-        actions: ['validate-config', 'verify-browser-capabilities'],
-        assertions: ['config.isValid === true'],
-      });
-    } else if (isPageObject) {
-      tests.push({
-        id: 'po-1',
-        name: `Validate Page Object locators and interactions (${fileName})`,
-        line: 1,
-        locators: Array.from(locatorsSet),
-        actions: ['bind-locators', 'verify-actions'],
-        assertions: ['locators.length > 0'],
-      });
-    } else {
-      tests.push({
-        id: 'flow-1',
-        name: `Execute End-to-End Workflow (${fileName || frameworkName})`,
-        line: 1,
-        locators: Array.from(locatorsSet),
-        actions: ['navigate', 'verify-element', 'interact', 'assert'],
-        assertions: ['expect(page).toHaveURL()'],
-      });
-    }
-  }
-
-  // Check for missing await in JS/TS
-  lines.forEach((line, idx) => {
-    if (line.includes('page.click') || line.includes('page.fill') || line.includes('page.goto')) {
-      if (!line.includes('await') && !line.includes('return') && !line.trim().startsWith('//')) {
-        syntaxWarnings.push(`Line ${idx + 1}: Asynchronous call without 'await'.`);
-      }
-    }
-  });
 
   return {
-    totalLines: lines.length,
-    targetUrl: targetUrls[0] || 'https://example.com',
-    tests,
-    locatorsList: Array.from(locatorsSet),
-    totalLocators: locatorsSet.size,
-    syntaxErrors,
-    syntaxWarnings,
+    tests: extract(testPattern, ['java', 'csharp', 'python'].includes(language) ? 1 : 2),
+    urls: extract(/\b(?:goto|visit|get|Navigate\(\)\.GoToUrl)\s*\(\s*['"\x60](https?:\/\/[^'"\x60]+)['"\x60]/g, 1),
+    locators: extract(
+      /\b(?:By\.(?:id|name|cssSelector|xpath|className|tagName|linkText|partialLinkText)|locator|getByRole|getByText|getByLabel|getByPlaceholder|getByTestId|cy\.get|find_element)\s*\(\s*(?:By\.\w+\s*,\s*)?['"\x60]([^'"\x60]+)['"\x60]/gi,
+      1
+    ),
   };
 }
 
@@ -575,7 +432,7 @@ export const TestScriptCodeViewer: React.FC<TestScriptCodeViewerProps> = ({
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [wordWrap, setWordWrap] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [importedLog, setImportedLog] = useState<{ name: string; text: string } | null>(null);
   const [isZipping, setIsZipping] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState<string>('');
   const [fileCopied, setFileCopied] = useState(false);
@@ -583,17 +440,9 @@ export const TestScriptCodeViewer: React.FC<TestScriptCodeViewerProps> = ({
   const [simLogs, setSimLogs] = useState<
     Array<{ text: string; type: 'info' | 'pass' | 'warn' | 'dim' | 'error' }>
   >([]);
-  const simTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const terminalLogsEndRef = useRef<HTMLDivElement>(null);
 
   const fwMeta = useMemo(() => getFrameworkMeta(framework, language), [framework, language]);
-
-  // Clean up timeouts on unmount
-  useEffect(() => {
-    return () => {
-      simTimeoutsRef.current.forEach(clearTimeout);
-    };
-  }, []);
 
   // Auto scroll terminal logs
   useEffect(() => {
@@ -813,156 +662,46 @@ jobs:
   };
 
   const handleCopyLogs = () => {
-    if (!simLogs.length) return;
-    const text = simLogs.map((l) => l.text).join('\n');
+    if (!simLogs.length && !importedLog) return;
+    const text = importedLog?.text ?? simLogs.map((l) => l.text).join('\n');
     navigator.clipboard.writeText(text);
     setLogsCopied(true);
     setTimeout(() => setLogsCopied(false), 2000);
   };
 
   const handleClearLogs = () => {
-    simTimeoutsRef.current.forEach(clearTimeout);
-    simTimeoutsRef.current = [];
-    setIsSimulating(false);
+    setImportedLog(null);
     setSimLogs([]);
   };
 
-  const handleSimulateRun = () => {
-    // If already simulating, clicking acts as "Stop"
-    if (isSimulating) {
-      simTimeoutsRef.current.forEach(clearTimeout);
-      simTimeoutsRef.current = [];
-      setIsSimulating(false);
-      setSimLogs((prev) => [
-        ...prev,
-        { text: `[SYSTEM] ⏹️ Simulation aborted by user.`, type: 'warn' },
-      ]);
+  const handleDownloadLogs = () => {
+    const text = importedLog?.text ?? simLogs.map((log) => log.text).join('\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = importedLog?.name ?? 'forgeqa-static-preview.txt';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleRunPreview = () => {
+    setImportedLog(null);
+    const code = currentText || '';
+    if (!code.trim()) {
+      setSimLogs([{ text: 'The selected file is empty.', type: 'warn' }]);
       return;
     }
-
-    simTimeoutsRef.current.forEach(clearTimeout);
-    simTimeoutsRef.current = [];
-
-    const codeToRun = currentText || '';
-    if (!codeToRun.trim()) {
-      setSimLogs([{ text: `[ERROR] No test script content available to execute.`, type: 'error' }]);
-      return;
-    }
-
-    setIsSimulating(true);
+    const languages: Record<string, string> = { java: 'java', cs: 'csharp', py: 'python', js: 'javascript', ts: 'typescript' };
+    const extension = currentFileName.split('.').pop()?.toLowerCase() ?? '';
+    const analysis = analyzeTestScript(code, languages[extension] ?? language);
     setSimLogs([
-      { text: `[SYSTEM] Starting ForgeQA static script preview...`, type: 'info' },
-      {
-        text: `[CONFIG] Framework: ${fwMeta.label.toUpperCase()} | Execution adapter: not configured`,
-        type: 'dim',
-      },
-      {
-        text: `[FILE] Target Spec: ${currentFileName} (${codeToRun.split('\n').length} lines)`,
-        type: 'dim',
-      },
+      { text: 'Source inspection. No test executor is configured.', type: 'dim' },
+      { text: currentFileName + ' (' + code.split('\n').length + ' lines)', type: 'info' },
+      { text: 'Detected ' + analysis.tests.length + ' test declaration(s), ' + analysis.locators.length + ' locator reference(s), and ' + analysis.urls.length + ' literal target URL(s).', type: 'info' },
+      ...analysis.tests.map(({ text, line }) => ({ text: 'Line ' + line + ' | Test | ' + text, type: 'info' as const })),
+      ...analysis.locators.map(({ text, line }) => ({ text: 'Line ' + line + ' | Locator | ' + text, type: 'dim' as const })),
+      ...analysis.urls.map(({ text, line }) => ({ text: 'Line ' + line + ' | URL | ' + text + ' (not contacted in static preview)', type: 'dim' as const })),
     ]);
-
-    const analysis = analyzeTestScript(
-      codeToRun,
-      currentFileName,
-      fwMeta.label,
-      scriptResult?.testCases
-    );
-
-    const schedule = (fn: () => void, delayMs: number) => {
-      const t = setTimeout(fn, delayMs);
-      simTimeoutsRef.current.push(t);
-    };
-
-    // Stage 1: AST static analysis & environment setup
-    schedule(() => {
-      setSimLogs((prev) => [
-        ...prev,
-        {
-          text: `[INFO] Target URL in script: ${analysis.targetUrl} (not contacted in static preview).`,
-          type: 'info',
-        },
-        {
-          text: `[AST] Static code analysis: ${analysis.tests.length} test block(s) detected, ${analysis.totalLocators} locators mapped.`,
-          type: 'info',
-        },
-      ]);
-
-      // If syntax errors found, display and stop
-      if (analysis.syntaxErrors.length > 0) {
-        setSimLogs((prev) => [
-          ...prev,
-          ...analysis.syntaxErrors.map((err) => ({
-            text: `[FAIL] Static syntax check: ${err}`,
-            type: 'error' as const,
-          })),
-          {
-            text: `[RESULT] Static preview failed: ${analysis.tests.length} test(s) not run; no tests were executed.`,
-            type: 'error',
-          },
-        ]);
-        setIsSimulating(false);
-        return;
-      }
-
-      // If syntax warnings found, report
-      if (analysis.syntaxWarnings.length > 0) {
-        analysis.syntaxWarnings.slice(0, 3).forEach((warn) => {
-          setSimLogs((prev) => [...prev, { text: `[WARN] ${warn}`, type: 'warn' }]);
-        });
-      }
-
-      // Stage 2: Report detected test blocks without claiming they were executed.
-      let currentDelay = 400;
-      analysis.tests.forEach((test, idx) => {
-        schedule(() => {
-          setSimLogs((prev) => [
-            ...prev,
-            {
-              text: `[ANALYSIS] (${idx + 1}/${analysis.tests.length}) Detected test: "${test.name}".`,
-              type: 'info',
-            },
-          ]);
-
-          if (test.locators && test.locators.length > 0) {
-            test.locators.slice(0, 2).forEach((loc) => {
-              setSimLogs((prev) => [
-                ...prev,
-                {
-                  text: `  ↳ [LOCATOR] Found in source (not runtime-verified): ${loc}`,
-                  type: 'dim',
-                },
-              ]);
-            });
-          }
-          setSimLogs((prev) => [
-            ...prev,
-            {
-              text: `[NOT RUN] "${test.name}" — static preview only; no test executor is configured.`,
-              type: 'warn',
-            },
-          ]);
-        }, currentDelay);
-
-        currentDelay += 400;
-      });
-
-      // Stage 3: Summary results
-      schedule(() => {
-        setSimLogs((prev) => [
-          ...prev,
-          {
-            text: `[INFO] ${analysis.totalLocators} locator(s) found in source; none were checked against the target page.`,
-            type: 'dim',
-          },
-          {
-            text: `[RESULT] Static preview complete: 0 passed, 0 failed, ${analysis.tests.length} not run. No tests were executed.`,
-            type: 'warn',
-          },
-        ]);
-        setIsSimulating(false);
-      }, currentDelay + 150);
-    }, 450);
   };
 
   const hasContent = !!(scriptResult || frameworkProject);
@@ -1389,7 +1128,7 @@ jobs:
                     Static Test Script Preview
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span>Static script analysis only; no browser or tests are executed</span>
+                    <span>Inspect the selected source file, or import output from a local or CI test run.</span>
                     {currentFileName && (
                       <span className="font-mono text-[10px] text-cyan-300 bg-cyan-950/60 px-1.5 py-0.5 rounded border border-cyan-800/50">
                         {currentFileName}
@@ -1398,7 +1137,7 @@ jobs:
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {simLogs.length > 0 && (
+                  {(simLogs.length > 0 || importedLog) && (
                     <>
                       <button
                         type="button"
@@ -1418,57 +1157,38 @@ jobs:
                       </button>
                     </>
                   )}
-                  <button
-                    type="button"
-                    disabled={!hasContent}
-                    onClick={handleSimulateRun}
-                    className={`px-3 py-1.5 font-semibold text-xs rounded-lg shadow transition-all flex items-center gap-1.5 text-white ${
-                      isSimulating
-                        ? 'bg-rose-600 hover:bg-rose-500'
-                        : 'bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40'
-                    }`}
+                  {(simLogs.length > 0 || importedLog) && (
+                    <button type="button" onClick={handleDownloadLogs} className="px-2 py-1 text-xs text-cyan-300">
+                      Download Log
+                    </button>
+                  )}
+                  <label className="cursor-pointer px-2 py-1 text-xs text-cyan-300">
+                    Import Run Log
+                    <input type="file" className="sr-only" accept=".txt,.log,text/plain"
+                      onChange={async (event) => {
+                        const input = event.currentTarget;
+                        const file = input.files?.[0];
+                        input.value = '';
+                        if (!file) return;
+                        try {
+                          setImportedLog({ name: file.name, text: await file.text() });
+                        } catch {
+                          setImportedLog(null);
+                          setSimLogs([{ text: 'Unable to read the selected log file.', type: 'error' }]);
+                        }
+                      }}
+                    />
+                  </label>
+                  <button type="button" disabled={!hasContent} onClick={handleRunPreview}
+                    className="px-3 py-1.5 font-semibold text-xs rounded-lg text-white bg-emerald-600 disabled:opacity-40"
                   >
-                    {isSimulating ? (
-                      <>
-                        <svg
-                          className="w-3.5 h-3.5 animate-spin"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                          />
-                        </svg>
-                        <span>Stop Runner</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                          />
-                        </svg>
-                        <span>Run Static Preview</span>
-                      </>
-                    )}
+                    Run Static Preview
                   </button>
                 </div>
               </div>
 
               <div className="flex-1 bg-slate-950 p-4 rounded-xl border border-slate-800/80 font-mono text-xs space-y-2 overflow-auto min-h-[220px]">
-                {simLogs.length === 0 ? (
+                {importedLog ? (<div><p className="text-cyan-300 mb-2">Imported run log ? {importedLog.name}</p><pre className="whitespace-pre-wrap break-words">{importedLog.text}</pre></div>) : simLogs.length === 0 ? (
                   <div className="text-slate-500 italic text-center py-10">
                     Click &ldquo;Run Static Preview&rdquo; to inspect the generated script. This
                     does not execute tests or contact the target URL.
